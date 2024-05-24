@@ -234,7 +234,7 @@ fantastic enthusiasm, starting lessons with energy and eagerness.</option>
             .then(response => response.json())
             .then(data => {
                 let report = data.report;
-                resultContainer.innerHTML += `<div>${report}</div>`;
+                resultContainer.innerHTML += `<div>----------<br />${report}<br /></div>`;
             })
             .catch(error => {
                 console.error('Error:', error);
