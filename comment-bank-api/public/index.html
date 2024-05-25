@@ -54,195 +54,163 @@
         </div>
 
         <div class="form-section">
-            <label for="interest-engagement">Interest and Engagement:</label>
-            <select id="interest-engagement">
-                <option value="">-- Select Comment --</option>
-                <option value="shows good attitude initially but sometimes struggles to maintain focus.">shows good attitude initially but sometimes struggles to maintain focus.</option>
-                <option value="has fantastic enthusiasm, starting lessons with energy and eagerness.">has
+            <label for="subject-select">Subject:</label>
+            <select id="subject-select" onchange="loadCategoriesAndComments()">
+                <option value="">-- Select Subject --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
 
-fantastic enthusiasm, starting lessons with energy and eagerness.</option>
-<option value="brings quiet confidence and ensures correct setup before starting.">brings quiet confidence and ensures correct setup before starting.</option>
-<option value="shows strong interest and enthusiasm, especially in interesting, relevant, and challenging topics.">shows strong interest and enthusiasm, especially in interesting, relevant, and challenging topics.</option>
-</select>
-</div>
-    <div class="form-section">
-        <label for="independent-study">Independent Study:</label>
-        <select id="independent-study">
-            <option value="">-- Select Comment --</option>
-            <option value="keen to learn quickly but sometimes rushes and misses mistakes.">keen to learn quickly but sometimes rushes and misses mistakes.</option>
-            <option value="prefers independence, completing much work outside of school.">prefers independence, completing much work outside of school.</option>
-            <option value="works hard in lessons and completes extra work outside class.">works hard in lessons and completes extra work outside class.</option>
-        </select>
+        <div class="form-section">
+            <label for="year-group-select">Year Group:</label>
+            <select id="year-group-select" onchange="loadCategoriesAndComments()">
+                <option value="">-- Select Year Group --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div id="categories-container"></div>
+
+        <div class="form-section">
+            <label for="additional-comments">Additional Comments:</label>
+            <textarea id="additional-comments" rows="4" placeholder="Add any additional comments about the pupil here..."></textarea>
+        </div>
+
+        <button class="button" onclick="addPupil()">Add Pupil</button>
+        <button class="button" onclick="generateReports()">Generate Reports</button>
     </div>
 
-    <div class="form-section">
-        <label for="programming-skills">Programming Skills:</label>
-        <select id="programming-skills">
-            <option value="">-- Select Comment --</option>
-            <option value="developed skills in short bursts, not yet completing larger projects.">developed skills in short bursts, not yet completing larger projects.</option>
-            <option value="shows fantastic aptitude for coding and program design, from idea to program.">shows fantastic aptitude for coding and program design, from idea to program.</option>
-            <option value="struggled with programming more than theory but improving in both.">struggled with programming more than theory but improving in both.</option>
-            <option value="good at experimenting with concepts, gaining deeper understanding.">good at experimenting with concepts, gaining deeper understanding.</option>
-            <option value="better at programming than theory; can decompose tasks but struggles with error messages.">better at programming than theory; can decompose tasks but struggles with error messages.</option>
-        </select>
-    </div>
+    <div id="result-container" class="result-section"></div>
 
-    <div class="form-section">
-        <label for="theory-understanding">Theory Understanding:</label>
-        <select id="theory-understanding">
-            <option value="">-- Select Comment --</option>
-            <option value="patchy understanding, excelling in some areas, struggling in others.">patchy understanding, excelling in some areas, struggling in others.</option>
-            <option value="demonstrates secure understanding of most theory topics.">demonstrates secure understanding of most theory topics.</option>
-            <option value="strong in topics like networks, explaining concepts clearly.">strong in topics like networks, explaining concepts clearly.</option>
-            <option value="consistently produces high-quality work showing secure understanding.">consistently produces high-quality work showing secure understanding.</option>
-        </select>
-    </div>
+    <script>
+        let pupils = [];
 
-    <div class="form-section">
-        <label for="exam-performance">Exam Performance:</label>
-        <select id="exam-performance">
-            <option value="">-- Select Comment --</option>
-            <option value="struggles with written answers; needs clarity despite good verbal understanding.">struggles with written answers; needs clarity despite good verbal understanding.</option>
-            <option value="answers exam-style questions quickly and accurately when in the right mood.">answers exam-style questions quickly and accurately when in the right mood.</option>
-            <option value="finds exam-style questions hard without support but working on it.">finds exam-style questions hard without support but working on it.</option>
-        </select>
-    </div>
-
-    <div class="form-section">
-        <label for="motivation-focus">Motivation and Focus:</label>
-        <select id="motivation-focus">
-            <option value="">-- Select Comment --</option>
-            <option value="finds it hard to maintain enthusiasm but improving with breaks.">finds it hard to maintain enthusiasm but improving with breaks.</option>
-            <option value="works well on interesting topics but sometimes loses motivation.">works well on interesting topics but sometimes loses motivation.</option>
-            <option value="needs reminders to stay on task but can produce good work.">needs reminders to stay on task but can produce good work
-
-.</option>
-</select>
-</div>
-
-    <div class="form-section">
-        <label for="problem-solving">Problem-Solving:</label>
-        <select id="problem-solving">
-            <option value="">-- Select Comment --</option>
-            <option value="gets frustrated with errors but improving at debugging.">gets frustrated with errors but improving at debugging.</option>
-            <option value="resourceful and persistent, sees mistakes as learning opportunities.">resourceful and persistent, sees mistakes as learning opportunities.</option>
-            <option value="finds it hard to finish programs from written problems but improving.">finds it hard to finish programs from written problems but improving.</option>
-        </select>
-    </div>
-
-    <div class="form-section">
-        <label for="class-participation">Class Participation:</label>
-        <select id="class-participation">
-            <option value="">-- Select Comment --</option>
-            <option value="more confident in theory, often leading group discussions.">more confident in theory, often leading group discussions.</option>
-            <option value="contributes well with insightful class discussions.">contributes well with insightful class discussions.</option>
-            <option value="asks interesting questions showing good topic understanding.">asks interesting questions showing good topic understanding.</option>
-        </select>
-    </div>
-
-    <div class="form-section">
-        <label for="targets">Targets:</label>
-        <select id="targets">
-            <option value="">-- Select Comment --</option>
-            <option value="should work on task decomposition for complex problems.">should work on task decomposition for complex problems.</option>
-            <option value="should maintain enthusiasm throughout lessons, taking breaks when needed.">should maintain enthusiasm throughout lessons, taking breaks when needed.</option>
-            <option value="should improve written answers for clarity and coherence.">should improve written answers for clarity and coherence.</option>
-            <option value="should develop programming skills with larger projects.">should develop programming skills with larger projects.</option>
-            <option value="should connect theoretical concepts with practical applications.">should connect theoretical concepts with practical applications.</option>
-            <option value="should practice timed exam questions for accuracy and speed.">should practice timed exam questions for accuracy and speed.</option>
-            <option value="should interpret error messages to guide debugging.">should interpret error messages to guide debugging.</option>
-            <option value="should seek support, avoid rushing, and check work.">should seek support, avoid rushing, and check work.</option>
-            <option value="should minimize distractions and maintain focus.">should minimize distractions and maintain focus.</option>
-            <option value="should participate in discussions and ask insightful questions.">should participate in discussions and ask insightful questions.</option>
-        </select>
-    </div>
-
-    <div class="form-section">
-        <label for="additional-comments">Additional Comments:</label>
-        <textarea id="additional-comments" rows="4" placeholder="Add any additional comments about the pupil here..."></textarea>
-    </div>
-
-    <button class="button" onclick="addPupil()">Add Pupil</button>
-    <button class="button" onclick="generateReports()">Generate Reports</button>
-</div>
-
-<div id="result-container" class="result-section"></div>
-
-<script>
-    let pupils = [];
-
-    function addPupil() {
-        const pupilName = document.getElementById('pupil-name').value;
-        const pupilPronouns = document.getElementById('pupil-pronouns').value;
-        const interestEngagement = document.getElementById('interest-engagement').value;
-        const independentStudy = document.getElementById('independent-study').value;
-        const programmingSkills = document.getElementById('programming-skills').value;
-        const theoryUnderstanding = document.getElementById('theory-understanding').value;
-        const examPerformance = document.getElementById('exam-performance').value;
-        const motivationFocus = document.getElementById('motivation-focus').value;
-        const problemSolving = document.getElementById('problem-solving').value;
-        const classParticipation = document.getElementById('class-participation').value;
-        const targets = document.getElementById('targets').value;
-        const additionalComments = document.getElementById('additional-comments').value;
-
-        const pupil = {
-            name: pupilName,
-            pronouns: pupilPronouns,
-            interestEngagement: interestEngagement,
-            independentStudy: independentStudy,
-            programmingSkills: programmingSkills,
-            theoryUnderstanding: theoryUnderstanding,
-            examPerformance: examPerformance,
-            motivationFocus: motivationFocus,
-            problemSolving: problemSolving,
-            classParticipation: classParticipation,
-            targets: targets,
-            additionalComments: additionalComments
-        };
-
-        pupils.push(pupil);
-
-        // Clear the form fields
-        document.getElementById('pupil-name').value = '';
-        document.getElementById('pupil-pronouns').value = '';
-        document.getElementById('interest-engagement').selectedIndex = 0;
-        document.getElementById('independent-study').selectedIndex = 0;
-        document.getElementById('programming-skills').selectedIndex = 0;
-        document.getElementById('theory-understanding').selectedIndex = 0;
-        document.getElementById('exam-performance').selectedIndex = 0;
-        document.getElementById('motivation-focus').selectedIndex = 0;
-        document.getElementById('problem-solving').selectedIndex = 0;
-        document.getElementById('class-participation').selectedIndex = 0;
-        document.getElementById('targets').selectedIndex = 0;
-        document.getElementById('additional-comments').value = '';
-
-        alert('Pupil added successfully!');
-    }
-
-    function generateReports() {
-        let resultContainer = document.getElementById('result-container');
-        resultContainer.innerHTML = ''; // Clear previous results
-
-        pupils.forEach(pupil => {
-            fetch('/generate-report', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(pupil)
-            })
-            .then(response => response.json())
-            .then(data => {
-                let report = data.report;
-                resultContainer.innerHTML += `<div>----------<br />${report}<br /></div>`;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectSelect = document.getElementById('subject-select');
+            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
             });
+        }
+
+        async function loadYearGroups() {
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupSelect = document.getElementById('year-group-select');
+            yearGroupSelect.innerHTML = '<option value="">-- Select Year Group --</option>';
+            yearGroups.forEach(yearGroup => {
+                const option = document.createElement('option');
+                option.value = yearGroup.id;
+                option.textContent = yearGroup.name;
+                yearGroupSelect.appendChild(option);
+            });
+        }
+
+        async function loadCategoriesAndComments() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            if (subjectId && yearGroupId) {
+                console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
+                const response = await fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
+                const categories = await response.json();
+                console.log('Fetched categories:', categories);
+
+                const categoriesContainer = document.getElementById('categories-container');
+                categoriesContainer.innerHTML = ''; // Clear previous options
+
+                categories.forEach(category => {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.classList.add('form-section');
+                    
+                    const label = document.createElement('label');
+                    label.for = category.name.toLowerCase().replace(' ', '-');
+                    label.textContent = category.name + ':';
+                    categoryDiv.appendChild(label);
+
+                    const select = document.createElement('select');
+                    select.id = category.name.toLowerCase().replace(' ', '-');
+                    select.innerHTML = '<option value="">-- Select Comment --</option>';
+
+                    category.Comments.forEach(comment => {
+                        const option = document.createElement('option');
+                        option.value = comment.text;
+                        option.textContent = comment.text;
+                        select.appendChild(option);
+                    });
+
+                    categoryDiv.appendChild(select);
+                    categoriesContainer.appendChild(categoryDiv);
+                });
+            }
+        }
+
+        function addPupil() {
+            const pupilName = document.getElementById('pupil-name').value;
+            const pupilPronouns = document.getElementById('pupil-pronouns').value;
+            const additionalComments = document.getElementById('additional-comments').value;
+
+            const categoriesContainer = document.getElementById('categories-container');
+            const categorySelects = categoriesContainer.getElementsByTagName('select');
+
+            const pupil = {
+                name: pupilName,
+                pronouns: pupilPronouns,
+                additionalComments: additionalComments
+            };
+
+            Array.from(categorySelects).forEach(select => {
+                const categoryName = select.id.replace('-', ' ');
+                pupil[categoryName] = select.value;
+            });
+
+            pupils.push(pupil);
+
+            // Clear the form fields
+            document.getElementById('pupil-name').value = '';
+            document.getElementById('pupil-pronouns').value = '';
+            document.getElementById('subject-select').selectedIndex = 0;
+            document.getElementById('year-group-select').selectedIndex = 0;
+            categoriesContainer.innerHTML = '';
+            document.getElementById('additional-comments').value = '';
+
+            alert('Pupil added successfully!');
+        }
+
+        function generateReports() {
+            let resultContainer = document.getElementById('result-container');
+            resultContainer.innerHTML = ''; // Clear previous results
+
+            pupils.forEach(pupil => {
+                fetch('/generate-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(pupil)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    let report = data.report;
+                    resultContainer.innerHTML += `<div><br />--------------<br />${report}<br />-------------------------<br></div>`;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
+                });
+            });
+        }
+
+        // Load subjects and year groups on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSubjects();
+            loadYearGroups();
         });
-    }
-</script>
+    </script>
 
 </body>
 </html>

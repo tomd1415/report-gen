@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comment Bank Selector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .form-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .result-section {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Comment Bank Selector</h1>
+
+    <div id="form-container">
+        <div class="form-section">
+            <label for="pupil-name">Pupil Name:</label>
+            <input type="text" id="pupil-name" required>
+
+            <label for="pupil-pronouns">Pronouns:</label>
+            <input type="text" id="pupil-pronouns" required>
+        </div>
+
+        <div class="form-section">
+            <label for="subject">Subject:</label>
+            <select id="subject" onchange="loadComments()">
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="year-group">Year Group:</label>
+            <select id="year-group" onchange="loadComments()">
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="interest-engagement">Interest and Engagement:</label>
+            <select id="interest-engagement">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="independent-study">Independent Study:</label>
+            <select id="independent-study">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="programming-skills">Programming Skills:</label>
+            <select id="programming-skills">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="theory-understanding">Theory Understanding:</label>
+            <select id="theory-understanding">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="exam-performance">Exam Performance:</label>
+            <select id="exam-performance">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="motivation-focus">Motivation and Focus:</label>
+            <select id="motivation-focus">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="problem-solving">Problem-Solving:</label>
+            <select id="problem-solving">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="class-participation">Class Participation:</label>
+            <select id="class-participation">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="targets">Targets:</label>
+            <select id="targets">
+                <option value="">-- Select Comment --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="additional-comments">Additional Comments:</label>
+            <textarea id="additional-comments" rows="4" placeholder="Add any additional comments about the pupil here..."></textarea>
+        </div>
+
+        <button class="button" onclick="addPupil()">Add Pupil</button>
+        <button class="button" onclick="generateReports()">Generate Reports</button>
+    </div>
+
+    <div id="result-container" class="result-section"></div>
+
+    <script>
+        let pupils = [];
+
+        async function loadSubjectsAndYearGroups() {
+            const subjects = await fetch('/api/subjects').then(res => res.json());
+            const yearGroups = await fetch('/api/year-groups').then(res => res.json());
+
+            const subjectSelect = document.getElementById('subject');
+            const yearGroupSelect = document.getElementById('year-group');
+
+            subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
+            });
+
+            yearGroups.forEach(yearGroup => {
+                const option = document.createElement('option');
+                option.value = yearGroup.id;
+                option.textContent = yearGroup.name;
+                yearGroupSelect.appendChild(option);
+            });
+        }
+
+        async function loadComments() {
+            const subjectId = document.getElementById('subject').value;
+            const yearGroupId = document.getElementById('year-group').value;
+
+            if (subjectId && yearGroupId) {
+                const comments = await fetch(`/api/comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`).then(res => res.json());
+
+                const categories = [
+                    'interest-engagement',
+                    'independent-study',
+                    'programming-skills',
+                    'theory-understanding',
+                    'exam-performance',
+                    'motivation-focus',
+                    'problem-solving',
+                    'class-participation',
+                    'targets'
+                ];
+
+                categories.forEach(category => {
+                    const select = document.getElementById(category);
+                    select.innerHTML = '<option value="">-- Select Comment --</option>'; // Clear previous options
+
+                    comments
+                        .filter(comment => comment.category.name === category)
+                        .forEach(comment => {
+                            const option = document.createElement('option');
+                            option.value = comment.text;
+                            option.textContent = comment.text;
+                            select.appendChild(option);
+                        });
+                });
+            }
+        }
+        function addPupil() {
+            const pupilName = document.getElementById('pupil-name').value;
+            const pupilPronouns = document.getElementById('pupil-pronouns').value;
+            const interestEngagement = document.getElementById('interest-engagement').value;
+            const independentStudy = document.getElementById('independent-study').value;
+            const programmingSkills = document.getElementById('programming-skills').value;
+            const theoryUnderstanding = document.getElementById('theory-understanding').value;
+            const examPerformance = document.getElementById('exam-performance').value;
+            const motivationFocus = document.getElementById('motivation-focus').value;
+            const problemSolving = document.getElementById('problem-solving').value;
+            const classParticipation = document.getElementById('class-participation').value;
+            const targets = document.getElementById('targets').value;
+            const additionalComments = document.getElementById('additional-comments').value;
+
+            const pupil = {
+                name: pupilName,
+                pronouns: pupilPronouns,
+                interestEngagement: interestEngagement,
+                independentStudy: independentStudy,
+                programmingSkills: programmingSkills,
+                theoryUnderstanding: theoryUnderstanding,
+                examPerformance: examPerformance,
+                motivationFocus: motivationFocus,
+                problemSolving: problemSolving,
+                classParticipation: classParticipation,
+                targets: targets,
+                additionalComments: additionalComments
+            };
+
+            pupils.push(pupil);
+
+            // Clear the form fields
+            document.getElementById('pupil-name').value = '';
+            document.getElementById('pupil-pronouns').value = '';
+            document.getElementById('subject').selectedIndex = 0;
+            document.getElementById('year-group').selectedIndex = 0;
+            const categories = [
+                'interest-engagement',
+                'independent-study',
+                'programming-skills',
+                'theory-understanding',
+                'exam-performance',
+                'motivation-focus',
+                'problem-solving',
+                'class-participation',
+                'targets'
+            ];
+            categories.forEach(category => {
+                document.getElementById(category).innerHTML = '<option value="">-- Select Comment --</option>';
+            });
+            document.getElementById('additional-comments').value = '';
+
+            alert('Pupil added successfully!');
+        }
+
+        function generateReports() {
+            let resultContainer = document.getElementById('result-container');
+            resultContainer.innerHTML = ''; // Clear previous results
+
+            pupils.forEach(pupil => {
+                fetch('/generate-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(pupil)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    let report = data.report;
+                    resultContainer.innerHTML += `<div>${report}</div>`;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
+                });
+            });
+        }
+
+        // Load subjects and year groups on page load
+        document.addEventListener('DOMContentLoaded', loadSubjectsAndYearGroups);
+    </script>
+
+</body>
+</html>
