@@ -136,7 +136,7 @@ app.post('/generate-report', async (req, res) => {
   }
 
   if (additionalComments) {
-    prompt += `The following additional comments shold be weaved into the whole report: ${additionalComments}\n`;
+    prompt += `The following additional comments shold be woven into the whole report: ${additionalComments}\n`;
   }
 
   try {

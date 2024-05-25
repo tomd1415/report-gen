@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Subjects and Year Groups</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .form-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+        input, button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Manage Subjects and Year Groups</h1>
+
+    <div class="form-section">
+        <h2>Add Subject</h2>
+        <label for="subject-name">Subject Name:</label>
+        <input type="text" id="subject-name">
+        <button class="button" onclick="addSubject()">Add Subject</button>
+    </div>
+
+    <div class="form-section">
+        <h2>Add Year Group</h2>
+        <label for="year-group-name">Year Group Name:</label>
+        <input type="text" id="year-group-name">
+        <button class="button" onclick="addYearGroup()">Add Year Group</button>
+    </div>
+
+    <div class="form-section">
+        <h2>Existing Subjects</h2>
+        <ul id="subjects-list"></ul>
+    </div>
+
+    <div class="form-section">
+        <h2>Existing Year Groups</h2>
+        <ul id="year-groups-list"></ul>
+    </div>
+
+    <script>
+        async function fetchSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectsList = document.getElementById('subjects-list');
+            subjectsList.innerHTML = '';
+            subjects.forEach(subject => {
+                const li = document.createElement('li');
+                li.textContent = subject.name;
+                li.appendChild(createEditButton(subject.id, subject.name, 'subject'));
+                li.appendChild(createDeleteButton(subject.id, 'subject'));
+                subjectsList.appendChild(li);
+            });
+        }
+
+        async function fetchYearGroups() {
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupsList = document.getElementById('year-groups-list');
+            yearGroupsList.innerHTML = '';
+            yearGroups.forEach(yearGroup => {
+                const li = document.createElement('li');
+                li.textContent = yearGroup.name;
+                li.appendChild(createEditButton(yearGroup.id, yearGroup.name, 'yearGroup'));
+                li.appendChild(createDeleteButton(yearGroup.id, 'yearGroup'));
+                yearGroupsList.appendChild(li);
+            });
+        }
+
+        function createEditButton(id, name, type) {
+            const button = document.createElement('button');
+            button.textContent = 'Edit';
+            button.onclick = () => editItem(id, name, type);
+            return button;
+        }
+
+        function createDeleteButton(id, type) {
+            const button = document.createElement('button');
+            button.textContent = 'Delete';
+            button.onclick = () => deleteItem(id, type);
+            return button;
+        }
+
+        async function addSubject() {
+            const name = document.getElementById('subject-name').value;
+            if (name) {
+                await fetch('/api/subjects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                document.getElementById('subject-name').value = '';
+                fetchSubjects();
+            }
+        }
+
+        async function addYearGroup() {
+            const name = document.getElementById('year-group-name').value;
+            if (name) {
+                await fetch('/api/year-groups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                document.getElementById('year-group-name').value = '';
+                fetchYearGroups();
+            }
+        }
+
+        async function editItem(id, name, type) {
+            const newName = prompt(`Enter new name for the ${type}:`, name);
+            if (newName) {
+                await fetch(`/api/${type}s/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: newName })
+                });
+                if (type === 'subject') {
+                    fetchSubjects();
+                } else {
+                    fetchYearGroups();
+                }
+            }
+        }
+
+        async function deleteItem(id, type) {
+            if (confirm(`Are you sure you want to delete this ${type}?`)) {
+                await fetch(`/api/${type}s/${id}`, {
+                    method: 'DELETE'
+                });
+                if (type === 'subject') {
+                    fetchSubjects();
+                } else {
+                    fetchYearGroups();
+                }
+            }
+        }
+
+        // Fetch subjects and year groups on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSubjects();
+            fetchYearGroups();
+        });
+    </script>
+
+</body>
+</html>
+

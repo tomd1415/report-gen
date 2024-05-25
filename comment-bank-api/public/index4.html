@@ -84,7 +84,6 @@
 
     <script>
         let pupils = [];
-        let promptPart = 'Generate a comprehensive report for a student.';
 
         async function loadSubjects() {
             const response = await fetch('/api/subjects');
@@ -117,17 +116,9 @@
             const yearGroupId = document.getElementById('year-group-select').value;
             if (subjectId && yearGroupId) {
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
-                
-                const [categoriesResponse, promptPartResponse] = await Promise.all([
-                    fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
-                    fetch(`/api/prompt-part?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
-                ]);
-
-                const categories = await categoriesResponse.json();
-                promptPart = await promptPartResponse.text();
-
+                const response = await fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
+                const categories = await response.json();
                 console.log('Fetched categories:', categories);
-                console.log('Fetched prompt part:', promptPart);
 
                 const categoriesContainer = document.getElementById('categories-container');
                 categoriesContainer.innerHTML = ''; // Clear previous options
@@ -169,8 +160,6 @@
             const pupil = {
                 name: pupilName,
                 pronouns: pupilPronouns,
-                subjectId: document.getElementById('subject-select').value,
-                yearGroupId: document.getElementById('year-group-select').value,
                 additionalComments: additionalComments
             };
 
@@ -207,7 +196,7 @@
                 .then(response => response.json())
                 .then(data => {
                     let report = data.report;
-                    resultContainer.innerHTML += `<div>${report}</div>`;
+                    resultContainer.innerHTML += `<div><br />--------------<br />${report}<br />-------------------------<br></div>`;
                 })
                 .catch(error => {
                     console.error('Error:', error);
