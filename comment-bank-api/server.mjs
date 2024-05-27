@@ -85,6 +85,30 @@ const Comment = sequelize.define('Comment', {
 }, {
   timestamps: false
 });
+/*
+const SubjectYearGroupPrompt = sequelize.define('SubjectYearGroupPrompt', {
+  subjectId: {
+    type: Sequelize.INTEGER,
+    references: {
+      model: Subject,
+      key: 'id'
+    }
+  },
+  yearGroupId: {
+    type: Sequelize.INTEGER,
+    references: {
+      model: YearGroup,
+      key: 'id'
+    }
+  },
+  promptPart: {
+    type: Sequelize.TEXT,
+    allowNull: false
+  }
+}, {
+  timestamps: false
+});
+*/
 
 const Prompt = sequelize.define('Prompt', {
   subjectId: {
@@ -323,6 +347,22 @@ app.get('/api/categories-comments', async (req, res) => {
   }
 });
 
+// Fetch a single category by ID
+app.get('/api/categories/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const category = await Category.findByPk(id);
+    if (category) {
+      res.json(category);
+    } else {
+      res.status(404).send('Category not found');
+    }
+  } catch (error) {
+    console.error('Error fetching category:', error);
+    res.status(500).send('Error fetching category');
+  }
+});
+
 
 // CRUD operations for Comments
 // Create a new comment
@@ -372,6 +412,35 @@ app.delete('/api/comments/:id', async (req, res) => {
       res.status(500).send('Error deleting comment');
   }
 });
+// Endpoint to fetch comments based on category
+app.get('/api/comments', async (req, res) => {
+  const { categoryId } = req.query;
+  try {
+      const comments = await Comment.findAll({
+          where: { categoryId }
+      });
+      res.json(comments);
+  } catch (error) {
+      console.error('Error fetching comments:', error);
+      res.status(500).send('Error fetching comments');
+  }
+});
+
+// Fetch a single comment by ID
+app.get('/api/comments/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const comment = await Comment.findByPk(id);
+    if (comment) {
+      res.json(comment);
+    } else {
+      res.status(404).send('Comment not found');
+    }
+  } catch (error) {
+    console.error('Error fetching comment:', error);
+    res.status(500).send('Error fetching comment');
+  }
+});
 
 // Move a comment to a different category
 app.post('/api/move-comment', async (req, res) => {
@@ -411,7 +480,7 @@ app.post('/generate-report', async (req, res) => {
           }
       });
 
-      let prompt = promptPart ? promptPart.promptPart : 'Generate a consise school report for a pupil. This is for Computing lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicley with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs in necessary';
+      let prompt = promptPart ? promptPart.promptPart : 'Generate a concision school report for a pupil. This is for Computing lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary';
       const placeholder = 'PUPIL_NAME';
       prompt += `\nName: ${placeholder} (${pronouns})\n`;
 
@@ -502,7 +571,185 @@ app.post('/api/import-reports', async (req, res) => {
     }
 });
 
+//PROMPT PART
+// Create or update a prompt by subjectId and yearGroupId
+app.post('/api/prompts', async (req, res) => {
+  const { subjectId, yearGroupId, promptPart } = req.body;
+  try {
+    const [prompt, created] = await Prompt.findOrCreate({
+      where: {
+        subjectId: subjectId,
+        yearGroupId: yearGroupId
+      },
+      defaults: {
+        promptPart: promptPart
+      }
+    });
 
+    if (!created) {
+      prompt.promptPart = promptPart;
+      await prompt.save();
+    }
+
+    res.json(prompt);
+  } catch (error) {
+    console.error('Error creating or updating prompt:', error);
+    res.status(500).send('Error creating or updating prompt');
+  }
+});
+
+// Update a prompt by subjectId and yearGroupId
+app.put('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
+  const { subjectId, yearGroupId } = req.params;
+  const { promptPart } = req.body;
+  try {
+    const prompt = await Prompt.findOne({
+      where: {
+        subjectId: subjectId,
+        yearGroupId: yearGroupId
+      }
+    });
+    if (prompt) {
+      prompt.promptPart = promptPart;
+      await prompt.save();
+      res.json(prompt);
+    } else {
+      res.status(404).send('Prompt not found');
+    }
+  } catch (error) {
+    console.error('Error updating prompt:', error);
+    res.status(500).send('Error updating prompt');
+  }
+});
+
+
+app.put('/api/prompts/:id', async (req, res) => {
+  const { id } = req.params;
+  const { promptPart } = req.body;
+  try {
+    const prompt = await Prompt.findByPk(id);
+    if (prompt) {
+      prompt.promptPart = promptPart;
+      await prompt.save();
+      res.json(prompt);
+    } else {
+      res.status(404).send('Prompt not found');
+    }
+  } catch (error) {
+    console.error('Error updating prompt:', error);
+    res.status(500).send('Error updating prompt');
+  }
+});
+
+app.delete('/api/prompts/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prompt = await Prompt.findByPk(id);
+    if (prompt) {
+      await prompt.destroy();
+      res.sendStatus(204);
+    } else {
+      res.status(404).send('Prompt not found');
+    }
+  } catch (error) {
+    console.error('Error deleting prompt:', error);
+    res.status(500).send('Error deleting prompt');
+  }
+});
+
+// Delete a prompt by subjectId and yearGroupId
+app.delete('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
+  const { subjectId, yearGroupId } = req.params;
+  try {
+    const prompt = await Prompt.findOne({
+      where: {
+        subjectId: subjectId,
+        yearGroupId: yearGroupId
+      }
+    });
+    if (prompt) {
+      await prompt.destroy();
+      res.sendStatus(204);
+    } else {
+      res.status(404).send('Prompt not found');
+    }
+  } catch (error) {
+    console.error('Error deleting prompt:', error);
+    res.status(500).send('Error deleting prompt');
+  }
+});
+
+
+app.get('/api/prompts', async (req, res) => {
+  try {
+    const prompts = await Prompt.findAll();
+    res.json(prompts);
+  } catch (error) {
+    console.error('Error fetching prompts:', error);
+    res.status(500).send('Error fetching prompts');
+  }
+});
+
+// Fetch a prompt by subjectId and yearGroupId
+app.get('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
+  const { subjectId, yearGroupId } = req.params;
+  try {
+    const prompt = await Prompt.findOne({
+      where: {
+        subjectId: subjectId,
+        yearGroupId: yearGroupId
+      }
+    });
+    res.json(prompt ? prompt.promptPart : '');
+  } catch (error) {
+    console.error('Error fetching prompt:', error);
+    res.status(500).send('Error fetching prompt');
+  }
+});
+/*
+// Fetch the prompt part based on subject and year group
+app.get('/api/prompt-part', async (req, res) => {
+  const { subjectId, yearGroupId } = req.query;
+  try {
+      const promptPart = await SubjectYearGroupPrompt.findOne({
+          where: {
+              subjectId: subjectId,
+              yearGroupId: yearGroupId
+          }
+      });
+      res.json(promptPart ? promptPart.promptPart : '');
+  } catch (error) {
+      console.error('Error fetching prompt part:', error);
+      res.status(500).send('Error fetching prompt part');
+  }
+});
+*/
+/*
+// Save or update the prompt part for a specific subject and year group
+app.post('/api/prompt-part', async (req, res) => {
+  const { subjectId, yearGroupId, promptPart } = req.body;
+  try {
+      const existingPrompt = await SubjectYearGroupPrompt.findOne({
+          where: {
+              subjectId: subjectId,
+              yearGroupId: yearGroupId
+          }
+      });
+
+      if (existingPrompt) {
+          existingPrompt.promptPart = promptPart;
+          await existingPrompt.save();
+      } else {
+          await SubjectYearGroupPrompt.create({ subjectId, yearGroupId, promptPart });
+      }
+
+      res.sendStatus(200);
+  } catch (error) {
+      console.error('Error saving prompt part:', error);
+      res.status(500).send('Error saving prompt part');
+  }
+});
+*/
 
 //app.listen(port, () => {
 //  console.log(`Server running at http://localhost:${port}`);

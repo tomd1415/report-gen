@@ -16,10 +16,10 @@
             display: block;
             margin: 5px 0;
         }
-        select, input, button {
+        select, input, textarea {
             width: 100%;
             padding: 8px;
-            margin: 5px 0;
+            margin: 5px 0 15px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
@@ -38,231 +38,130 @@
         .result-section {
             margin-top: 20px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ccc;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
+        .sample-prompt {
+            font-style: italic;
+            color: #666;
         }
     </style>
 </head>
 <body>
 
-<h1>Manage Subjects and Year Groups</h1>
+    <h1>Manage Subjects and Year Groups</h1>
 
-<div id="form-container">
-    <div class="form-section">
-        <label for="subject-name">Subject Name:</label>
-        <input type="text" id="subject-name">
-        <button class="button" onclick="addSubject()">Add Subject</button>
+    <div id="form-container">
+        <div class="form-section">
+            <label for="subject-select">Select Subject:</label>
+            <select id="subject-select" onchange="loadYearGroups()">
+                <option value="">-- Select Subject --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+
+            <label for="year-group-select">Select Year Group:</label>
+            <select id="year-group-select" onchange="loadPrompt()">
+                <option value="">-- Select Year Group --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
+
+        <div class="form-section">
+            <label for="prompt-text">Prompt Text:</label>
+            <textarea id="prompt-text" rows="4"></textarea>
+            <p class="sample-prompt">Sample Prompt: Generate a concise school report for a pupil. This is for school lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary.</p>
+        </div>
+
+        <button class="button" onclick="savePrompt()">Save Prompt</button>
     </div>
 
-    <div class="form-section">
-        <label for="year-group-name">Year Group Name:</label>
-        <input type="text" id="year-group-name">
-        <button class="button" onclick="addYearGroup()">Add Year Group</button>
-    </div>
+    <div id="result-container" class="result-section"></div>
 
-    <div class="form-section">
-        <label for="subject-select">Select Subject:</label>
-        <select id="subject-select">
-            <!-- Options will be populated dynamically -->
-        </select>
-        <button class="button" onclick="deleteSubject()">Delete Selected Subject</button>
-    </div>
-
-    <div class="form-section">
-        <label for="year-group-select">Select Year Group:</label>
-        <select id="year-group-select">
-            <!-- Options will be populated dynamically -->
-        </select>
-        <button class="button" onclick="deleteYearGroup()">Delete Selected Year Group</button>
-    </div>
-</div>
-
-<div id="result-container" class="result-section">
-    <h2>Current Subjects</h2>
-    <table id="subjects-table">
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Actions</th>
-        </tr>
-        <!-- Rows will be populated dynamically -->
-    </table>
-
-    <h2>Current Year Groups</h2>
-    <table id="year-groups-table">
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Actions</th>
-        </tr>
-        <!-- Rows will be populated dynamically -->
-    </table>
-</div>
-
-<script>
-    async function fetchSubjects() {
-        const response = await fetch('/api/subjects');
-        const subjects = await response.json();
-        const subjectSelect = document.getElementById('subject-select');
-        const subjectsTable = document.getElementById('subjects-table');
-
-        subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
-        subjectsTable.innerHTML = `
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Actions</th>
-            </tr>
-        `;
-
-        subjects.forEach(subject => {
-            const option = document.createElement('option');
-            option.value = subject.id;
-            option.textContent = subject.name;
-            subjectSelect.appendChild(option);
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${subject.id}</td>
-                <td>${subject.name}</td>
-                <td><button onclick="editSubject(${subject.id}, '${subject.name}')">Edit</button></td>
-            `;
-            subjectsTable.appendChild(row);
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSubjects();
         });
-    }
 
-    async function fetchYearGroups() {
-        const response = await fetch('/api/year-groups');
-        const yearGroups = await response.json();
-        const yearGroupSelect = document.getElementById('year-group-select');
-        const yearGroupsTable = document.getElementById('year-groups-table');
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectSelect = document.getElementById('subject-select');
+            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
+            });
+        }
 
-        yearGroupSelect.innerHTML = '<option value="">-- Select Year Group --</option>';
-        yearGroupsTable.innerHTML = `
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Actions</th>
-            </tr>
-        `;
+        async function loadYearGroups() {
+            const subjectId = document.getElementById('subject-select').value;
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupSelect = document.getElementById('year-group-select');
+            yearGroupSelect.innerHTML = '<option value="">-- Select Year Group --</option>';
+            yearGroups.forEach(yearGroup => {
+                const option = document.createElement('option');
+                option.value = yearGroup.id;
+                option.textContent = yearGroup.name;
+                yearGroupSelect.appendChild(option);
+            });
+        }
 
-        yearGroups.forEach(yearGroup => {
-            const option = document.createElement('option');
-            option.value = yearGroup.id;
-            option.textContent = yearGroup.name;
-            yearGroupSelect.appendChild(option);
+        async function loadPrompt() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            if (subjectId && yearGroupId) {
+                const response = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
+                const promptPart = await response.json();
 
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${yearGroup.id}</td>
-                <td>${yearGroup.name}</td>
-                <td><button onclick="editYearGroup(${yearGroup.id}, '${yearGroup.name}')">Edit</button></td>
-            `;
-            yearGroupsTable.appendChild(row);
-        });
-    }
+                const defaultPrompt = "Generate a concise school report for a pupil. This is for school lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary.";
 
-    async function addSubject() {
-        const name = document.getElementById('subject-name').value;
-        if (name) {
-            try {
-                const response = await fetch('/api/subjects', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name })
-                });
-                if (response.ok) {
-                    document.getElementById('subject-name').value = '';
-                    fetchSubjects();
+                if (!promptPart || promptPart === '') {
+                    document.getElementById('prompt-text').value = defaultPrompt;
                 } else {
-                    console.error('Error adding subject:', await response.text());
+                    document.getElementById('prompt-text').value = promptPart;
                 }
-            } catch (error) {
-                console.error('Error adding subject:', error);
             }
         }
-    }
 
-    async function addYearGroup() {
-        const name = document.getElementById('year-group-name').value;
-        if (name) {
-            await fetch('/api/year-groups', {
-                method: 'POST',
+        async function savePrompt() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            const promptPart = document.getElementById('prompt-text').value;
+
+            // Check if the prompt exists
+            const checkResponse = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
+            const existingPrompt = await checkResponse.json();
+
+            let method;
+            let url;
+
+            if (existingPrompt && existingPrompt !== '') {
+                method = 'PUT';
+                url = `/api/prompts/${subjectId}/${yearGroupId}`;
+            } else {
+                method = 'POST';
+                url = '/api/prompts';
+            }
+
+            const responseSave = await fetch(url, {
+                method: method,
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({
+                    subjectId,
+                    yearGroupId,
+                    promptPart
+                })
             });
-            document.getElementById('year-group-name').value = '';
-            fetchYearGroups();
-        }
-    }
 
-    async function deleteSubject() {
-        const id = document.getElementById('subject-select').value;
-        if (id) {
-            await fetch(`/api/subjects/${id}`, {
-                method: 'DELETE'
-            });
-            fetchSubjects();
+            if (responseSave.ok) {
+                alert('Prompt saved successfully!');
+            } else {
+                alert('Error saving prompt.');
+            }
         }
-    }
-
-    async function deleteYearGroup() {
-        const id = document.getElementById('year-group-select').value;
-        if (id) {
-            await fetch(`/api/year-groups/${id}`, {
-                method: 'DELETE'
-            });
-            fetchYearGroups();
-        }
-    }
-
-    async function editSubject(id, name) {
-        const newName = prompt('Edit subject name:', name);
-        if (newName) {
-            await fetch(`/api/subjects/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ name: newName })
-            });
-            fetchSubjects();
-        }
-    }
-
-    async function editYearGroup(id, name) {
-        const newName = prompt('Edit year group name:', name);
-        if (newName) {
-            await fetch(`/api/year-groups/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ name: newName })
-            });
-            fetchYearGroups();
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        fetchSubjects();
-        fetchYearGroups();
-    });
-</script>
+    </script>
 
 </body>
 </html>
-
