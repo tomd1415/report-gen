@@ -477,7 +477,7 @@ app.post('/generate-report', async (req, res) => {
       const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 400,
+          max_tokens: 500,
           temperature: 0.7
       });
 
@@ -507,75 +507,126 @@ app.post('/api/import-reports', async (req, res) => {
           const regex = new RegExp(`\\b${name}\\b`, 'g');
           reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, placeholder);
       });
-      
+
       // Call OpenAI to process the reports
       const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [{
-            role: 'user',
-            content: `
-            Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports. There should be no more than 8 categories and similar categories should be merged. Ensure that the comments are concise, clear, and avoid any redundancy. Each category should have no more than 8 comments, and similar comments should be merged or removed. The final category should be 'Targets', containing specific and actionable targets for students, with the last target being "***Generate a target for this pupil and add to the report***". 
-            
-            Please try to make each category have the comments cover a variety of abilities and behaviors. Please order the comments from least able to most able. 
-
-            Format the output as follows:
-            Category: [Category Name]
-            [Comment 1]
-            [Comment 2]
-            ...
-    
-            Here is an example of the desired output:
-            Category: Interest and Engagement
-            Shows good attitude initially but sometimes struggles to maintain focus.
-            Brings a quiet confidence to all computing lessons but can sometimes lose focus.
-    
-            Category: Independent Study
-            Keen to learn quickly but sometimes rushes and misses mistakes.
-            Prefers independence and self-study, often completing work outside of school.
-    
-            The reports start here:
-    
-            ${reportsWithPlaceholder}
-            `
-        }],
+              role: 'user',
+              content: `
+              Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports. There should be no more than 8 categories and similar categories should be merged. Ensure that the comments are concise, clear, and avoid any redundancy. Each category should have no more than 8 comments, and similar comments should be merged or removed. The final category should be 'Targets', containing specific and actionable targets for students, with the last target being "***Generate a target for this pupil and add to the report***". 
+              
+              Please try to make each category have the comments cover a variety of abilities and behaviors. Please order the comments from least able to most able. 
+  
+              Format the output as follows:
+              Category: [Category Name]
+              [Comment 1]
+              [Comment 2]
+              ...
+      
+              Here is an example of the desired output:
+              Category: Interest and Engagement
+              Shows good attitude initially but sometimes struggles to maintain focus.
+              Brings a quiet confidence to all computing lessons but can sometimes lose focus.
+      
+              Category: Independent Study
+              Keen to learn quickly but sometimes rushes and misses mistakes.
+              Prefers independence and self-study, often completing work outside of school.
+      
+              The reports start here:
+      
+              ${reportsWithPlaceholder}
+              `
+            }],
           max_tokens: 3500,
           temperature: 0.6
       });
 
-      const extractedText = response.choices[0].message.content.trim();
+      const newExtractedText = response.choices[0].message.content.trim();
 
-        // Example response parsing (assumes categories and comments are structured in the response)
-        const categories = {};
-        const lines = extractedText.split('\n');
-        let currentCategory = null;
+      // Example response parsing (assumes categories and comments are structured in the response)
+      const newCategories = {};
+      const lines = newExtractedText.split('\n');
+      let currentCategory = null;
 
-        lines.forEach(line => {
-            const categoryMatch = line.match(/^Category: (.+)$/);
-            if (categoryMatch) {
-                currentCategory = categoryMatch[1];
-                categories[currentCategory] = new Set();
-            } else if (currentCategory && line.trim()) {
-                categories[currentCategory].add(line.trim());
-            }
-        });
+      lines.forEach(line => {
+          const categoryMatch = line.match(/^Category: (.+)$/);
+          if (categoryMatch) {
+              currentCategory = categoryMatch[1];
+              newCategories[currentCategory] = new Set();
+          } else if (currentCategory && line.trim()) {
+              newCategories[currentCategory].add(line.trim());
+          }
+      });
 
-        // Insert categories and comments into the database
-        for (const [categoryName, comments] of Object.entries(categories)) {
-            let category = await Category.findOne({ where: { name: categoryName, subjectId, yearGroupId } });
-            if (!category) {
-                category = await Category.create({ name: categoryName, subjectId, yearGroupId });
-            }
-            for (const comment of comments) {
-                await Comment.create({ text: comment, categoryId: category.id });
-            }
-        }
+      // Fetch existing categories and comments from the database
+      const existingCategories = await Category.findAll({
+          where: { subjectId, yearGroupId },
+          include: [Comment]
+      });
 
-        res.json({ message: 'Reports imported successfully and categories/comments generated.' });
-    } catch (error) {
-        console.error('Error importing reports:', error);
-        res.status(500).send('Error importing reports');
-    }
+      if (existingCategories.length > 0) {
+          // Format existing categories and comments
+          const existingFormattedCategories = existingCategories.reduce((acc, category) => {
+              acc[category.name] = category.Comments.map(comment => comment.text);
+              return acc;
+          }, {});
+
+          // Create a prompt to merge existing and new categories and comments
+          const mergePrompt = `I have two sets of categories and comments for student reports. Please merge them, ensuring no more than 8 categories and no more than 8 comments per category. If categories are similar, please merge them. Prioritize clarity and conciseness. Please try and keep the order of the comments (ordered by ability and behaviour) and give priority to the New categories and comments.\n\nExisting categories and comments:\n\n${JSON.stringify(existingFormattedCategories, null, 2)}\n\nNew categories and comments:\n\n${JSON.stringify(newCategories, null, 2)}\n\nFormat the output as follows:\nCategory: [Category Name]\n[Comment 1]\n[Comment 2]\n...\n`;
+
+          // Call OpenAI to merge the existing and new categories and comments
+          const mergeResponse = await openai.chat.completions.create({
+              model: 'gpt-4o',
+              messages: [{ role: 'user', content: mergePrompt }],
+              max_tokens: 3500,
+              temperature: 0.6
+          });
+
+          const mergedText = mergeResponse.choices[0].message.content.trim();
+
+          // Parse the merged categories and comments
+          const mergedCategories = {};
+          const mergedLines = mergedText.split('\n');
+          let mergedCurrentCategory = null;
+
+          mergedLines.forEach(line => {
+              const categoryMatch = line.match(/^Category: (.+)$/);
+              if (categoryMatch) {
+                  mergedCurrentCategory = categoryMatch[1];
+                  mergedCategories[mergedCurrentCategory] = [];
+              } else if (mergedCurrentCategory && line.trim()) {
+                  mergedCategories[mergedCurrentCategory].push(line.trim());
+              }
+          });
+
+          // Replace the existing categories and comments with the merged ones
+          await Category.destroy({ where: { subjectId, yearGroupId } });
+
+          for (const [categoryName, comments] of Object.entries(mergedCategories)) {
+              const category = await Category.create({ name: categoryName, subjectId, yearGroupId });
+              for (const comment of comments) {
+                  await Comment.create({ text: comment, categoryId: category.id });
+              }
+          }
+      } else {
+          // Insert new categories and comments if there are no existing ones
+          for (const [categoryName, comments] of Object.entries(newCategories)) {
+              const category = await Category.create({ name: categoryName, subjectId, yearGroupId });
+              for (const comment of comments) {
+                  await Comment.create({ text: comment, categoryId: category.id });
+              }
+          }
+      }
+
+      res.json({ message: 'Reports imported successfully and categories/comments generated.' });
+  } catch (error) {
+      console.error('Error importing reports:', error);
+      res.status(500).send('Error importing reports');
+  }
 });
+
+
 
 //PROMPT PART
 // Create or update a prompt by subjectId and yearGroupId
@@ -712,53 +763,5 @@ app.get('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
     res.status(500).send('Error fetching prompt');
   }
 });
-/*
-// Fetch the prompt part based on subject and year group
-app.get('/api/prompt-part', async (req, res) => {
-  const { subjectId, yearGroupId } = req.query;
-  try {
-      const promptPart = await SubjectYearGroupPrompt.findOne({
-          where: {
-              subjectId: subjectId,
-              yearGroupId: yearGroupId
-          }
-      });
-      res.json(promptPart ? promptPart.promptPart : '');
-  } catch (error) {
-      console.error('Error fetching prompt part:', error);
-      res.status(500).send('Error fetching prompt part');
-  }
-});
-*/
-/*
-// Save or update the prompt part for a specific subject and year group
-app.post('/api/prompt-part', async (req, res) => {
-  const { subjectId, yearGroupId, promptPart } = req.body;
-  try {
-      const existingPrompt = await SubjectYearGroupPrompt.findOne({
-          where: {
-              subjectId: subjectId,
-              yearGroupId: yearGroupId
-          }
-      });
-
-      if (existingPrompt) {
-          existingPrompt.promptPart = promptPart;
-          await existingPrompt.save();
-      } else {
-          await SubjectYearGroupPrompt.create({ subjectId, yearGroupId, promptPart });
-      }
-
-      res.sendStatus(200);
-  } catch (error) {
-      console.error('Error saving prompt part:', error);
-      res.status(500).send('Error saving prompt part');
-  }
-});
-*/
-
-//app.listen(port, () => {
-//  console.log(`Server running at http://localhost:${port}`);
-//});
 
      
