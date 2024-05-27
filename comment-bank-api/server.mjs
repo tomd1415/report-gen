@@ -5,6 +5,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import { Sequelize, DataTypes } from 'sequelize';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const app = express();
 const port = 3000;
@@ -19,13 +23,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Initialize OpenAI
 const openai = new OpenAI({
-  apiKey: 'sk-proj-NRXojKZoTDvNsFuhUH8WT3BlbkFJCbb0Gup2YMFD3iq8lRVS'
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 // Initialize Sequelize with IPv4 address
-const sequelize = new Sequelize('comment_bank', 'root', 'exhall2024', {
-  host: '127.0.0.1',
-  dialect: 'mariadb',
+const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
+  host: process.env.DB_HOST,
+  dialect: process.env.DB_DIALECT,
   logging: console.log
 });
 
