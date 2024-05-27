@@ -4,48 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Subjects and Year Groups</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .form-section {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin: 5px 0;
-        }
-        select, input, textarea {
-            width: 100%;
-            padding: 8px;
-            margin: 5px 0 15px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        .result-section {
-            margin-top: 20px;
-        }
-        .sample-prompt {
-            font-style: italic;
-            color: #666;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+ 
 </head>
 <body>
-
+    <!-- Include header -->
+    <div id="header-placeholder"></div>
+    <div class="container">
     <h1>Manage Subjects and Year Groups</h1>
 
     <div id="form-container">
@@ -66,15 +31,35 @@
         <div class="form-section">
             <label for="prompt-text">Prompt Text:</label>
             <textarea id="prompt-text" rows="4"></textarea>
-            <p class="sample-prompt">Sample Prompt: Generate a concise school report for a pupil. This is for school lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary.</p>
+            <p class="sample-prompt"><b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in Year 7 Computing lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition. 
+<br />
+                <br />Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.
+      <br />          
+                <br />Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in Computing.
+                </p>
         </div>
 
         <button class="button" onclick="savePrompt()">Save Prompt</button>
     </div>
-
+    </div>
     <div id="result-container" class="result-section"></div>
-
+    <div id="footer-placeholder"></div>
     <script>
+        // Function to load header
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch("header.html")
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById("header-placeholder").innerHTML = data;
+                });
+        });
+
+        fetch('footer.html')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('footer-placeholder').innerHTML = data;
+            });
+
         document.addEventListener('DOMContentLoaded', () => {
             loadSubjects();
         });

@@ -462,7 +462,7 @@ app.post('/generate-report', async (req, res) => {
 
       let prompt = promptPart ? promptPart.promptPart : 'Generate a concision school report for a pupil. This is for Computing lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary';
       const placeholder = 'PUPIL_NAME';
-      prompt += `\nName: ${placeholder} (${pronouns})\n`;
+      prompt += `\nI am using the following placeholder for a name: ${placeholder} the pronouns for this pupil are (${pronouns})\n`;
 
       for (const [category, comment] of Object.entries(categories)) {
           if (comment) {

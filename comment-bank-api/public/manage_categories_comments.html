@@ -3,304 +3,337 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Categories and Comments</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .form-section {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin: 5px 0;
-        }
-        select, input, button {
-            width: calc(100% - 20px);
-            padding: 8px;
-            margin: 5px 0 15px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 5px;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        .result-section {
-            margin-top: 20px;
-        }
-    </style>
+    <title>Manage Comments and Categories</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <h1>Manage Categories and Comments</h1>
+    <!-- Include header -->
+    <div id="header-placeholder"></div>
 
-    <div id="form-container">
+    <div class="container">
+        <h1>Manage Comments and Categories</h1>
+
         <div class="form-section">
             <label for="subject-select">Subject:</label>
-            <select id="subject-select" onchange="loadYearGroups()">
+            <select id="subject-select" onchange="loadCategoriesAndComments()">
                 <option value="">-- Select Subject --</option>
-                <!-- Options will be populated dynamically -->
             </select>
         </div>
 
         <div class="form-section">
             <label for="year-group-select">Year Group:</label>
-            <select id="year-group-select" onchange="loadCategories()">
+            <select id="year-group-select" onchange="loadCategoriesAndComments()">
                 <option value="">-- Select Year Group --</option>
-                <!-- Options will be populated dynamically -->
             </select>
         </div>
 
         <div class="form-section">
-            <label for="action-select">Action:</label>
-            <select id="action-select" onchange="toggleActionSections()">
-                <option value="">-- Select Action --</option>
-                <option value="add-category">Add Category</option>
-                <option value="edit-category">Edit Category</option>
-                <option value="delete-category">Delete Category</option>
-                <option value="add-comment">Add Comment</option>
-                <option value="edit-comment">Edit Comment</option>
-                <option value="delete-comment">Delete Comment</option>
-                <option value="move-comment">Move Comment</option>
-            </select>
+            <label for="new-category-name">New Category Name:</label>
+            <input type="text" id="new-category-name" placeholder="Enter new category name">
+            <button class="button" onclick="addCategory()">Add Category</button>
         </div>
 
-        <div id="category-section" class="form-section" style="display: none;">
-            <label for="category-select">Category:</label>
-            <select id="category-select" onchange="loadComments()">
-                <option value="">-- Select Category --</option>
-                <!-- Options will be populated dynamically -->
-            </select>
-        </div>
-
-        <div id="comment-section" class="form-section" style="display: none;">
-            <label for="comment-select">Comment:</label>
-            <select id="comment-select" onchange="prefillComment()">
-                <option value="">-- Select Comment --</option>
-                <!-- Options will be populated dynamically -->
-            </select>
-        </div>
-
-        <div id="move-comment-section" class="form-section" style="display: none;">
-            <label for="new-category-select">New Category:</label>
-            <select id="new-category-select">
-                <option value="">-- Select New Category --</option>
-                <!-- Options will be populated dynamically -->
-            </select>
-        </div>
-
-        <div class="form-section">
-            <label for="name-input" id="name-input-label" style="display: none;">Name/Text:</label>
-            <input type="text" id="name-input" style="display: none;" placeholder="Enter name or comment text...">
-        </div>
-
-        <div class="form-section">
-            <button class="button" onclick="performAction()">Submit</button>
+        <div id="categories-container" class="category-container">
+            <!-- Categories and comments will be populated here -->
         </div>
     </div>
-
-    <div id="result-container" class="result-section"></div>
-
+    <div id="footer-placeholder"></div>
     <script>
-        async function loadSubjects() {
-            const response = await fetch('/api/subjects');
-            const subjects = await response.json();
-            const subjectSelect = document.getElementById('subject-select');
-            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
-            subjects.forEach(subject => {
-                const option = document.createElement('option');
-                option.value = subject.id;
-                option.textContent = subject.name;
-                subjectSelect.appendChild(option);
+        // Function to load header
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch("header.html")
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById("header-placeholder").innerHTML = data;
+                });
+        });
+
+        fetch('footer.html')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('footer-placeholder').innerHTML = data;
             });
-        }
 
         async function loadYearGroups() {
-            const response = await fetch('/api/year-groups');
-            const yearGroups = await response.json();
-            const yearGroupSelect = document.getElementById('year-group-select');
-            yearGroupSelect.innerHTML = '<option value="">-- Select Year Group --</option>';
-            yearGroups.forEach(yearGroup => {
-                const option = document.createElement('option');
-                option.value = yearGroup.id;
-                option.textContent = yearGroup.name;
-                yearGroupSelect.appendChild(option);
-            });
-        }
-
-        async function loadCategories() {
-            const subjectId = document.getElementById('subject-select').value;
-            const yearGroupId = document.getElementById('year-group-select').value;
-            if (subjectId && yearGroupId) {
-                const response = await fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
-                const categories = await response.json();
-                const categorySelect = document.getElementById('category-select');
-                categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
-                categories.forEach(category => {
+            try {
+                const response = await fetch('/api/year-groups');
+                if (!response.ok) {
+                    console.error('Failed to fetch year groups:', response.statusText);
+                    return;
+                }
+                const yearGroups = await response.json();
+                const yearGroupSelect = document.getElementById('year-group-select');
+                yearGroups.forEach(yearGroup => {
                     const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.name;
-                    categorySelect.appendChild(option);
+                    option.value = yearGroup.id;
+                    option.textContent = yearGroup.name;
+                    yearGroupSelect.appendChild(option);
                 });
-
-                const newCategorySelect = document.getElementById('new-category-select');
-                newCategorySelect.innerHTML = '<option value="">-- Select New Category --</option>';
-                categories.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.name;
-                    newCategorySelect.appendChild(option);
-                });
+            } catch (error) {
+                console.error('Error loading year groups:', error);
             }
         }
 
-        async function loadComments() {
-            const categoryId = document.getElementById('category-select').value;
-            if (categoryId) {
-                try {
-                    const response = await fetch(`/api/comments?categoryId=${categoryId}`);
-                    const text = await response.text(); // Get raw response text for debugging
-                    console.log('Response text:', text); // Log the raw response
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/api/subjects');
+                if (!response.ok) {
+                    console.error('Failed to fetch subjects:', response.statusText);
+                    return;
+                }
+                const subjects = await response.json();
+                const subjectSelect = document.getElementById('subject-select');
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.id;
+                    option.textContent = subject.name;
+                    subjectSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+            }
+        }
 
-                    const comments = JSON.parse(text); // Parse the response as JSON
-                    const commentSelect = document.getElementById('comment-select');
-                    commentSelect.innerHTML = '<option value="">-- Select Comment --</option>';
-                    comments.forEach(comment => {
-                        const option = document.createElement('option');
-                        option.value = comment.id;
-                        option.textContent = comment.text;
-                        commentSelect.appendChild(option);
+        async function loadCategoriesAndComments() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            if (subjectId && yearGroupId) {
+                try {
+                    const response = await fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
+                    if (!response.ok) {
+                        console.error('Failed to fetch categories and comments:', response.statusText);
+                        return;
+                    }
+                    const categories = await response.json();
+                    const categoriesContainer = document.getElementById('categories-container');
+                    categoriesContainer.innerHTML = '';
+                    categories.forEach(category => {
+                        const categoryDiv = document.createElement('div');
+                        categoryDiv.classList.add('category');
+                        categoryDiv.innerHTML = `
+                            <h3 contenteditable="true" onblur="editCategory(${category.id}, this.textContent)">${category.name}</h3>
+                            <button class="button delete" onclick="deleteCategory(${category.id})">Delete Category</button>
+                            <div>
+                                ${category.Comments.map(comment => `
+                                    <div class="comment" draggable="true" ondragstart="drag(event)" data-comment-id="${comment.id}">
+                                        <div class="comment-content" contenteditable="true" onblur="editComment(${comment.id}, this.textContent)">${comment.text}</div>
+                                        <div class="comment-actions">
+                                            <select onchange="moveComment(${comment.id}, this.value)">
+                                                <option value="">Move to...</option>
+                                                ${categories.map(cat => `
+                                                    <option value="${cat.id}" ${cat.id === category.id ? 'disabled' : ''}>${cat.name}</option>
+                                                `).join('')}
+                                            </select>
+                                            <button class="button delete" onclick="deleteComment(${comment.id})">Delete</button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                <div>
+                                    <textarea rows="2" placeholder="Add new comment"></textarea>
+                                    <button class="button addcomment" onclick="addComment(${category.id}, this.previousElementSibling.value)">Add Comment</button>
+                                </div>
+                            </div>
+                        `;
+                        categoryDiv.addEventListener('drop', drop);
+                        categoryDiv.addEventListener('dragover', allowDrop);
+                        categoriesContainer.appendChild(categoryDiv);
                     });
                 } catch (error) {
-                    console.error('Error loading comments:', error);
-                    alert('Error loading comments. Check the console for more details.');
+                    console.error('Error loading categories and comments:', error);
                 }
             }
         }
 
-        function toggleActionSections() {
-            const action = document.getElementById('action-select').value;
-            const categorySection = document.getElementById('category-section');
-            const commentSection = document.getElementById('comment-section');
-            const moveCommentSection = document.getElementById('move-comment-section');
-            const nameInput = document.getElementById('name-input');
-            const nameInputLabel = document.getElementById('name-input-label');
-
-            categorySection.style.display = 'none';
-            commentSection.style.display = 'none';
-            moveCommentSection.style.display = 'none';
-            nameInput.style.display = 'none';
-            nameInputLabel.style.display = 'none';
-
-            if (action === 'add-category') {
-                nameInput.style.display = 'block';
-                nameInputLabel.style.display = 'block';
-            } else if (action === 'edit-category' || action === 'delete-category') {
-                categorySection.style.display = 'block';
-                nameInput.style.display = action === 'edit-category' ? 'block' : 'none';
-                nameInputLabel.style.display = action === 'edit-category' ? 'block' : 'none';
-            } else if (action === 'add-comment') {
-                categorySection.style.display = 'block';
-                nameInput.style.display = 'block';
-                nameInputLabel.style.display = 'block';
-            } else if (action === 'edit-comment' || action === 'delete-comment' || action === 'move-comment') {
-                categorySection.style.display = 'block';
-                commentSection.style.display = 'block';
-                nameInput.style.display = action === 'edit-comment' ? 'block' : 'none';
-                nameInputLabel.style.display = action === 'edit-comment' ? 'block' : 'none';
-                moveCommentSection.style.display = action === 'move-comment' ? 'block' : 'none';
+        async function addCategory() {
+            const name = document.getElementById('new-category-name').value;
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            if (name && subjectId && yearGroupId) {
+                try {
+                    const response = await fetch('/api/categories', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name, subjectId, yearGroupId })
+                    });
+                    if (!response.ok) {
+                        console.error('Error adding category:', response.statusText);
+                        alert('Error adding category.');
+                        return;
+                    }
+                    document.getElementById('new-category-name').value = '';
+                    loadCategoriesAndComments();
+                } catch (error) {
+                    console.error('Error adding category:', error);
+                    alert('Error adding category.');
+                }
+            } else {
+                alert('Please enter a name and select a subject and year group.');
             }
         }
 
-        async function prefillCategory() {
-            const action = document.getElementById('action-select').value;
-            const categoryId = document.getElementById('category-select').value;
-            if (action === 'edit-category' && categoryId) {
-                const category = await fetch(`/api/categories/${categoryId}`).then(res => res.json());
-                document.getElementById('name-input').value = category.name;
+        async function editCategory(id, newName) {
+            if (newName) {
+                try {
+                    const response = await fetch(`/api/categories/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name: newName })
+                    });
+                    if (!response.ok) {
+                        console.error('Error editing category:', response.statusText);
+                        alert('Error editing category.');
+                    }
+                } catch (error) {
+                    console.error('Error editing category:', error);
+                    alert('Error editing category.');
+                }
             }
         }
 
-        async function prefillComment() {
-            const action = document.getElementById('action-select').value;
-            const commentId = document.getElementById('comment-select').value;
-            if (action === 'edit-comment' && commentId) {
-                const comment = await fetch(`/api/comments/${commentId}`).then(res => res.json());
-                document.getElementById('name-input').value = comment.text;
+        async function deleteCategory(id) {
+            if (confirm('Are you sure you want to delete this category? All comments in this category will also be deleted.')) {
+                try {
+                    const response = await fetch(`/api/categories/${id}`, {
+                        method: 'DELETE'
+                    });
+                    if (!response.ok) {
+                        console.error('Error deleting category:', response.statusText);
+                        alert('Error deleting category.');
+                        return;
+                    }
+                    loadCategoriesAndComments();
+                } catch (error) {
+                    console.error('Error deleting category:', error);
+                    alert('Error deleting category.');
+                }
             }
         }
 
-        async function performAction() {
-            const action = document.getElementById('action-select').value;
-            const categoryId = document.getElementById('category-select').value;
-            const commentId = document.getElementById('comment-select').value;
-            const newCategoryId = document.getElementById('new-category-select').value;
-            const name = document.getElementById('name-input').value;
-
-            if (action === 'add-category') {
-                await fetch('/api/categories', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name, subjectId: document.getElementById('subject-select').value, yearGroupId: document.getElementById('year-group-select').value })
-                });
-            } else if (action === 'edit-category') {
-                await fetch(`/api/categories/${categoryId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name })
-                });
-            } else if (action === 'delete-category') {
-                await fetch(`/api/categories/${categoryId}`, {
-                    method: 'DELETE'
-                });
-            } else if (action === 'add-comment') {
-                await fetch('/api/comments', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ text: name, categoryId })
-                });
-            } else if (action === 'edit-comment') {
-                await fetch(`/api/comments/${commentId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ text: name })
-                });
-            } else if (action === 'delete-comment') {
-                await fetch(`/api/comments/${commentId}`, {
-                    method: 'DELETE'
-                });
-            } else if (action === 'move-comment') {
-                await fetch('/api/move-comment', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ commentId, newCategoryId })
-                });
+        async function addComment(categoryId, text) {
+            if (text) {
+                try {
+                    const response = await fetch('/api/comments', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ text, categoryId })
+                    });
+                    if (!response.ok) {
+                        console.error('Error adding comment:', response.statusText);
+                        alert('Error adding comment.');
+                        return;
+                    }
+                    loadCategoriesAndComments();
+                } catch (error) {
+                    console.error('Error adding comment:', error);
+                    alert('Error adding comment.');
+                }
+            } else {
+                alert('Please enter a comment.');
             }
+        }
 
-            alert('Action performed successfully!');
-            // Reload the categories and comments to reflect changes
-            loadCategories();
-            loadComments();
+        async function editComment(id, newText) {
+            if (newText) {
+                try {
+                    const response = await fetch(`/api/comments/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ text: newText })
+                    });
+                    if (!response.ok) {
+                        console.error('Error editing comment:', response.statusText);
+                        alert('Error editing comment.');
+                    }
+                } catch (error) {
+                    console.error('Error editing comment:', error);
+                    alert('Error editing comment.');
+                }
+            }
+        }
+
+        async function deleteComment(id) {
+            if (confirm('Are you sure you want to delete this comment?')) {
+                try {
+                    const response = await fetch(`/api/comments/${id}`, {
+                        method: 'DELETE'
+                    });
+                    if (!response.ok) {
+                        console.error('Error deleting comment:', response.statusText);
+                        alert('Error deleting comment.');
+                        return;
+                    }
+                    loadCategoriesAndComments();
+                } catch (error) {
+                    console.error('Error deleting comment:', error);
+                    alert('Error deleting comment.');
+                }
+            }
+        }
+
+        async function moveComment(commentId, newCategoryId) {
+            if (newCategoryId) {
+                try {
+                    const response = await fetch('/api/move-comment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ commentId, newCategoryId })
+                    });
+                    if (!response.ok) {
+                        console.error('Error moving comment:', response.statusText);
+                        alert('Error moving comment.');
+                        return;
+                    }
+                    loadCategoriesAndComments();
+                } catch (error) {
+                    console.error('Error moving comment:', error);
+                    alert('Error moving comment.');
+                }
+            }
+        }
+
+        function allowDrop(event) {
+            event.preventDefault();
+        }
+
+        function drag(event) {
+            event.dataTransfer.setData('text', event.target.getAttribute('data-comment-id'));
+        }
+
+        async function drop(event) {
+            event.preventDefault();
+            const commentId = event.dataTransfer.getData('text');
+            const newCategoryId = event.target.closest('.category').querySelector('h3').getAttribute('data-category-id');
+            if (commentId && newCategoryId) {
+                try {
+                    const response = await fetch('/api/move-comment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ commentId, newCategoryId })
+                    });
+                    if (!response.ok) {
+                        console.error('Error moving comment:', response.statusText);
+                        alert('Error moving comment.');
+                        return;
+                    }
+                    loadCategoriesAndComments();
+                } catch (error) {
+                    console.error('Error moving comment:', error);
+                    alert('Error moving comment.');
+                }
+            }
         }
 
         // Load subjects and year groups on page load
@@ -308,7 +341,9 @@
             loadSubjects();
             loadYearGroups();
         });
+
     </script>
 
 </body>
 </html>
+

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Comments and Categories</title>
+    <link rel="stylesheet" href="styles.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -115,9 +116,11 @@
     </style>
 </head>
 <body>
-
+    <!-- Include header -->
+    <div id="header-placeholder"></div>
+    
     <h1>Manage Comments and Categories</h1>
-
+    <div id="form-container">
     <div class="form-section">
         <label for="year-group-select">Year Group:</label>
         <select id="year-group-select" onchange="loadCategoriesAndComments()">
@@ -137,12 +140,21 @@
         <input type="text" id="new-category-name" placeholder="Enter new category name">
         <button class="button" onclick="addCategory()">Add Category</button>
     </div>
-
+    </div>
     <div id="categories-container" class="category-container">
         <!-- Categories and comments will be populated here -->
     </div>
 
     <script>
+        // Function to load header
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch("header.html")
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById("header-placeholder").innerHTML = data;
+                });
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             loadYearGroups();
             loadSubjects();

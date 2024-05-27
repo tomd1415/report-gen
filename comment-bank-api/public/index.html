@@ -4,75 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comment Bank Selector</title>
+    <link rel="stylesheet" href="styles.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .form-section {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin: 5px 0;
-        }
-        select, input, textarea {
-            width: calc(440px);
-            padding: 8px;
-            margin: 5px 0 15px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        .button:hover {
-            background-color: #45a049;
-        }
-        .result-section {
-            margin-top: 20px;
-        }
-        .add-comment-btn {
-            width: 100px;
-            margin-left: 10px;
+
+        input{
+            width: 20em;
+            padding: 12px 10px;
+            margin: 8px 0;
             display: inline-block;
-            vertical-align: top;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
         }
+
+        .form-section label {
+            display: inline;
+            padding:15px;
+            margin:0;
+        }
+
+        .form-section select {
+            width: 40em;
+            padding: 12px 10px;
+            margin: 8px 0;
+            display: inline;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        .comment-category label {
+            display: block;
+            padding: 0;
+            margin: 0;
+            
+        }
+
+        .subject-year{
+            border: #000 0px solid ;
+        }
+
+        .subject-year .form-section{
+            display: inline-block;
+            padding: 10px;
+        }
+        .subject-year .form-section select{
+            width: 20em;
+        }
+
     </style>
 </head>
 <body>
-
+    
+    <div id="header-placeholder"></div>
+    <div class="container">
     <h1>Comment Bank Selector</h1>
 
     <div id="form-container">
+        <div class="subject-year">
+            <div class="form-section">
+                <label for="subject-select">Subject:</label>
+                <select id="subject-select" onchange="loadCategoriesAndComments()">
+                    <option value="">-- Select Subject --</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+            
+            <div class="form-section">
+                <label for="year-group-select">Year Group:</label>
+                <select id="year-group-select" onchange="loadCategoriesAndComments()">
+                    <option value="">-- Select Year Group --</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+            </div>
         <div class="form-section">
             <label for="pupil-name">Pupil Name:</label>
             <input type="text" id="pupil-name" required>
 
             <label for="pupil-pronouns">Pronouns:</label>
             <input type="text" id="pupil-pronouns" required>
-        </div>
-
-        <div class="form-section">
-            <label for="subject-select">Subject:</label>
-            <select id="subject-select" onchange="loadCategoriesAndComments()">
-                <option value="">-- Select Subject --</option>
-                <!-- Options will be populated dynamically -->
-            </select>
-        </div>
-
-        <div class="form-section">
-            <label for="year-group-select">Year Group:</label>
-            <select id="year-group-select" onchange="loadCategoriesAndComments()">
-                <option value="">-- Select Year Group --</option>
-                <!-- Options will be populated dynamically -->
-            </select>
         </div>
 
         <div id="categories-container"></div>
@@ -86,8 +95,25 @@
     </div>
 
     <div id="result-container" class="result-section"></div>
-
+    </div>
+    
+    <div id="footer-placeholder"></div>
     <script>
+        // Function to load header
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch("header.html")
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById("header-placeholder").innerHTML = data;
+                });
+        });
+
+        fetch('footer.html')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('footer-placeholder').innerHTML = data;
+            });
+
         let pupils = [];
         let promptPart = 'Generate a comprehensive report for a student.';
 
@@ -125,7 +151,7 @@
                 
                 const [categoriesResponse, promptPartResponse] = await Promise.all([
                     fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
-                    fetch(`/api/prompt-part?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
+                    fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
                 ]);
 
                 const categories = await categoriesResponse.json();
@@ -140,6 +166,7 @@
                 categories.forEach(category => {
                     const categoryDiv = document.createElement('div');
                     categoryDiv.classList.add('form-section');
+                    categoryDiv.classList.add('comment-category');
                     
                     const label = document.createElement('label');
                     label.for = category.name.toLowerCase().replace(' ', '-');
@@ -223,7 +250,7 @@
             });
 
             let resultContainer = document.getElementById('result-container');
-            resultContainer.innerHTML = ''; // Clear previous results
+            resultContainer.innerHTML = '<h1>Generating Report</h1>'; // Clear previous results
 
             // Generate report for the pupil
             try {
@@ -236,6 +263,7 @@
                 });
                 const data = await response.json();
                 let report = data.report;
+                resultContainer.innerHTML = ''
                 resultContainer.innerHTML += `<div><br />---------------------<br />${report}<br />------------------------<br /></div>`;
             } catch (error) {
                 console.error('Error:', error);
