@@ -436,7 +436,7 @@ app.post('/generate-report', async (req, res) => {
 
       // Replace the placeholder with the actual pupil's name
       report = report.replace(new RegExp(placeholder, 'g'), name);
-      
+
       res.json({ report });
   } catch (error) {
       console.error('Error generating report:', error);
@@ -446,9 +446,19 @@ app.post('/generate-report', async (req, res) => {
 
 // Endpoint to import reports and generate categories/comments
 app.post('/api/import-reports', async (req, res) => {
-  const { subjectId, yearGroupId, reports } = req.body;
+  const { subjectId, yearGroupId, pupilNames, reports } = req.body;
 
   try {
+      const placeholder = 'PUPIL_NAME';
+      const namesArray = pupilNames.split(',').map(name => name.trim());
+      let reportsWithPlaceholder = reports;
+
+      // Replace pupil names with placeholder
+      namesArray.forEach(name => {
+          const regex = new RegExp(`\\b${name}\\b`, 'g');
+          reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, placeholder);
+      });
+      
       // Call OpenAI to process the reports
       const response = await openai.chat.completions.create({
           model: 'gpt-4o',
@@ -459,38 +469,39 @@ app.post('/api/import-reports', async (req, res) => {
 
       const extractedText = response.choices[0].message.content.trim();
 
-      // Example response parsing (assumes categories and comments are structured in the response)
-      const categories = {};
-      const lines = extractedText.split('\n');
-      let currentCategory = null;
+        // Example response parsing (assumes categories and comments are structured in the response)
+        const categories = {};
+        const lines = extractedText.split('\n');
+        let currentCategory = null;
 
-      lines.forEach(line => {
-          const categoryMatch = line.match(/^Category: (.+)$/);
-          if (categoryMatch) {
-              currentCategory = categoryMatch[1];
-              categories[currentCategory] = new Set();
-          } else if (currentCategory && line.trim()) {
-              categories[currentCategory].add(line.trim());
-          }
-      });
+        lines.forEach(line => {
+            const categoryMatch = line.match(/^Category: (.+)$/);
+            if (categoryMatch) {
+                currentCategory = categoryMatch[1];
+                categories[currentCategory] = new Set();
+            } else if (currentCategory && line.trim()) {
+                categories[currentCategory].add(line.trim());
+            }
+        });
 
-      // Insert categories and comments into the database
-      for (const [categoryName, comments] of Object.entries(categories)) {
-          let category = await Category.findOne({ where: { name: categoryName, subjectId, yearGroupId } });
-          if (!category) {
-              category = await Category.create({ name: categoryName, subjectId, yearGroupId });
-          }
-          for (const comment of comments) {
-              await Comment.create({ text: comment, categoryId: category.id });
-          }
-      }
+        // Insert categories and comments into the database
+        for (const [categoryName, comments] of Object.entries(categories)) {
+            let category = await Category.findOne({ where: { name: categoryName, subjectId, yearGroupId } });
+            if (!category) {
+                category = await Category.create({ name: categoryName, subjectId, yearGroupId });
+            }
+            for (const comment of comments) {
+                await Comment.create({ text: comment, categoryId: category.id });
+            }
+        }
 
-      res.json({ message: 'Reports imported successfully and categories/comments generated.' });
-  } catch (error) {
-      console.error('Error importing reports:', error);
-      res.status(500).send('Error importing reports');
-  }
+        res.json({ message: 'Reports imported successfully and categories/comments generated.' });
+    } catch (error) {
+        console.error('Error importing reports:', error);
+        res.status(500).send('Error importing reports');
+    }
 });
+
 
 
 //app.listen(port, () => {

@@ -16,7 +16,7 @@
             display: block;
             margin: 5px 0;
         }
-        select, input, textarea {
+        input, textarea {
             width: 100%;
             padding: 8px;
             margin: 5px 0 15px 0;
@@ -41,28 +41,38 @@
     </style>
 </head>
 <body>
+
     <h1>Import Reports</h1>
 
-    <div class="form-section">
-        <label for="subject-select">Subject:</label>
-        <select id="subject-select">
-            <option value="">-- Select Subject --</option>
-        </select>
-    </div>
+    <div id="form-container">
+        <div class="form-section">
+            <label for="subject-select">Subject:</label>
+            <select id="subject-select">
+                <option value="">-- Select Subject --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
 
-    <div class="form-section">
-        <label for="year-group-select">Year Group:</label>
-        <select id="year-group-select">
-            <option value="">-- Select Year Group --</option>
-        </select>
-    </div>
+        <div class="form-section">
+            <label for="year-group-select">Year Group:</label>
+            <select id="year-group-select">
+                <option value="">-- Select Year Group --</option>
+                <!-- Options will be populated dynamically -->
+            </select>
+        </div>
 
-    <div class="form-section">
-        <label for="reports-input">Paste Reports Here:</label>
-        <textarea id="reports-input" rows="10" placeholder="Paste multiple reports here..."></textarea>
-    </div>
+        <div class="form-section">
+            <label for="pupil-names">Pupil Names (comma separated):</label>
+            <input type="text" id="pupil-names" placeholder="Enter pupil names separated by commas...">
+        </div>
 
-    <button class="button" onclick="importReports()">Import Reports</button>
+        <div class="form-section">
+            <label for="reports">Reports:</label>
+            <textarea id="reports" rows="10" placeholder="Paste the reports here..."></textarea>
+        </div>
+
+        <button class="button" onclick="importReports()">Import Reports</button>
+    </div>
 
     <div id="result-container" class="result-section"></div>
 
@@ -77,6 +87,8 @@
             const yearGroups = await yearGroupsResponse.json();
 
             const subjectSelect = document.getElementById('subject-select');
+            const yearGroupSelect = document.getElementById('year-group-select');
+
             subjects.forEach(subject => {
                 const option = document.createElement('option');
                 option.value = subject.id;
@@ -84,7 +96,6 @@
                 subjectSelect.appendChild(option);
             });
 
-            const yearGroupSelect = document.getElementById('year-group-select');
             yearGroups.forEach(yearGroup => {
                 const option = document.createElement('option');
                 option.value = yearGroup.id;
@@ -96,9 +107,10 @@
         async function importReports() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
-            const reports = document.getElementById('reports-input').value;
+            const pupilNames = document.getElementById('pupil-names').value;
+            const reports = document.getElementById('reports').value;
 
-            if (!subjectId || !yearGroupId || !reports) {
+            if (!subjectId || !yearGroupId || !pupilNames || !reports) {
                 alert('Please fill in all fields.');
                 return;
             }
@@ -108,16 +120,22 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ subjectId, yearGroupId, reports })
+                body: JSON.stringify({
+                    subjectId,
+                    yearGroupId,
+                    pupilNames,
+                    reports
+                })
             });
 
             const result = await response.json();
+
             const resultContainer = document.getElementById('result-container');
-            resultContainer.innerHTML = result.message;
+            resultContainer.innerHTML = `<p>${result.message}</p>`;
         }
 
-        // Load subjects and year groups on page load
         document.addEventListener('DOMContentLoaded', loadSubjectsAndYearGroups);
     </script>
+
 </body>
 </html>
