@@ -17,7 +17,7 @@
             margin: 5px 0;
         }
         select, input, textarea {
-            width: 100%;
+            width: calc(440px);
             padding: 8px;
             margin: 5px 0 15px 0;
             border: 1px solid #ccc;
@@ -37,6 +37,12 @@
         }
         .result-section {
             margin-top: 20px;
+        }
+        .add-comment-btn {
+            width: 100px;
+            margin-left: 10px;
+            display: inline-block;
+            vertical-align: top;
         }
     </style>
 </head>
@@ -76,8 +82,7 @@
             <textarea id="additional-comments" rows="4" placeholder="Add any additional comments about the pupil here..."></textarea>
         </div>
 
-        <button class="button" onclick="addPupil()">Add Pupil</button>
-        <button class="button" onclick="generateReports()">Generate Reports</button>
+        <button class="button" onclick="generateReport()">Generate Report</button>
     </div>
 
     <div id="result-container" class="result-section"></div>
@@ -152,16 +157,54 @@
                         select.appendChild(option);
                     });
 
+                    const addCommentButton = document.createElement('button');
+                    addCommentButton.classList.add('button', 'add-comment-btn');
+                    addCommentButton.textContent = 'Add Comment';
+                    addCommentButton.onclick = () => addNewComment(category.id, select);
+
                     categoryDiv.appendChild(select);
+                    categoryDiv.appendChild(addCommentButton);
                     categoriesContainer.appendChild(categoryDiv);
                 });
             }
         }
 
-        function addPupil() {
+        async function addNewComment(categoryId, selectElement) {
+            const commentText = prompt('Enter the new comment:');
+            if (commentText) {
+                try {
+                    const response = await fetch('/api/comments', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ text: commentText, categoryId })
+                    });
+                    if (!response.ok) {
+                        console.error('Error adding comment:', response.statusText);
+                        alert('Error adding comment.');
+                        return;
+                    }
+                    const newComment = await response.json();
+                    const option = document.createElement('option');
+                    option.value = newComment.text;
+                    option.textContent = newComment.text;
+                    selectElement.appendChild(option);
+                    selectElement.value = newComment.text; // Select the newly added comment
+                } catch (error) {
+                    console.error('Error adding comment:', error);
+                    alert('Error adding comment.');
+                }
+            }
+        }
+
+        async function generateReport() {
             const pupilName = document.getElementById('pupil-name').value;
             const pupilPronouns = document.getElementById('pupil-pronouns').value;
             const additionalComments = document.getElementById('additional-comments').value;
+
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
 
             const categoriesContainer = document.getElementById('categories-container');
             const categorySelects = categoriesContainer.getElementsByTagName('select');
@@ -169,8 +212,8 @@
             const pupil = {
                 name: pupilName,
                 pronouns: pupilPronouns,
-                subjectId: document.getElementById('subject-select').value,
-                yearGroupId: document.getElementById('year-group-select').value,
+                subjectId: subjectId,
+                yearGroupId: yearGroupId,
                 additionalComments: additionalComments
             };
 
@@ -179,40 +222,34 @@
                 pupil[categoryName] = select.value;
             });
 
-            pupils.push(pupil);
-
-            // Clear the form fields
-            document.getElementById('pupil-name').value = '';
-            document.getElementById('pupil-pronouns').value = '';
-            document.getElementById('subject-select').selectedIndex = 0;
-            document.getElementById('year-group-select').selectedIndex = 0;
-            categoriesContainer.innerHTML = '';
-            document.getElementById('additional-comments').value = '';
-
-            alert('Pupil added successfully!');
-        }
-
-        function generateReports() {
             let resultContainer = document.getElementById('result-container');
             resultContainer.innerHTML = ''; // Clear previous results
 
-            pupils.forEach(pupil => {
-                fetch('/generate-report', {
+            // Generate report for the pupil
+            try {
+                const response = await fetch('/generate-report', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(pupil)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    let report = data.report;
-                    resultContainer.innerHTML += `<div><br />---------------------<br />${report}<br />------------------------<br /></div>`;
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
                 });
+                const data = await response.json();
+                let report = data.report;
+                resultContainer.innerHTML += `<div><br />---------------------<br />${report}<br />------------------------<br /></div>`;
+            } catch (error) {
+                console.error('Error:', error);
+                resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
+            }
+
+            // Clear the form fields
+            document.getElementById('pupil-name').value = '';
+            document.getElementById('pupil-pronouns').value = '';
+            document.getElementById('additional-comments').value = '';
+
+            // Reset all comment selections to "-- Select Comment --"
+            Array.from(categorySelects).forEach(select => {
+                select.selectedIndex = 0;
             });
         }
 
