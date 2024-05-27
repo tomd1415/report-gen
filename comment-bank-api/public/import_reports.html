@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Reports</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .form-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .result-section {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Import Reports</h1>
+
+    <div class="form-section">
+        <label for="subject-select">Subject:</label>
+        <select id="subject-select">
+            <option value="">-- Select Subject --</option>
+        </select>
+    </div>
+
+    <div class="form-section">
+        <label for="year-group-select">Year Group:</label>
+        <select id="year-group-select">
+            <option value="">-- Select Year Group --</option>
+        </select>
+    </div>
+
+    <div class="form-section">
+        <label for="reports-input">Paste Reports Here:</label>
+        <textarea id="reports-input" rows="10" placeholder="Paste multiple reports here..."></textarea>
+    </div>
+
+    <button class="button" onclick="importReports()">Import Reports</button>
+
+    <div id="result-container" class="result-section"></div>
+
+    <script>
+        async function loadSubjectsAndYearGroups() {
+            const [subjectsResponse, yearGroupsResponse] = await Promise.all([
+                fetch('/api/subjects'),
+                fetch('/api/year-groups')
+            ]);
+
+            const subjects = await subjectsResponse.json();
+            const yearGroups = await yearGroupsResponse.json();
+
+            const subjectSelect = document.getElementById('subject-select');
+            subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
+            });
+
+            const yearGroupSelect = document.getElementById('year-group-select');
+            yearGroups.forEach(yearGroup => {
+                const option = document.createElement('option');
+                option.value = yearGroup.id;
+                option.textContent = yearGroup.name;
+                yearGroupSelect.appendChild(option);
+            });
+        }
+
+        async function importReports() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            const reports = document.getElementById('reports-input').value;
+
+            if (!subjectId || !yearGroupId || !reports) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            const response = await fetch('/api/import-reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ subjectId, yearGroupId, reports })
+            });
+
+            const result = await response.json();
+            const resultContainer = document.getElementById('result-container');
+            resultContainer.innerHTML = result.message;
+        }
+
+        // Load subjects and year groups on page load
+        document.addEventListener('DOMContentLoaded', loadSubjectsAndYearGroups);
+    </script>
+</body>
+</html>
