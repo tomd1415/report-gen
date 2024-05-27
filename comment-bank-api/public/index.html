@@ -207,7 +207,7 @@
                 .then(response => response.json())
                 .then(data => {
                     let report = data.report;
-                    resultContainer.innerHTML += `<div>${report}</div>`;
+                    resultContainer.innerHTML += `<div><br />---------------------<br />${report}<br />------------------------<br /></div>`;
                 })
                 .catch(error => {
                     console.error('Error:', error);

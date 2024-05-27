@@ -16,10 +16,10 @@
             display: block;
             margin: 5px 0;
         }
-        input, button {
+        select, input, button {
             width: 100%;
             padding: 8px;
-            margin: 5px 0 15px 0;
+            margin: 5px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
@@ -35,146 +35,233 @@
         .button:hover {
             background-color: #45a049;
         }
+        .result-section {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Manage Subjects and Year Groups</h1>
+<h1>Manage Subjects and Year Groups</h1>
 
+<div id="form-container">
     <div class="form-section">
-        <h2>Add Subject</h2>
         <label for="subject-name">Subject Name:</label>
         <input type="text" id="subject-name">
         <button class="button" onclick="addSubject()">Add Subject</button>
     </div>
 
     <div class="form-section">
-        <h2>Add Year Group</h2>
         <label for="year-group-name">Year Group Name:</label>
         <input type="text" id="year-group-name">
         <button class="button" onclick="addYearGroup()">Add Year Group</button>
     </div>
 
     <div class="form-section">
-        <h2>Existing Subjects</h2>
-        <ul id="subjects-list"></ul>
+        <label for="subject-select">Select Subject:</label>
+        <select id="subject-select">
+            <!-- Options will be populated dynamically -->
+        </select>
+        <button class="button" onclick="deleteSubject()">Delete Selected Subject</button>
     </div>
 
     <div class="form-section">
-        <h2>Existing Year Groups</h2>
-        <ul id="year-groups-list"></ul>
+        <label for="year-group-select">Select Year Group:</label>
+        <select id="year-group-select">
+            <!-- Options will be populated dynamically -->
+        </select>
+        <button class="button" onclick="deleteYearGroup()">Delete Selected Year Group</button>
     </div>
+</div>
 
-    <script>
-        async function fetchSubjects() {
-            const response = await fetch('/api/subjects');
-            const subjects = await response.json();
-            const subjectsList = document.getElementById('subjects-list');
-            subjectsList.innerHTML = '';
-            subjects.forEach(subject => {
-                const li = document.createElement('li');
-                li.textContent = subject.name;
-                li.appendChild(createEditButton(subject.id, subject.name, 'subject'));
-                li.appendChild(createDeleteButton(subject.id, 'subject'));
-                subjectsList.appendChild(li);
-            });
-        }
+<div id="result-container" class="result-section">
+    <h2>Current Subjects</h2>
+    <table id="subjects-table">
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Actions</th>
+        </tr>
+        <!-- Rows will be populated dynamically -->
+    </table>
 
-        async function fetchYearGroups() {
-            const response = await fetch('/api/year-groups');
-            const yearGroups = await response.json();
-            const yearGroupsList = document.getElementById('year-groups-list');
-            yearGroupsList.innerHTML = '';
-            yearGroups.forEach(yearGroup => {
-                const li = document.createElement('li');
-                li.textContent = yearGroup.name;
-                li.appendChild(createEditButton(yearGroup.id, yearGroup.name, 'yearGroup'));
-                li.appendChild(createDeleteButton(yearGroup.id, 'yearGroup'));
-                yearGroupsList.appendChild(li);
-            });
-        }
+    <h2>Current Year Groups</h2>
+    <table id="year-groups-table">
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Actions</th>
+        </tr>
+        <!-- Rows will be populated dynamically -->
+    </table>
+</div>
 
-        function createEditButton(id, name, type) {
-            const button = document.createElement('button');
-            button.textContent = 'Edit';
-            button.onclick = () => editItem(id, name, type);
-            return button;
-        }
+<script>
+    async function fetchSubjects() {
+        const response = await fetch('/api/subjects');
+        const subjects = await response.json();
+        const subjectSelect = document.getElementById('subject-select');
+        const subjectsTable = document.getElementById('subjects-table');
 
-        function createDeleteButton(id, type) {
-            const button = document.createElement('button');
-            button.textContent = 'Delete';
-            button.onclick = () => deleteItem(id, type);
-            return button;
-        }
+        subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+        subjectsTable.innerHTML = `
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Actions</th>
+            </tr>
+        `;
 
-        async function addSubject() {
-            const name = document.getElementById('subject-name').value;
-            if (name) {
-                await fetch('/api/subjects', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name })
-                });
-                document.getElementById('subject-name').value = '';
-                fetchSubjects();
-            }
-        }
+        subjects.forEach(subject => {
+            const option = document.createElement('option');
+            option.value = subject.id;
+            option.textContent = subject.name;
+            subjectSelect.appendChild(option);
 
-        async function addYearGroup() {
-            const name = document.getElementById('year-group-name').value;
-            if (name) {
-                await fetch('/api/year-groups', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name })
-                });
-                document.getElementById('year-group-name').value = '';
-                fetchYearGroups();
-            }
-        }
-
-        async function editItem(id, name, type) {
-            const newName = prompt(`Enter new name for the ${type}:`, name);
-            if (newName) {
-                await fetch(`/api/${type}s/${id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name: newName })
-                });
-                if (type === 'subject') {
-                    fetchSubjects();
-                } else {
-                    fetchYearGroups();
-                }
-            }
-        }
-
-        async function deleteItem(id, type) {
-            if (confirm(`Are you sure you want to delete this ${type}?`)) {
-                await fetch(`/api/${type}s/${id}`, {
-                    method: 'DELETE'
-                });
-                if (type === 'subject') {
-                    fetchSubjects();
-                } else {
-                    fetchYearGroups();
-                }
-            }
-        }
-
-        // Fetch subjects and year groups on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchSubjects();
-            fetchYearGroups();
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${subject.id}</td>
+                <td>${subject.name}</td>
+                <td><button onclick="editSubject(${subject.id}, '${subject.name}')">Edit</button></td>
+            `;
+            subjectsTable.appendChild(row);
         });
-    </script>
+    }
+
+    async function fetchYearGroups() {
+        const response = await fetch('/api/year-groups');
+        const yearGroups = await response.json();
+        const yearGroupSelect = document.getElementById('year-group-select');
+        const yearGroupsTable = document.getElementById('year-groups-table');
+
+        yearGroupSelect.innerHTML = '<option value="">-- Select Year Group --</option>';
+        yearGroupsTable.innerHTML = `
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Actions</th>
+            </tr>
+        `;
+
+        yearGroups.forEach(yearGroup => {
+            const option = document.createElement('option');
+            option.value = yearGroup.id;
+            option.textContent = yearGroup.name;
+            yearGroupSelect.appendChild(option);
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${yearGroup.id}</td>
+                <td>${yearGroup.name}</td>
+                <td><button onclick="editYearGroup(${yearGroup.id}, '${yearGroup.name}')">Edit</button></td>
+            `;
+            yearGroupsTable.appendChild(row);
+        });
+    }
+
+    async function addSubject() {
+        const name = document.getElementById('subject-name').value;
+        if (name) {
+            try {
+                const response = await fetch('/api/subjects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (response.ok) {
+                    document.getElementById('subject-name').value = '';
+                    fetchSubjects();
+                } else {
+                    console.error('Error adding subject:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error adding subject:', error);
+            }
+        }
+    }
+
+    async function addYearGroup() {
+        const name = document.getElementById('year-group-name').value;
+        if (name) {
+            await fetch('/api/year-groups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name })
+            });
+            document.getElementById('year-group-name').value = '';
+            fetchYearGroups();
+        }
+    }
+
+    async function deleteSubject() {
+        const id = document.getElementById('subject-select').value;
+        if (id) {
+            await fetch(`/api/subjects/${id}`, {
+                method: 'DELETE'
+            });
+            fetchSubjects();
+        }
+    }
+
+    async function deleteYearGroup() {
+        const id = document.getElementById('year-group-select').value;
+        if (id) {
+            await fetch(`/api/year-groups/${id}`, {
+                method: 'DELETE'
+            });
+            fetchYearGroups();
+        }
+    }
+
+    async function editSubject(id, name) {
+        const newName = prompt('Edit subject name:', name);
+        if (newName) {
+            await fetch(`/api/subjects/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: newName })
+            });
+            fetchSubjects();
+        }
+    }
+
+    async function editYearGroup(id, name) {
+        const newName = prompt('Edit year group name:', name);
+        if (newName) {
+            await fetch(`/api/year-groups/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: newName })
+            });
+            fetchYearGroups();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchSubjects();
+        fetchYearGroups();
+    });
+</script>
 
 </body>
 </html>

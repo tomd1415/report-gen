@@ -102,6 +102,46 @@
             });
         }
 
+        async function fetchCategories() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            if (subjectId && yearGroupId) {
+                const response = await fetch(`/api/categories?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
+                const categories = await response.json();
+                const categoriesContainer = document.getElementById('categories-container');
+                categoriesContainer.innerHTML = '';
+                const commentCategorySelect = document.getElementById('comment-category');
+                commentCategorySelect.innerHTML = '<option value="">-- Select Category --</option>';
+
+                categories.forEach(category => {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.classList.add('form-section');
+                    
+                    const label = document.createElement('label');
+                    label.textContent = category.name;
+                    categoryDiv.appendChild(label);
+
+                    const commentsList = document.createElement('ul');
+                    category.Comments.forEach(comment => {
+                        const li = document.createElement('li');
+                        li.textContent = comment.text;
+                        li.appendChild(createEditButton(comment.id, comment.text, 'comment'));
+                        li.appendChild(createDeleteButton(comment.id, 'comment'));
+                        li.appendChild(createMoveButton(comment.id, category.id));
+                        commentsList.appendChild(li);
+                    });
+                    categoryDiv.appendChild(commentsList);
+
+                    categoriesContainer.appendChild(categoryDiv);
+
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    commentCategorySelect.appendChild(option);
+                });
+            }
+        }
+
         async function loadCategoriesAndComments() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
