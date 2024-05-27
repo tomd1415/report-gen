@@ -89,30 +89,6 @@ const Comment = sequelize.define('Comment', {
 }, {
   timestamps: false
 });
-/*
-const SubjectYearGroupPrompt = sequelize.define('SubjectYearGroupPrompt', {
-  subjectId: {
-    type: Sequelize.INTEGER,
-    references: {
-      model: Subject,
-      key: 'id'
-    }
-  },
-  yearGroupId: {
-    type: Sequelize.INTEGER,
-    references: {
-      model: YearGroup,
-      key: 'id'
-    }
-  },
-  promptPart: {
-    type: Sequelize.TEXT,
-    allowNull: false
-  }
-}, {
-  timestamps: false
-});
-*/
 
 const Prompt = sequelize.define('Prompt', {
   subjectId: {
@@ -535,9 +511,35 @@ app.post('/api/import-reports', async (req, res) => {
       // Call OpenAI to process the reports
       const response = await openai.chat.completions.create({
           model: 'gpt-4o',
-          messages: [{ role: 'user', content: `Extract categories and comments from the following reports. These categories and comments are to be used in a comment bank to help write future reports and so should not contain names and be reasonably short. There should be no more than 8 comments per category. Please remove similar comments. The final category should be 'Targets' and have some relevant and reasonable possibel targets for these pupils reports. They should be in the format of Category: and then the category name followed by a new line and then the comment. Each comment should have a new line after it. Here is an example of the output I would like: Category: Interest and Engagement\nShows good attitude initially but sometimes struggles to maintain focus.\nBrings a quiet confidence to all computing lessons but can sometimes lose focus.\n\nCategory: Independent Study\nKeen to learn quickly but sometimes rushes and misses mistakes.\nPrefers independence and self-study, often completing work outside of school.\nThe reports start here:\n\n${reports}` }],
-          max_tokens: 2000,
-          temperature: 0.7
+          messages: [{
+            role: 'user',
+            content: `
+            Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports. There should be no more than 8 categories and similar categories should be merged. Ensure that the comments are concise, clear, and avoid any redundancy. Each category should have no more than 8 comments, and similar comments should be merged or removed. The final category should be 'Targets', containing specific and actionable targets for students, with the last target being "***Generate a target for this pupil and add to the report***". 
+            
+            Please try to make each category have the comments cover a variety of abilities and behaviors. Please order the comments from least able to most able. 
+
+            Format the output as follows:
+            Category: [Category Name]
+            [Comment 1]
+            [Comment 2]
+            ...
+    
+            Here is an example of the desired output:
+            Category: Interest and Engagement
+            Shows good attitude initially but sometimes struggles to maintain focus.
+            Brings a quiet confidence to all computing lessons but can sometimes lose focus.
+    
+            Category: Independent Study
+            Keen to learn quickly but sometimes rushes and misses mistakes.
+            Prefers independence and self-study, often completing work outside of school.
+    
+            The reports start here:
+    
+            ${reportsWithPlaceholder}
+            `
+        }],
+          max_tokens: 3500,
+          temperature: 0.6
       });
 
       const extractedText = response.choices[0].message.content.trim();
