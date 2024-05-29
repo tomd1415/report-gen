@@ -6,70 +6,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comment Bank Selector</title>
     <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 
-<body class="bg-light-blue text-dark-gray">
+<body class="bg-blue-100 text-gray-900">
 
     <div id="header-placeholder"></div>
-    <div class="container bg-light-blue rounded-lg shadow-lg">
-        <h1 class="main-title">Generate Report</h1>
+    <div class="container mx-auto p-4 bg-blue-100 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold mb-4 text-center">Generate Report</h1>
 
         <div id="form-container">
             <div class="subject-year">
                 <div class="form-section">
-                    <select id="subject-select" onchange="loadCategoriesAndComments()" class="form-control">
+                    <select id="subject-select" onchange="loadCategoriesAndComments()"
+                        class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
                         <option value="">Select Subject</option>
                     </select>
                 </div>
-                
+
                 <div class="form-section">
-                    <select id="year-group-select" onchange="loadCategoriesAndComments()" class="form-control">
+                    <select id="year-group-select" onchange="loadCategoriesAndComments()"
+                        class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
                         <option value="">Select Year Group</option>
                     </select>
                 </div>
             </div>
 
-            <div id="name-pronoun-section" class="flex-center">
-                <div class="flex-col-center">
-                    <input type="text" id="pupil-name" required class="input-text">
-                    <label for="pupil-name" class="block text-center">Pupil's First Name</label>
+            <div id="name-pronoun-section" class="flex justify-center space-x-4">
+                <div class="flex flex-col items-center">
+                    <input type="text" id="pupil-name" required class="border border-gray-300 rounded-md shadow-sm mb-0 p-1 text-center">
+                    <label for="pupil-name" class="block text-center">Pupil Name</label>
                 </div>
-                <div class="flex-col-center">
-                    <input type="text" id="pupil-pronouns" required class="input-text">
+                <div class="flex flex-col items-center">
+                    <input type="text" id="pupil-pronouns" required class="border border-gray-300 rounded-md shadow-sm mb-0 p-1 text-center">
                     <label for="pupil-pronouns" class="block text-center">Pronouns</label>
                 </div>
             </div>
+            
 
-            <div id="categories-container" class="comment-categories-container">
-                <!-- Dynamic content will be added here -->
-            </div>
+            <div id="categories-container" class="comment-categories-container"></div>
 
-            <div class="form-section" id="additional-comments-wrapper">
+            <div class="form-section">
                 <label for="additional-comments">Additional Comments:</label>
-                <textarea id="additional-comments" rows="4" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
+                <textarea id="additional-comments" rows="4"
+                    class="w-full border border-gray-300 rounded-md shadow-sm"
+                    placeholder="Add any additional comments about the pupil here..."></textarea>
             </div>
 
-            <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
-
+            <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="generateReport()">Generate
+                Report</button>
         </div>
 
-        <div id="result-container" class="result-section"></div>
+        <div id="result-container" class="result-section mt-4 p-4 bg-gray-100 rounded-md shadow-md border-slate-900 border-2"></div>
     </div>
 
     <div id="footer-placeholder"></div>
 
-    <div id="add-comment-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2 class="modal-title">Add New Comment</h2>
-            <textarea id="new-comment-text" rows="4" class="textarea mb-4" placeholder="Enter new comment"></textarea>
-            <div class="modal-buttons">
-                <button class="button cancel" onclick="closeModal()">Cancel</button>
-                <button class="button save" onclick="saveNewComment()">Save Comment</button>
+    <div id="add-comment-modal" class="modal hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg p-8">
+            <h2 class="text-xl font-bold mb-4">Add New Comment</h2>
+            <textarea id="new-comment-text" rows="4" class="w-full border border-gray-300 rounded-md shadow-sm mb-4"
+                placeholder="Enter new comment"></textarea>
+            <div class="flex justify-end">
+                <button class="button bg-gray-600 text-white px-4 py-2 rounded-md mr-2" onclick="closeModal()">Cancel</button>
+                <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="saveNewComment()">Save Comment</button>
             </div>
         </div>
     </div>
 
     <script>
+        // Function to load header
         document.addEventListener("DOMContentLoaded", function () {
             fetch("header.html")
                 .then(response => response.text())
@@ -117,7 +123,6 @@
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             if (subjectId && yearGroupId) {
-                document.getElementById('name-pronoun-section').style.display = 'flex';
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
 
                 const [categoriesResponse, promptPartResponse] = await Promise.all([
@@ -136,7 +141,8 @@
 
                 categories.forEach(category => {
                     const categoryDiv = document.createElement('div');
-                    categoryDiv.classList.add('form-section', 'comment-category');
+                    categoryDiv.classList.add('form-section', 'm-1', 'p-1', 'bg-blue-300', 'rounded-md', 'shadow-sm');
+                    categoryDiv.classList.add('comment-category', 'm-0', 'p-0');
 
                     const label = document.createElement('label');
                     label.for = category.name.toLowerCase().replace(' ', '-');
@@ -146,7 +152,7 @@
                     const select = document.createElement('select');
                     select.id = category.name.toLowerCase().replace(' ', '-');
                     select.innerHTML = '<option value="">-- Select Comment --</option>';
-                    select.classList.add('dropdown');
+                    select.classList.add('border', 'border-gray-300', 'rounded-md', 'shadow-sm');
 
                     category.Comments.forEach(comment => {
                         const option = document.createElement('option');
@@ -171,9 +177,6 @@
                     categoryDiv.appendChild(select);
                     categoriesContainer.appendChild(categoryDiv);
                 });
-                document.getElementById('additional-comments-wrapper').style.display = 'block';
-                document.getElementById('generate-report').style.display = 'block';
-
             }
         }
 
@@ -273,7 +276,7 @@
                 const categoryName = select.id.replace('-', ' ');
                 pupil[categoryName] = select.value;
             });
-            document.getElementById('result-container').style.display = 'block';
+
             let resultContainer = document.getElementById('result-container');
             resultContainer.innerHTML = '<h1>Generating Report</h1>'; // Clear previous results
 
@@ -289,7 +292,7 @@
                 const data = await response.json();
                 let report = data.report;
                 resultContainer.innerHTML = ''
-                resultContainer.innerHTML += `<div>${report}</div>`;
+                resultContainer.innerHTML += `<div><br />---------------------<br />${report}<br />------------------------<br /></div>`;
             } catch (error) {
                 console.error('Error:', error);
                 resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
@@ -315,4 +318,5 @@
 
 </body>
 </html>
+
 

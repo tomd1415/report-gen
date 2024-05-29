@@ -1,76 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comment Bank Selector</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+
+        input{
+            width: 20em;
+            padding: 12px 10px;
+            margin: 8px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        .form-section label {
+            display: inline;
+            padding:15px;
+            margin:0;
+        }
+
+        .form-section select {
+            width: 40em;
+            padding: 12px 10px;
+            margin: 8px 0;
+            display: inline;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        .comment-category label {
+            display: block;
+            padding: 0;
+            margin: 0;
+            
+        }
+
+        .subject-year{
+            #border: #000 8px solid ;
+	    vertical-align: middle;
+        }
+
+        .subject-year .form-section{
+            display: inline;
+            padding: 10px;
+	    #border: #000 4px solid;
+        }
+        .subject-year .form-section select{
+            width: 20em;
+        }
+	.container
+	{	
+	    vertical-align: middle;
+	}
+    </style>
 </head>
-
-<body class="bg-light-blue text-dark-gray">
-
+<body>
+    
     <div id="header-placeholder"></div>
-    <div class="container bg-light-blue rounded-lg shadow-lg">
-        <h1 class="main-title">Generate Report</h1>
+    <div class="container">
+    <h1>Comment Bank Selector</h1>
 
-        <div id="form-container">
-            <div class="subject-year">
-                <div class="form-section">
-                    <select id="subject-select" onchange="loadCategoriesAndComments()" class="form-control">
-                        <option value="">Select Subject</option>
-                    </select>
-                </div>
-                
-                <div class="form-section">
-                    <select id="year-group-select" onchange="loadCategoriesAndComments()" class="form-control">
-                        <option value="">Select Year Group</option>
-                    </select>
-                </div>
+    <div id="form-container">
+        <div class="subject-year">
+            <div class="form-section">
+                <label for="subject-select">Subject:</label>
+                <select id="subject-select" onchange="loadCategoriesAndComments()">
+                    <option value="">-- Select Subject --</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
             </div>
-
-            <div id="name-pronoun-section" class="flex-center">
-                <div class="flex-col-center">
-                    <input type="text" id="pupil-name" required class="input-text">
-                    <label for="pupil-name" class="block text-center">Pupil's First Name</label>
-                </div>
-                <div class="flex-col-center">
-                    <input type="text" id="pupil-pronouns" required class="input-text">
-                    <label for="pupil-pronouns" class="block text-center">Pronouns</label>
-                </div>
+            
+            <div class="form-section">
+                <label for="year-group-select">Year Group:</label>
+                <select id="year-group-select" onchange="loadCategoriesAndComments()">
+                    <option value="">-- Select Year Group --</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
             </div>
-
-            <div id="categories-container" class="comment-categories-container">
-                <!-- Dynamic content will be added here -->
             </div>
+        <div class="form-section">
+            <label for="pupil-name">Pupil Name:</label>
+            <input type="text" id="pupil-name" required>
 
-            <div class="form-section" id="additional-comments-wrapper">
-                <label for="additional-comments">Additional Comments:</label>
-                <textarea id="additional-comments" rows="4" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
-            </div>
-
-            <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
-
+            <label for="pupil-pronouns">Pronouns:</label>
+            <input type="text" id="pupil-pronouns" required>
         </div>
 
-        <div id="result-container" class="result-section"></div>
+        <div id="categories-container"></div>
+
+        <div class="form-section">
+            <label for="additional-comments">Additional Comments:</label>
+            <textarea id="additional-comments" rows="4" placeholder="Add any additional comments about the pupil here..."></textarea>
+        </div>
+
+        <button class="button" onclick="generateReport()">Generate Report</button>
     </div>
 
+    <div id="result-container" class="result-section"></div>
+    </div>
+    
     <div id="footer-placeholder"></div>
-
-    <div id="add-comment-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2 class="modal-title">Add New Comment</h2>
-            <textarea id="new-comment-text" rows="4" class="textarea mb-4" placeholder="Enter new comment"></textarea>
-            <div class="modal-buttons">
-                <button class="button cancel" onclick="closeModal()">Cancel</button>
-                <button class="button save" onclick="saveNewComment()">Save Comment</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
+        // Function to load header
+        document.addEventListener("DOMContentLoaded", function() {
             fetch("header.html")
                 .then(response => response.text())
                 .then(data => {
@@ -91,7 +126,7 @@
             const response = await fetch('/api/subjects');
             const subjects = await response.json();
             const subjectSelect = document.getElementById('subject-select');
-            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
             subjects.forEach(subject => {
                 const option = document.createElement('option');
                 option.value = subject.id;
@@ -104,7 +139,7 @@
             const response = await fetch('/api/year-groups');
             const yearGroups = await response.json();
             const yearGroupSelect = document.getElementById('year-group-select');
-            yearGroupSelect.innerHTML = '<option value="">Select Year Group</option>';
+            yearGroupSelect.innerHTML = '<option value="">-- Select Year Group --</option>';
             yearGroups.forEach(yearGroup => {
                 const option = document.createElement('option');
                 option.value = yearGroup.id;
@@ -117,9 +152,8 @@
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             if (subjectId && yearGroupId) {
-                document.getElementById('name-pronoun-section').style.display = 'flex';
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
-
+                
                 const [categoriesResponse, promptPartResponse] = await Promise.all([
                     fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
                     fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
@@ -136,8 +170,9 @@
 
                 categories.forEach(category => {
                     const categoryDiv = document.createElement('div');
-                    categoryDiv.classList.add('form-section', 'comment-category');
-
+                    categoryDiv.classList.add('form-section');
+                    categoryDiv.classList.add('comment-category');
+                    
                     const label = document.createElement('label');
                     label.for = category.name.toLowerCase().replace(' ', '-');
                     label.textContent = category.name + ':';
@@ -146,7 +181,6 @@
                     const select = document.createElement('select');
                     select.id = category.name.toLowerCase().replace(' ', '-');
                     select.innerHTML = '<option value="">-- Select Comment --</option>';
-                    select.classList.add('dropdown');
 
                     category.Comments.forEach(comment => {
                         const option = document.createElement('option');
@@ -155,29 +189,17 @@
                         select.appendChild(option);
                     });
 
-                    // Add option to add new comment
-                    const addOption = document.createElement('option');
-                    addOption.value = "add-new";
-                    addOption.textContent = "Add new comment";
-                    select.appendChild(addOption);
-
-                    select.addEventListener('change', () => {
-                        if (select.value === "add-new") {
-                            currentCategorySelect = select; // Keep track of the current select element
-                            openModal(category.id);
-                        }
-                    });
+                    const addCommentButton = document.createElement('button');
+                    addCommentButton.classList.add('button', 'add-comment-btn');
+                    addCommentButton.textContent = 'Add Comment';
+                    addCommentButton.onclick = () => addNewComment(category.id, select);
 
                     categoryDiv.appendChild(select);
+                    categoryDiv.appendChild(addCommentButton);
                     categoriesContainer.appendChild(categoryDiv);
                 });
-                document.getElementById('additional-comments-wrapper').style.display = 'block';
-                document.getElementById('generate-report').style.display = 'block';
-
             }
         }
-
-        let currentCategorySelect = null;
 
         async function addNewComment(categoryId, selectElement) {
             const commentText = prompt('Enter the new comment:');
@@ -208,48 +230,6 @@
             }
         }
 
-        function openModal(categoryId) {
-            document.getElementById('add-comment-modal').classList.remove('hidden');
-            document.getElementById('add-comment-modal').dataset.categoryId = categoryId;
-        }
-
-        function closeModal() {
-            document.getElementById('add-comment-modal').classList.add('hidden');
-            document.getElementById('new-comment-text').value = '';
-        }
-
-        async function saveNewComment() {
-            const categoryId = document.getElementById('add-comment-modal').dataset.categoryId;
-            const commentText = document.getElementById('new-comment-text').value;
-
-            if (commentText) {
-                try {
-                    const response = await fetch('/api/comments', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ text: commentText, categoryId })
-                    });
-                    if (!response.ok) {
-                        console.error('Error adding comment:', response.statusText);
-                        alert('Error adding comment.');
-                        return;
-                    }
-                    const newComment = await response.json();
-                    const option = document.createElement('option');
-                    option.value = newComment.text;
-                    option.textContent = newComment.text;
-                    currentCategorySelect.appendChild(option);
-                    currentCategorySelect.value = newComment.text; // Select the newly added comment
-                    closeModal();
-                } catch (error) {
-                    console.error('Error adding comment:', error);
-                    alert('Error adding comment.');
-                }
-            }
-        }
-
         async function generateReport() {
             const pupilName = document.getElementById('pupil-name').value;
             const pupilPronouns = document.getElementById('pupil-pronouns').value;
@@ -273,7 +253,7 @@
                 const categoryName = select.id.replace('-', ' ');
                 pupil[categoryName] = select.value;
             });
-            document.getElementById('result-container').style.display = 'block';
+
             let resultContainer = document.getElementById('result-container');
             resultContainer.innerHTML = '<h1>Generating Report</h1>'; // Clear previous results
 
@@ -289,7 +269,7 @@
                 const data = await response.json();
                 let report = data.report;
                 resultContainer.innerHTML = ''
-                resultContainer.innerHTML += `<div>${report}</div>`;
+                resultContainer.innerHTML += `<div><br />---------------------<br />${report}<br />------------------------<br /></div>`;
             } catch (error) {
                 console.error('Error:', error);
                 resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
@@ -315,4 +295,3 @@
 
 </body>
 </html>
-

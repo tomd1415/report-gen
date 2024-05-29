@@ -6,55 +6,82 @@
     <title>Manage Comments and Categories</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="bg-gray-100 text-gray-900">
 
     <!-- Include header -->
     <div id="header-placeholder"></div>
 
-    <div class="container">
-        <h1>Manage Comments and Categories</h1>
+    <div class="container mx-auto p-4 bg-white rounded-lg shadow-lg">
+        <h1 class="main-title">Manage Comments and Categories</h1>
 
-        <div class="form-section">
-            <label for="subject-select">Subject:</label>
-            <select id="subject-select" onchange="loadCategoriesAndComments()">
-                <option value="">-- Select Subject --</option>
-            </select>
-        </div>
+        <div id="form-container">
+            <div class="subject-year">
+            <div class="form-section">
+                <!--
+                <label for="subject-select" class="block text-center">Subject:</label>
+                -->
+                <select id="subject-select" onchange="loadCategoriesAndComments()"
+                        class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
+                    <option value="">Select Subject</option>
+                </select>
+            </div>
 
-        <div class="form-section">
-            <label for="year-group-select">Year Group:</label>
-            <select id="year-group-select" onchange="loadCategoriesAndComments()">
-                <option value="">-- Select Year Group --</option>
-            </select>
-        </div>
+            <div class="form-section">
+                <!--
+                <label for="year-group-select" class="block text-center">Year Group:</label>
+                -->
+                <select id="year-group-select" onchange="loadCategoriesAndComments()"
+                        class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
+                    <option value="">Select Year Group</option>
+                </select>
+            </div>
+            </div>
 
-        <div class="form-section">
-            <label for="new-category-name">New Category Name:</label>
-            <input type="text" id="new-category-name" placeholder="Enter new category name">
-            <button class="button" onclick="addCategory()">Add Category</button>
-        </div>
-
-        <div id="categories-container" class="category-container">
-            <!-- Categories and comments will be populated here -->
+            <div id="new-category">
+            <div class="form-section">
+                <label for="new-category-name" class="block text-center">New Category Name:</label>
+                <input type="text" id="new-category-name" placeholder="Enter new category name"
+                       class="border border-gray-300 rounded-md shadow-sm mb-0 p-1 text-center">
+                <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="addCategory()">Add Category</button>
+            </div>
+            </div>
+            <div id="categories-container" class="comment-categories-container">
+                <!-- Categories and comments will be populated here -->
+            </div>
         </div>
     </div>
+
     <div id="footer-placeholder"></div>
+
     <script>
-        // Function to load header
+        // Function to load header and footer
         document.addEventListener("DOMContentLoaded", function() {
             fetch("header.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById("header-placeholder").innerHTML = data;
                 });
+
+            fetch('footer.html')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('footer-placeholder').innerHTML = data;
+                });
         });
 
-        fetch('footer.html')
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('footer-placeholder').innerHTML = data;
-            });
+        // Function to toggle category visibility
+        function toggleCategory(categoryDiv) {
+            const commentsContainer = categoryDiv.querySelector('.comments-container');
+            commentsContainer.style.display = commentsContainer.style.display === 'none' ? 'block' : 'none';
+            if (commentsContainer.style.display === 'none') {
+                categoryDiv.querySelector('.expand').textContent = '+';
+            } else {
+                categoryDiv.querySelector('.expand').textContent = '-';
+            }
+            categoryDiv.classList.toggle('collapsed');
+        }
 
+        // Fetch and populate year groups
         async function loadYearGroups() {
             try {
                 const response = await fetch('/api/year-groups');
@@ -75,6 +102,7 @@
             }
         }
 
+        // Fetch and populate subjects
         async function loadSubjects() {
             try {
                 const response = await fetch('/api/subjects');
@@ -95,6 +123,7 @@
             }
         }
 
+        // Fetch and populate categories and comments
         async function loadCategoriesAndComments() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
@@ -105,19 +134,25 @@
                         console.error('Failed to fetch categories and comments:', response.statusText);
                         return;
                     }
+
                     const categories = await response.json();
                     const categoriesContainer = document.getElementById('categories-container');
                     categoriesContainer.innerHTML = '';
                     categories.forEach(category => {
+                        document.getElementById('new-category').style.display = 'block';
                         const categoryDiv = document.createElement('div');
-                        categoryDiv.classList.add('category');
+                        categoryDiv.classList.add('category', 'm-1', 'p-1', 'bg-blue-300', 'rounded-md', 'shadow-sm');
                         categoryDiv.innerHTML = `
-                            <h3 contenteditable="true" onblur="editCategory(${category.id}, this.textContent)">${category.name}</h3>
+                            <h3 class="category-title" onclick="toggleCategory(this.parentElement)" data-category-id="${category.id}">
+                                ${category.name} <span class="expand">+</span>
+                            </h3>
                             <button class="button delete" onclick="deleteCategory(${category.id})">Delete Category</button>
-                            <div>
+                            <div class="comments-container" style="display: none;">
                                 ${category.Comments.map(comment => `
-                                    <div class="comment" draggable="true" ondragstart="drag(event)" data-comment-id="${comment.id}">
-                                        <div class="comment-content" contenteditable="true" onblur="editComment(${comment.id}, this.textContent)">${comment.text}</div>
+                                    <div class="comment" data-comment-id="${comment.id}">
+                                        <div class="comment-content" contenteditable="true" onblur="editComment(${comment.id}, this.textContent)">
+                                            ${comment.text}
+                                        </div>
                                         <div class="comment-actions">
                                             <select onchange="moveComment(${comment.id}, this.value)">
                                                 <option value="">Move to...</option>
@@ -135,8 +170,8 @@
                                 </div>
                             </div>
                         `;
-                        categoryDiv.addEventListener('drop', drop);
-                        categoryDiv.addEventListener('dragover', allowDrop);
+                        //categoryDiv.addEventListener('drop', drop);
+                        //categoryDiv.addEventListener('dragover', allowDrop);
                         categoriesContainer.appendChild(categoryDiv);
                     });
                 } catch (error) {
@@ -145,6 +180,7 @@
             }
         }
 
+        // Add new category
         async function addCategory() {
             const name = document.getElementById('new-category-name').value;
             const subjectId = document.getElementById('subject-select').value;
@@ -174,6 +210,7 @@
             }
         }
 
+        // Edit category name
         async function editCategory(id, newName) {
             if (newName) {
                 try {
@@ -195,6 +232,7 @@
             }
         }
 
+        // Delete category
         async function deleteCategory(id) {
             if (confirm('Are you sure you want to delete this category? All comments in this category will also be deleted.')) {
                 try {
@@ -208,12 +246,14 @@
                     }
                     loadCategoriesAndComments();
                 } catch (error) {
-                    console.error('Error deleting category:', error);
-                    alert('Error deleting category.');
+                        console.error('Error deleting category:', error);
+                        alert('Error deleting category.');
+                    }
                 }
             }
-        }
+        
 
+        // Add new comment
         async function addComment(categoryId, text) {
             if (text) {
                 try {
@@ -239,6 +279,7 @@
             }
         }
 
+        // Edit comment
         async function editComment(id, newText) {
             if (newText) {
                 try {
@@ -260,6 +301,7 @@
             }
         }
 
+        // Delete comment
         async function deleteComment(id) {
             if (confirm('Are you sure you want to delete this comment?')) {
                 try {
@@ -279,6 +321,7 @@
             }
         }
 
+        // Move comment to a different category
         async function moveComment(commentId, newCategoryId) {
             if (newCategoryId) {
                 try {
@@ -302,14 +345,17 @@
             }
         }
 
+        // Allow dropping of comments
         function allowDrop(event) {
             event.preventDefault();
         }
-
+/*
+        // Drag comment
         function drag(event) {
             event.dataTransfer.setData('text', event.target.getAttribute('data-comment-id'));
         }
 
+        // Drop comment into a new category
         async function drop(event) {
             event.preventDefault();
             const commentId = event.dataTransfer.getData('text');
@@ -334,14 +380,13 @@
                     alert('Error moving comment.');
                 }
             }
-        }
+        } */
 
         // Load subjects and year groups on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadSubjects();
             loadYearGroups();
         });
-
     </script>
 
 </body>

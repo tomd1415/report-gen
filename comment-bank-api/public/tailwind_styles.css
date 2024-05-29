@@ -1,12 +1,13 @@
+/* Tailwind CSS inclusion */
+@import url('https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css');
+
 /* Custom styles for Exhall Grange Specialist School */
 body {
-    font-family: 'Arial', sans-serif;
+    font-family: Arial, sans-serif;
     margin: 20px;
     background-color: #f8f9fa;
-    color: #333;
 }
 
-/* Header and Footer Styles */
 header, footer {
     background-color: #ffffff;
     color: #002D72;
@@ -30,21 +31,16 @@ nav a {
     color: #ffffff;
     margin: 0 15px;
     text-decoration: none;
-    font-weight: bold;
 }
 
 nav a:hover {
     text-decoration: underline;
 }
 
-/* Container and Form Sections */
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
-    background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .form-section {
@@ -53,22 +49,21 @@ nav a:hover {
 
 label {
     display: block;
-    margin-bottom: 5px;
+    margin: 5px 0;
     color: #333;
     font-weight: bold;
 }
 
 select, input, textarea, button {
     width: 100%;
-    padding: 10px;
+    padding: 8px;
     margin: 5px 0 15px 0;
     border: 1px solid #ccc;
     border-radius: 4px;
-    box-sizing: border-box;
 }
 
 textarea {
-    width: 100%;
+    width: 70%;
 }
 
 .button {
@@ -78,10 +73,11 @@ textarea {
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    margin-right: 10px;
 }
 
 .button:hover {
-    background-color: #0ec73c;
+    background-color: #ffcc00;
 }
 
 .button.delete {
@@ -94,13 +90,15 @@ textarea {
 
 .result-section {
     margin-top: 20px;
-    padding: 1rem;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    border: 2px solid #333;
 }
 
-/* Category and Comment Styles */
+.add-comment-btn {
+    width: auto;
+    margin-left: 10px;
+    display: inline-block;
+    vertical-align: top;
+}
+
 .category-container {
     display: flex;
     flex-wrap: wrap;
@@ -168,7 +166,6 @@ textarea {
     float: right;
 }
 
-/* Navigation Styles */
 nav ul {
     list-style-type: none;
     padding: 0;
@@ -193,7 +190,7 @@ nav ul li a:hover {
 }
 
 .footer-content a {
-    color: #ffcc00;
+    color: #ffcc00; /* Exhall Grange accent color */
     text-decoration: none;
 }
 
@@ -206,7 +203,7 @@ nav ul li a:hover {
     color: #666;
 }
 
-/* Modal Styles */
+/* Additional styles for modal */
 .modal {
     position: fixed;
     top: 0;
@@ -231,7 +228,6 @@ nav ul li a:hover {
     display: none;
 }
 
-/* Category and Comment Category Styles */
 .comment-categories-container {
     display: flex;
     flex-wrap: wrap;
@@ -241,38 +237,17 @@ nav ul li a:hover {
 .comment-category {
     flex: 1 1 calc(50% - 20px);
     box-sizing: border-box;
-    background-color: rgb(171, 230, 225);
-    border: 2px solid #002D72;
-    border-radius: 8px;
-    margin-top: 5px;
-    margin-bottom: 5px;
-    padding: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .comment-category select {
     width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    text-align: center;
-    font-size: large;
-    background-color: #e3f2fd;
 }
 
-.comment-category label {
-    font-weight: bold;
-    text-align: center;
-    font-size: larger;
-}
-
-/* Styling for Subject-Year and Name-Pronoun Sections */
+/* Styling for subject-year and name-pronoun sections */
 .subject-year {
     display: flex;
     justify-content: center;
     margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: #8092B2 1px solid;
 }
 
 .subject-year .form-section {
@@ -283,18 +258,11 @@ nav ul li a:hover {
 }
 
 .subject-year .form-section select {
-    width: 15em;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    text-align: center;
-    font-size: larger;
-    background-color: #e3f2fd;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 20em;
 }
 
 #name-pronoun-section {
-    display: none;
+    display: flex;
     justify-content: center;
     gap: 1rem;
     margin-bottom: 20px;
@@ -302,21 +270,13 @@ nav ul li a:hover {
 
 #name-pronoun-section label {
     margin-top: 5px;
-    text-align: center;
 }
 
 #name-pronoun-section input[type="text"] {
     width: 15em;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    text-align: center;
-    font-size: larger;
-    background-color: #e3f2fd;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Styles for Inline Display of Pupil Details */
+/* Styles for inline display of pupil details */
 .pupil-details {
     display: flex;
     justify-content: space-between;
@@ -340,56 +300,4 @@ nav ul li a:hover {
 
 .pupil-details input {
     width: calc(100% - 10px);
-}
-
-.main-title {
-    text-align: center;
-    font-size: 2em;
-    color: #002D72;
-    margin-bottom: 20px;
-    border-top: #002D72 solid 4px;
-    border-bottom: #002D72 solid 4px;
-    padding: 7px;
-    margin-top: -10px;
-}
-
-#result-container {
-    font-size: 1.5em;
-    padding: 20px;
-    display: none;
-}
-
-/* Toggle Category Styling */
-.category-title {
-    cursor: pointer;
-    user-select: none;
-    width: 100%;
-}
-
-.expand {
-    float: right;
-}
-
-.category.collapsed .comments-container {
-    display: none;
-}
-
-#new-category {
-    display: none;
-}
-
-#additional-comments-wrapper {
-    display: none;
-}
-
-#generate-report {
-    display: none;
-}
-
-.savePromptDisabled {
-    background-color: #666;
-}
-
-.savePromptDisabled:hover {
-    background-color: #666;
 }
