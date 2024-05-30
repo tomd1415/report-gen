@@ -22,7 +22,7 @@ header img {
 
 nav {
     background-color: #006699;
-    padding: 10px;
+    padding: 2px;
     text-align: center;
 }
 
@@ -68,7 +68,8 @@ select, input, textarea, button {
 }
 
 textarea {
-    width: 100%;
+    width: 100%; class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>
+
 }
 
 .button {
@@ -303,6 +304,7 @@ nav ul li a:hover {
 #name-pronoun-section label {
     margin-top: 5px;
     text-align: center;
+    display: none;
 }
 
 #name-pronoun-section input[type="text"] {
@@ -354,7 +356,7 @@ nav ul li a:hover {
 }
 
 #result-container {
-    font-size: 1.5em;
+    font-size: 1.2em;
     padding: 20px;
     display: none;
 }
@@ -392,4 +394,41 @@ nav ul li a:hover {
 
 .savePromptDisabled:hover {
     background-color: #666;
+}
+
+.main-menu {
+    text-align: center;
+}
+ .main-menu ul {
+    padding: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+ }
+.main-menu ul li {
+    display: inline-block;
+    border: #002D72 solid 0px;
+    border-top: none;
+    border-bottom: none;
+    /*border-top: #002D52 solid 1px;
+    border-bottom: #002D52 solid 1px;*/
+    border-radius: 2px;
+    box-shadow: #002D72 0px 1px 1px 0px;
+    margin-left: 3px;
+    margin-right: 3px;
+    margin-top: 4px;
+    margin-bottom: 6px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background-color: #006699 /*#337fad;*/
+    
+}
+
+.main-menu ul li:hover {
+    background-color: #002D72;
+}
+
+#copy-report-btn {
+    margin-top: 0px;
+    margin-left: 0px;
+    display: none;
 }

@@ -6,6 +6,12 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import { Sequelize, DataTypes } from 'sequelize';
 import dotenv from 'dotenv';
+import { Parser } from 'json2csv';
+
+import multer from 'multer';
+import csv from 'csv-parser';
+import fs from 'fs';
+import { pipeline } from 'stream';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -764,4 +770,97 @@ app.get('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
   }
 });
 
-     
+
+// Export categories and comments to CSV
+app.get('/api/export-categories-comments', async (req, res) => {
+  const { subjectId, yearGroupId } = req.query;
+  try {
+    const categories = await Category.findAll({
+      where: {
+        subjectId,
+        yearGroupId
+      },
+      include: [Comment]
+    });
+
+    const data = categories.flatMap(category => {
+      return category.Comments.map(comment => ({
+        categoryName: category.name,
+        commentText: comment.text ? comment.text.replace(/\s+/g, ' ').trim() : '' // Remove extra whitespace and newlines
+      }));
+    });
+
+    const json2csvParser = new Parser({ fields: ['categoryName', 'commentText'] });
+    const csv = json2csvParser.parse(data);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`categories-comments-${subjectId}-${yearGroupId}.csv`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Error exporting categories and comments:', error);
+    res.status(500).send('Error exporting categories and comments');
+  }
+});
+
+
+// Add this middleware for handling file uploads
+const upload = multer({ dest: 'uploads/' });
+
+// Helper function to clean comment text
+const cleanText = (text) => text ? text.replace(/\s+/g, ' ').trim() : '';
+
+// Import categories and comments from CSV
+app.post('/api/import-categories-comments', upload.single('file'), async (req, res) => {
+  const { subjectId, yearGroupId } = req.body;
+  const filePath = req.file.path;
+
+  if (!subjectId || !yearGroupId) {
+    return res.status(400).send('Missing subjectId or yearGroupId');
+  }
+
+  if (!req.file) {
+    return res.status(400).send('No file uploaded');
+  }
+
+  const categories = {};
+
+  try {
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (data) => {
+          const categoryName = data['categoryName'];
+          const commentText = cleanText(data['commentText']); // Clean comment text
+
+          if (!categories[categoryName]) {
+            categories[categoryName] = [];
+          }
+
+          categories[categoryName].push(commentText);
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    await sequelize.transaction(async (transaction) => {
+      await Category.destroy({
+        where: { subjectId, yearGroupId },
+        transaction
+      });
+
+      for (const [name, comments] of Object.entries(categories)) {
+        const category = await Category.create({ name, subjectId, yearGroupId }, { transaction });
+        for (const text of comments) {
+          await Comment.create({ text, categoryId: category.id }, { transaction });
+        }
+      }
+    });
+
+    res.json({ message: 'Categories and comments imported successfully.' });
+  } catch (error) {
+    console.error('Error importing categories and comments:', error);
+    res.status(500).send('Error importing categories and comments');
+  } finally {
+    fs.unlinkSync(filePath); // Clean up the uploaded file
+  }
+});

@@ -61,6 +61,7 @@ INSERT INTO CommentYearGroups (commentId, yearGroupId) VALUES
 (7, 1),
 (8, 1);
 
+
 -- Insert prompt part for Year 10 and Computing
 INSERT INTO SubjectYearGroupPrompts (subjectId, yearGroupId, promptPart) VALUES 
 (1, 1, 'Generate a concise school report for a Computer Science GCSE student. This report should avoid repetition, be professional and friendly, and flow well. This text will appear in a preformatted text box and so should not have any titles or headings. There should be no sub-headings. This report should be around 150 words.');

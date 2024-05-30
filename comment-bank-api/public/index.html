@@ -31,11 +31,11 @@
 
             <div id="name-pronoun-section" class="flex-center">
                 <div class="flex-col-center">
-                    <input type="text" id="pupil-name" required class="input-text">
+                    <input type="text" id="pupil-name" required placeholder="Pupil's First Name" class="input-text">
                     <label for="pupil-name" class="block text-center">Pupil's First Name</label>
                 </div>
                 <div class="flex-col-center">
-                    <input type="text" id="pupil-pronouns" required class="input-text">
+                    <input type="text" id="pupil-pronouns" placeholder="Pupil's Pronouns" class="input-text">
                     <label for="pupil-pronouns" class="block text-center">Pronouns</label>
                 </div>
             </div>
@@ -51,9 +51,10 @@
 
             <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
 
-        </div>
 
+        </div>
         <div id="result-container" class="result-section"></div>
+
     </div>
 
     <div id="footer-placeholder"></div>
@@ -288,13 +289,13 @@
                 });
                 const data = await response.json();
                 let report = data.report;
-                resultContainer.innerHTML = ''
-                resultContainer.innerHTML += `<div>${report}</div>`;
+                resultContainer.innerHTML = `<button id="copy-report-btn" class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>`;
+                resultContainer.innerHTML += `<div id="the-report">${report}</div>`;
             } catch (error) {
                 console.error('Error:', error);
                 resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
             }
-
+            document.getElementById('copy-report-btn').style.display = 'block';
             // Clear the form fields
             document.getElementById('pupil-name').value = '';
             document.getElementById('pupil-pronouns').value = '';
@@ -305,7 +306,16 @@
                 select.selectedIndex = 0;
             });
         }
+        function copyReportToClipboard() {
+            const reportContainer = document.getElementById('the-report');
+            const reportText = reportContainer.innerText || reportContainer.textContent;
 
+            navigator.clipboard.writeText(reportText).then(() => {
+                alert('Report copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy report: ', err);
+            });
+}
         // Load subjects and year groups on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadSubjects();

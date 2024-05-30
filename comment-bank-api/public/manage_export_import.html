@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export and Import Categories and Comments</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+    <!-- Include header -->
+    <div id="header-placeholder"></div>
+
+    <div class="container mx-auto p-4 bg-white rounded-lg shadow-lg">
+        <h1 class="main-title">Save and Load Categories and Comments</h1>
+
+        <div id="form-container">
+            <div class="subject-year">
+                <div class="form-section">
+                    <select id="subject-select" class="form-control">
+                        <option value="">Select Subject</option>
+                    </select>
+                </div>
+                <div class="form-section">
+                    <select id="year-group-select" class="form-control">
+                        <option value="">Select Year Group</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <button class="button" onclick="exportCategoriesAndComments()">Export Categories and Comments</button>
+            </div>
+
+            <div class="form-section">
+                <label for="upload-csv" class="block text-center">Import Categories and Comments:</label>
+                <input type="file" id="upload-csv" class="border border-gray-300 rounded-md shadow-sm p-2">
+                <button class="button bg-red-600 text-white px-4 py-2 rounded-md" onclick="importCategoriesAndComments()">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="footer-placeholder"></div>
+
+    <script>
+        // Function to load header and footer
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch("header.html")
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById("header-placeholder").innerHTML = data;
+                });
+
+            fetch('footer.html')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('footer-placeholder').innerHTML = data;
+                });
+        });
+
+        async function loadSubjectsAndYearGroups() {
+            const [subjectsResponse, yearGroupsResponse] = await Promise.all([
+                fetch('/api/subjects'),
+                fetch('/api/year-groups')
+            ]);
+
+            const subjects = await subjectsResponse.json();
+            const yearGroups = await yearGroupsResponse.json();
+
+            const subjectSelect = document.getElementById('subject-select');
+            const yearGroupSelect = document.getElementById('year-group-select');
+
+            subjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
+            });
+
+            yearGroups.forEach(yearGroup => {
+                const option = document.createElement('option');
+                option.value = yearGroup.id;
+                option.textContent = yearGroup.name;
+                yearGroupSelect.appendChild(option);
+            });
+        }
+
+        async function exportCategoriesAndComments() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+
+            if (!subjectId || !yearGroupId) {
+                alert('Please select both subject and year group.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/export-categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data for export.');
+                }
+
+                const data = await response.text();
+                const blob = new Blob([data], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `categories-comments-${subjectId}-${yearGroupId}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Error exporting categories and comments: ' + error.message);
+            }
+        }
+
+        async function importCategoriesAndComments() {
+            const subjectId = document.getElementById('subject-select').value;
+            const yearGroupId = document.getElementById('year-group-select').value;
+            const fileInput = document.getElementById('upload-csv');
+
+            if (!subjectId || !yearGroupId) {
+                alert('Please select both subject and year group.');
+                return;
+            }
+
+            if (!fileInput.files.length) {
+                alert('Please select a file to upload.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to replace the existing categories and comments for the selected subject and year group? This action cannot be undone.')) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('subjectId', subjectId);
+            formData.append('yearGroupId', yearGroupId);
+
+            try {
+                const response = await fetch('/api/import-categories-comments', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to import categories and comments.');
+                }
+
+                alert('Categories and comments imported successfully.');
+                fileInput.value = ''; // Clear the file input
+            } catch (error) {
+                alert('Error importing categories and comments: ' + error.message);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadSubjectsAndYearGroups);
+    </script>
+</body>
+</html>
