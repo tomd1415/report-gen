@@ -34,7 +34,7 @@
         <div class="form-section">
             <label for="prompt-text">Prompt Text:</label>
             <textarea id="prompt-text" rows="4"></textarea>
-            <p class="sample-prompt"><b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in Year 7 Computing lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition. 
+            <p class="sample-prompt" id="sample-prompt"><b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in Year 7 Computing lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition. 
 <br />
                 <br />Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.
       <br />          
@@ -111,7 +111,13 @@
 
 Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.
 
-Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in Computing. `;
+Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in ${subjectText}. `;
+
+                document.getElementById('sample-prompt').innerHTML = `<b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in ${yearGroupText} ${subjectText} lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition.<br /><br />
+
+Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.<br /><br />
+
+Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in ${subjectText}. `;
 
                 if (!promptPart || promptPart === '') {
                     document.getElementById('prompt-text').value = defaultPrompt;
