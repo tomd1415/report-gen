@@ -1,0 +1,2 @@
+openai==1.30.5
+wxPython==4.2.0
