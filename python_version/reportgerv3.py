@@ -5,6 +5,7 @@ import os
 import shutil
 import json
 import csv
+import wx.lib.scrolledpanel as scrolled
 
 # Set up OpenAI
 client = OpenAI(api_key='sk-proj-NRXojKZoTDvNsFuhUH8WT3BlbkFJCbb0Gup2YMFD3iq8lRVS')
@@ -117,6 +118,10 @@ def fetch_categories(subject_id, year_group_id):
 
 def fetch_comments(category_id):
     cursor.execute("SELECT text FROM Comment WHERE category_id = ?", (category_id,))
+    return cursor.fetchall()
+
+def fetch_comments2(category_id):
+    cursor.execute("SELECT id, text FROM Comment WHERE category_id = ?", (category_id,))
     return cursor.fetchall()
 
 def fetch_prompt(subject_id, year_group_id):
@@ -668,6 +673,234 @@ class ImportDialog(wx.Dialog):
         else:
             wx.MessageBox("Please select both subject and year group", "Error", wx.OK | wx.ICON_ERROR)
 
+class ManageCommentsDialog(wx.Dialog):
+    def __init__(self, parent):
+        super().__init__(parent, title="Manage Comments and Categories", size=(900, 700))
+
+        self.panel = wx.Panel(self)
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Subject selection
+        self.subject_label = wx.StaticText(self.panel, label="Select Subject:")
+        self.sizer.Add(self.subject_label, 0, wx.ALL | wx.EXPAND, 5)
+        self.subject_select = wx.ComboBox(self.panel, style=wx.CB_READONLY)
+        self.sizer.Add(self.subject_select, 0, wx.ALL | wx.EXPAND, 5)
+
+        # Year group selection
+        self.year_group_label = wx.StaticText(self.panel, label="Select Year Group:")
+        self.sizer.Add(self.year_group_label, 0, wx.ALL | wx.EXPAND, 5)
+        self.year_group_select = wx.ComboBox(self.panel, style=wx.CB_READONLY)
+        self.sizer.Add(self.year_group_select, 0, wx.ALL | wx.EXPAND, 5)
+
+        # New category input
+        self.new_category_label = wx.StaticText(self.panel, label="New Category Name:")
+        self.sizer.Add(self.new_category_label, 0, wx.ALL | wx.EXPAND, 5)
+        self.new_category_input = wx.TextCtrl(self.panel)
+        self.sizer.Add(self.new_category_input, 0, wx.ALL | wx.EXPAND, 5)
+        self.add_category_button = wx.Button(self.panel, label="Add Category")
+        self.sizer.Add(self.add_category_button, 0, wx.ALL | wx.CENTER, 5)
+        self.add_category_button.Bind(wx.EVT_BUTTON, self.add_category)
+
+        # Scrollable panel for categories and comments
+        self.scroll_panel = scrolled.ScrolledPanel(self.panel, -1, style=wx.TAB_TRAVERSAL | wx.VSCROLL | wx.HSCROLL)
+        self.scroll_panel.SetAutoLayout(1)
+        self.scroll_panel.SetupScrolling()
+        self.categories_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.scroll_panel.SetSizer(self.categories_sizer)
+        self.sizer.Add(self.scroll_panel, 1, wx.ALL | wx.EXPAND, 5)
+
+        # Add Save Changes button
+        self.save_button = wx.Button(self.panel, label="Save Changes")
+        self.sizer.Add(self.save_button, 0, wx.ALL | wx.CENTER, 5)
+        self.save_button.Bind(wx.EVT_BUTTON, self.save_changes)
+
+        self.panel.SetSizer(self.sizer)
+
+        # Load subjects and year groups
+        self.load_subjects()
+        self.load_year_groups()
+
+        # Bind events
+        self.subject_select.Bind(wx.EVT_COMBOBOX, self.load_categories_and_comments)
+        self.year_group_select.Bind(wx.EVT_COMBOBOX, self.load_categories_and_comments)
+
+    def load_subjects(self):
+        subjects = fetch_subjects_to_display()
+        self.subject_map = {subject[1]: subject[0] for subject in subjects}
+        self.subject_select.Set([subject[1] for subject in subjects])
+
+    def load_year_groups(self):
+        year_groups = fetch_year_groups_to_display()
+        self.year_group_map = {year_group[1]: year_group[0] for year_group in year_groups}
+        self.year_group_select.Set([year_group[1] for year_group in year_groups])
+
+    def load_categories_and_comments(self, event):
+        self.categories_sizer.Clear(True)
+        subject_name = self.subject_select.GetValue()
+        year_group_name = self.year_group_select.GetValue()
+
+        if subject_name and year_group_name:
+            subject_id = self.subject_map[subject_name]
+            year_group_id = self.year_group_map[year_group_name]
+            categories = fetch_categories(subject_id, year_group_id)
+            self.comment_vars = {}
+
+            for category in categories:
+                category_name = category[1]
+                category_id = category[0]
+
+                category_box = wx.StaticBox(self.scroll_panel, label=category_name)
+                category_sizer = wx.StaticBoxSizer(category_box, wx.VERTICAL)
+
+                comments = fetch_comments2(category_id)
+                for comment in comments:
+                    comment_id = comment[0]
+                    comment_text = comment[1]
+
+                    comment_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                    comment_text_ctrl = wx.TextCtrl(self.scroll_panel, value=comment_text, size=(300, -1))
+                    comment_sizer.Add(comment_text_ctrl, 1, wx.ALL | wx.EXPAND, 5)
+                    self.comment_vars[comment_id] = comment_text_ctrl
+
+                    delete_comment_button = wx.Button(self.scroll_panel, label="Delete")
+                    delete_comment_button.Bind(wx.EVT_BUTTON, lambda event, id=comment_id: self.delete_comment(event, id))
+                    comment_sizer.Add(delete_comment_button, 0, wx.ALL, 5)
+
+                    category_sizer.Add(comment_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+                new_comment_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                new_comment_text_ctrl = wx.TextCtrl(self.scroll_panel, value="", size=(300, -1))
+                new_comment_sizer.Add(new_comment_text_ctrl, 1, wx.ALL | wx.EXPAND, 5)
+
+                add_comment_button = wx.Button(self.scroll_panel, label="Add Comment")
+                add_comment_button.Bind(wx.EVT_BUTTON, lambda event, id=category_id, text_ctrl=new_comment_text_ctrl: self.add_comment(event, id, text_ctrl))
+                new_comment_sizer.Add(add_comment_button, 0, wx.ALL, 5)
+
+                category_sizer.Add(new_comment_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+                delete_category_button = wx.Button(self.scroll_panel, label="Delete Category")
+                delete_category_button.Bind(wx.EVT_BUTTON, lambda event, id=category_id: self.delete_category(event, id))
+                category_sizer.Add(delete_category_button, 0, wx.ALL | wx.EXPAND, 5)
+
+                self.categories_sizer.Add(category_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.scroll_panel.Layout()
+        self.scroll_panel.SetupScrolling()
+
+    def add_category(self, event):
+        name = self.new_category_input.GetValue()
+        subject_name = self.subject_select.GetValue()
+        year_group_name = self.year_group_select.GetValue()
+
+        if name and subject_name and year_group_name:
+            subject_id = self.subject_map[subject_name]
+            year_group_id = self.year_group_map[year_group_name]
+            cursor.execute("INSERT INTO Category (name, subject_id, year_group_id) VALUES (?, ?, ?)", (name, subject_id, year_group_id))
+            conn.commit()
+            self.new_category_input.SetValue("")
+            self.load_categories_and_comments(None)
+        else:
+            wx.MessageBox("Please enter a category name and select both subject and year group", "Error", wx.OK | wx.ICON_ERROR)
+
+    def delete_category(self, event, category_id):
+        if wx.MessageBox("Are you sure you want to delete this category? All comments in this category will also be deleted.", "Confirm", wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING) == wx.YES:
+            cursor.execute("DELETE FROM Comment WHERE category_id = ?", (category_id,))
+            cursor.execute("DELETE FROM Category WHERE id = ?", (category_id,))
+            conn.commit()
+            self.load_categories_and_comments(None)
+
+    def add_comment(self, event, category_id, text_ctrl):
+        text = text_ctrl.GetValue()
+        if text:
+            cursor.execute("INSERT INTO Comment (text, category_id) VALUES (?, ?)", (text, category_id))
+            conn.commit()
+            text_ctrl.SetValue("")
+            self.load_categories_and_comments(None)
+        else:
+            wx.MessageBox("Please enter a comment", "Error", wx.OK | wx.ICON_ERROR)
+
+    def delete_comment(self, event, comment_id):
+        cursor.execute("DELETE FROM Comment WHERE id = ?", (comment_id,))
+        conn.commit()
+        self.load_categories_and_comments(None)
+
+    def move_comment(self, event, comment_id, new_category_id):
+        cursor.execute("UPDATE Comment SET category_id = ? WHERE id = ?", (new_category_id, comment_id))
+        conn.commit()
+        self.load_categories_and_comments(None)
+
+    def save_edits(self):
+        for comment_id, text_ctrl in self.comment_vars.items():
+            text = text_ctrl.GetValue()
+            cursor.execute("UPDATE Comment SET text = ? WHERE id = ?", (text, comment_id))
+        conn.commit()
+
+
+
+    def add_category(self, event):
+        name = self.new_category_input.GetValue()
+        subject_name = self.subject_select.GetValue()
+        year_group_name = self.year_group_select.GetValue()
+
+        if name and subject_name and year_group_name:
+            subject_id = self.subject_map[subject_name]
+            year_group_id = self.year_group_map[year_group_name]
+            cursor.execute("INSERT INTO Category (name, subject_id, year_group_id) VALUES (?, ?, ?)", (name, subject_id, year_group_id))
+            conn.commit()
+            self.new_category_input.SetValue("")
+            self.load_categories_and_comments2(None)
+        else:
+            wx.MessageBox("Please enter a category name and select both subject and year group", "Error", wx.OK | wx.ICON_ERROR)
+
+    def delete_category(self, event, category_id):
+        if wx.MessageBox("Are you sure you want to delete this category? All comments in this category will also be deleted.", "Confirm", wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING) == wx.YES:
+            cursor.execute("DELETE FROM Comment WHERE category_id = ?", (category_id,))
+            cursor.execute("DELETE FROM Category WHERE id = ?", (category_id,))
+            conn.commit()
+            self.load_categories_and_comments2(None)
+
+    def add_comment(self, event, category_id, text_ctrl):
+        text = text_ctrl.GetValue()
+        if text:
+            cursor.execute("INSERT INTO Comment (text, category_id) VALUES (?, ?)", (text, category_id))
+            conn.commit()
+            text_ctrl.SetValue("")
+            self.load_categories_and_comments2(None)
+        else:
+            wx.MessageBox("Please enter a comment", "Error", wx.OK | wx.ICON_ERROR)
+
+    def delete_comment(self, event, comment_id):
+        cursor.execute("DELETE FROM Comment WHERE id = ?", (comment_id,))
+        conn.commit()
+        self.load_categories_and_comments2(None)
+
+    def move_comment(self, event, comment_id, new_category_id):
+        cursor.execute("UPDATE Comment SET category_id = ? WHERE id = ?", (new_category_id, comment_id))
+        conn.commit()
+        self.load_categories_and_comments2(None)
+
+    def save_edits(self):
+        for comment_id, text_ctrl in self.comment_vars.items():
+            text = text_ctrl.GetValue()
+            cursor.execute("UPDATE Comment SET text = ? WHERE id = ?", (text, comment_id))
+        conn.commit()
+    
+    def save_changes(self, event):
+        for comment_id, text_ctrl in self.comment_vars.items():
+            text = text_ctrl.GetValue()
+            cursor.execute("UPDATE Comment SET text = ? WHERE id = ?", (text, comment_id))
+        conn.commit()
+        wx.MessageBox("Changes saved successfully", "Info", wx.OK | wx.ICON_INFORMATION)
+    """
+    def fetch_comments(category_id):
+        cursor.execute("SELECT id, text FROM Comment WHERE category_id = ?", (category_id, text))
+        rows = cursor.fetchall()
+        print(rows)  # Add this line to debug
+        return rows
+    """
+
+
+
 
 class Application(wx.Frame):
     def __init__(self):
@@ -884,7 +1117,9 @@ class Application(wx.Frame):
         dialog.Destroy()
     
     def OnEditCategories(self, events):
-        pass
+        dialog = ManageCommentsDialog(self)
+        dialog.ShowModal()
+        dialog.Destroy()
 
     def OnSaveSettings(self, events):
         pass
