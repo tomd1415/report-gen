@@ -2,10 +2,12 @@ import wx
 import sqlite3
 from openai import OpenAI
 import os
+import shutil
 
 # Set up OpenAI
 client = OpenAI(api_key='sk-proj-NRXojKZoTDvNsFuhUH8WT3BlbkFJCbb0Gup2YMFD3iq8lRVS')
-
+global conn
+global cursor
 # Database setup
 conn = sqlite3.connect('app.db')
 cursor = conn.cursor()
@@ -14,14 +16,16 @@ cursor = conn.cursor()
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS Subject (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    UNIQUE(id, name)
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS YearGroup (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    UNIQUE(id, name)
 )
 ''')
 
@@ -114,6 +118,49 @@ class Application(wx.Frame):
         super().__init__(None, title="Comment Bank Selector", size=(800, 900))
 
         self.panel = wx.Panel(self)
+        self.SetMinSize((600,600))
+        
+        self.CreateStatusBar() # A status bar at the bottom of the window
+        
+        # Setting up the menu
+        filemenu = wx.Menu()
+        
+        # wx.ID_ABOUT and wx.ID_EXIT are standard IDs provided by wxWidgets.
+        menuOpen = filemenu.Append(wx.ID_OPEN, "&Open", "Restore from backup")
+        menuSave = filemenu.Append(wx.ID_SAVE, "&Save", "Save current comment bank")
+        menuSaveAs = filemenu.Append(wx.ID_SAVEAS, "Save &As", "Save the all comments to backup")
+        menuImportComments = filemenu.Append(wx.ID_ANY, "&Import Comments", "Import comment bank for a year group and subject combination")
+        menuExportComments = filemenu.Append(wx.ID_ANY, "&Export Comments", "Export the comments for one year group and subject combination")
+        filemenu.AppendSeparator()
+        menuAbout = filemenu.Append(wx.ID_ABOUT, "&About","Information about this program.")
+        filemenu.AppendSeparator()
+        menuExit = filemenu.Append(wx.ID_EXIT,"E&xit"," Terminate the program")
+        
+        settingsmenu = wx.Menu()
+        menuYearSelect = settingsmenu.Append(wx.ID_ANY, "Select &Year Group(s)", "Select the year groups to focus on for the session")
+        menuSubjectSelect = settingsmenu.Append(wx.ID_ANY, "Select &Subject(s)", "Select the subjects to focus on for the session")
+        menuEditCategories = settingsmenu.Append(wx.ID_ANY, "Edit Categories and Comments", "Edit the comments and categories for a year group and subject combination")
+        menuSaveSettings = settingsmenu.Append(wx.ID_ANY, "Save Current Settings", "Save any changes to the settings")
+
+        #creating the menubar
+        menuBar = wx.MenuBar()
+        menuBar.Append(filemenu,"&File") #adding the filemanu to the MenuBar
+        menuBar.Append(settingsmenu, "&Settings")
+        self.SetMenuBar(menuBar) # Adding the menubar to the Frame content.
+        
+        self.Bind(wx.EVT_MENU, self.OnOpen, menuOpen)
+        self.Bind(wx.EVT_MENU, self.OnSave, menuSave)
+        self.Bind(wx.EVT_MENU, self.OnSaveAs, menuSaveAs)
+        self.Bind(wx.EVT_MENU, self.OnImport, menuImportComments)
+        self.Bind(wx.EVT_MENU, self.OnExport, menuExportComments)
+        self.Bind(wx.EVT_MENU, self.OnAbout, menuAbout)
+        self.Bind(wx.EVT_MENU, self.OnExit, menuExit)
+        
+        self.Bind(wx.EVT_MENU, self.OnYearSelect, menuYearSelect)
+        self.Bind(wx.EVT_MENU, self.OnSubjectSelect, menuSubjectSelect)
+        self.Bind(wx.EVT_MENU, self.OnEditCategories, menuEditCategories)
+        self.Bind(wx.EVT_MENU, self.OnSaveSettings, menuSaveSettings)
+        
         self.sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Subject and Year Group selection side by side
@@ -183,6 +230,88 @@ class Application(wx.Frame):
         self.year_group_select.Bind(wx.EVT_COMBOBOX, self.load_categories_and_comments)
 
         self.selected_comments = {}
+
+    def OnExit(self, event):
+        conn.commit()
+        conn.close()
+        self.Close(True) # close the frame
+    
+    def OnAbout(self, event):
+        # A message dialog box with an OK button. wx.OK is a standard ID in wxWidgets.
+        dlg = wx.MessageDialog( self, "A way if generating reports from comment banks", "About Report Generator", wx.OK)
+        dlg.ShowModal() # show it
+        dlg.Destroy() # finally destroy it when finished
+
+    def OnOpen(self, event):
+        """ Open a file """
+        global conn
+        global cursor
+        self.dirname = ''
+        dlg = wx.FileDialog(self, "Choose a file", self.dirname, "", "*.db", wx.FD_OPEN)
+        conn.close()
+        if dlg.ShowModal() == wx.ID_OK:
+            self.filename = dlg.GetFilename()
+            self.dirname = dlg.GetDirectory()
+            shutil.copyfile(os.path.join(self.dirname, self.filename), 'app.db')
+            conn = sqlite3.connect('app.db')
+            cursor = conn.cursor()
+            conn.commit()
+            self.load_subjects()
+            self.load_year_groups()
+            self.categories_sizer.Clear(True)
+            self.report_text.Clear()
+            self.name_entry.SetValue("")
+            self.pronouns_entry.SetValue("")
+            self.additional_comments_text.SetValue("")
+            self.Refresh()
+            self.Update()
+ 
+        dlg.Destroy()
+
+    def OnSave(self, event):
+        try:
+            conn.commit()
+            shutil.copyfile('app.db', 'app_backup.db')
+            dlg = wx.MessageDialog(self, "Save Completed", "Save", wx.OK)
+        except:
+            dlg = wx.MessageDialog(self, "Save Failed (sorry)", "Save", wx.OK)
+            
+        dlg.ShowModal()
+        dlg.Destroy
+
+    def OnSaveAs(self, event):
+        # Save a copy of the whole database
+        conn.commit()
+        #self.boxContent = self.control.GetValue()
+        self.dirname = ''
+        dlg = wx.FileDialog(self, "Save as", self.dirname, "", "*.db", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        #if (dlg.ShowModal() == wx.ID_CANCEL):
+        #    return
+        if dlg.ShowModal() == wx.ID_OK:
+            self.filename = dlg.GetFilename()
+            if not(self.filename.endswith(".db")):
+                self.filename = self.filename + ".db"
+            self.dirname = dlg.GetDirectory()
+            shutil.copyfile('app.db', os.path.join(self.dirname, self.filename))
+        
+        dlg.Destroy()
+    def OnImport(self, events):
+        pass
+    
+    def OnExport(self, events):
+        pass
+    
+    def OnYearSelect(self, events):
+        pass
+    
+    def OnSubjectSelect(self, events):
+        pass
+    
+    def OnEditCategories(self, events):
+        pass
+
+    def OnSaveSettings(self, events):
+        pass
 
     # Load subjects into the subject selection combobox
     def load_subjects(self):
