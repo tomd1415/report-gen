@@ -7,6 +7,7 @@ import json
 import csv
 import wx.lib.scrolledpanel as scrolled
 
+
 # Set up OpenAI
 client = OpenAI(api_key='sk-proj-NRXojKZoTDvNsFuhUH8WT3BlbkFJCbb0Gup2YMFD3iq8lRVS')
 global conn
@@ -135,8 +136,21 @@ def fetch_prompt(subject_id, year_group_id):
 def generate_report(name, pronouns, subject_id, year_group_id, additional_comments, categories):
     prompt_part = fetch_prompt(subject_id, year_group_id)
     if not prompt_part:
-        prompt_part = "Generate a concise school report for a pupil. the report should be between 120 and 160 words. It should not contain any repetition and should be written in a formal, yet friendly way."
-
+        cursor.execute("SELECT name FROM YearGroup WHERE id = ?", (year_group_id,))
+        year_group_name = str(cursor.fetchone()[0])
+        #print("year_group_name = " + year_group_name)
+        cursor.execute("SELECT name FROM Subject WHERE id = ?", (subject_id,))
+        subject_name = str(cursor.fetchone()[0])
+        #print("subject_name = " + str(subject_name))
+        prompt_part = ("Generate a detailed and concise school report for the pupil, who is in "  + year_group_name + " " + subject_name +
+                          " lessons. The tone of the report should be friendly yet formal. The report "
+                          "should be between 100 and 170 words and should flow smoothly without any repetition. Below are "
+                          "categories and comments to base the report on. Each comment should be integrated seamlessly into "
+                          "the report without explicit headings. The report can be organized into up to three paragraphs, "
+                          "ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour. "
+                          "Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. "
+                          "If applicable, provide specific examples or incidents that illustrate these points. Conclude with a "
+                          "positive outlook on the pupil's potential and future progress in " + subject_name + ".")
     placeholder = 'PUPIL_NAME'
     prompt = f"{prompt_part}\nI am using the following placeholder for a name: {placeholder} the pronouns for this pupil are ({pronouns})\n"
 
@@ -155,83 +169,205 @@ def generate_report(name, pronouns, subject_id, year_group_id, additional_commen
     report = response.choices[0].message.content.strip()
     return report.replace(placeholder, name)
 
+class AddYearGroupDialog(wx.Dialog):
+    """
+    Dialog for adding a new year group to the database.
+    """
+    def __init__(self, parent):
+        super().__init__(parent, title="Add Year Group", size=(300, 150))
+
+        self.panel = wx.Panel(self)
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Input for year group name
+        self.year_group_label = wx.StaticText(self.panel, label="Year Group Name:")
+        self.sizer.Add(self.year_group_label, 0, wx.ALL | wx.EXPAND, 5)
+        self.year_group_input = wx.TextCtrl(self.panel)
+        self.sizer.Add(self.year_group_input, 0, wx.ALL | wx.EXPAND, 5)
+
+        # OK button
+        self.ok_button = wx.Button(self.panel, label="OK")
+        self.sizer.Add(self.ok_button, 0, wx.ALL | wx.CENTER, 5)
+        self.ok_button.Bind(wx.EVT_BUTTON, self.on_ok)
+
+        self.panel.SetSizer(self.sizer)
+
+    def on_ok(self, event):
+        """
+        Add the new year group to the database.
+        """
+        year_group_name = self.year_group_input.GetValue().strip()
+        if year_group_name:
+            cursor.execute("INSERT INTO YearGroup (name, display) VALUES (?, 1)", (year_group_name,))
+            conn.commit()
+            wx.MessageBox("Year Group added successfully", "Info", wx.OK | wx.ICON_INFORMATION)
+            self.Destroy()
+        else:
+            wx.MessageBox("Please enter a valid year group name", "Error", wx.OK | wx.ICON_ERROR)
+
 class YearSelectDialog(wx.Dialog):
     def __init__(self, parent):
         super().__init__(parent, title="Select Year Groups", size=(200, 500))
-        
+
         self.panel = wx.Panel(self)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        
+
+        # Scrolled window for the checkboxes
+        self.scroll = scrolled.ScrolledPanel(self.panel, -1, style=wx.TAB_TRAVERSAL | wx.VSCROLL)
+        self.scroll.SetScrollRate(5, 5)
+        self.scroll_sizer = wx.BoxSizer(wx.VERTICAL)
+
         # Fetch year groups from the database
+        self.load_year_groups()
+
+        self.scroll.SetSizer(self.scroll_sizer)
+        self.scroll.SetupScrolling()
+        self.sizer.Add(self.scroll, 1, wx.EXPAND | wx.ALL, 5)
+
+        self.add_button = wx.Button(self.panel, label="Add Year Group to Database")
+        self.sizer.Add(self.add_button, 0, wx.ALL | wx.CENTER, 5)
+        self.add_button.Bind(wx.EVT_BUTTON, self.on_add_year_group)
+
+        self.ok_button = wx.Button(self.panel, label="OK")
+        self.sizer.Add(self.ok_button, 0, wx.ALL | wx.CENTER, 5)
+        self.ok_button.Bind(wx.EVT_BUTTON, self.on_ok)
+
+        self.panel.SetSizer(self.sizer)
+
+    def load_year_groups(self):
         year_groups = fetch_year_groups()
-        
         self.checkboxes = {}
-        
+
         for year_group in year_groups:
             year_group_id, year_group_name = year_group
-            checkbox = wx.CheckBox(self.panel, label=year_group_name)
-            self.sizer.Add(checkbox, 0, wx.ALL, 5)
+            checkbox = wx.CheckBox(self.scroll, label=year_group_name)
+            self.scroll_sizer.Add(checkbox, 0, wx.ALL, 5)
             self.checkboxes[year_group_id] = checkbox
-            
+
             # Set checkbox state based on the 'display' field in the database
             cursor.execute("SELECT display FROM YearGroup WHERE id = ?", (year_group_id,))
             display = cursor.fetchone()[0]
             checkbox.SetValue(display == 1)
-        
-        self.ok_button = wx.Button(self.panel, label="OK")
-        self.sizer.Add(self.ok_button, 0, wx.ALL | wx.CENTER, 5)
-        
-        self.ok_button.Bind(wx.EVT_BUTTON, self.on_ok)
-        
-        self.panel.SetSizer(self.sizer)
-    
+
+        self.scroll.Layout()
+        self.scroll.SetupScrolling()
+
     def on_ok(self, event):
         # Update the database based on checkbox states
         for year_group_id, checkbox in self.checkboxes.items():
             display = 1 if checkbox.GetValue() else 0
             cursor.execute("UPDATE YearGroup SET display = ? WHERE id = ?", (display, year_group_id))
-        
+
         conn.commit()
         self.Destroy()
 
+    def on_add_year_group(self, event):
+        """
+        Open the AddYearGroupDialog to add a new year group to the database.
+        """
+        dialog = AddYearGroupDialog(self)
+        if dialog.ShowModal() == wx.ID_OK:
+            self.scroll_sizer.Clear(True)
+            self.load_year_groups()
+            self.panel.Layout()
+        dialog.Destroy()
+
 class SubjectSelectDialog(wx.Dialog):
     def __init__(self, parent):
-        super().__init__(parent, title="Select Subjects", size=(300, 400))
-        
+        super().__init__(parent, title="Select Subjects")
+        self.SetInitialSize((250, 500))
+
         self.panel = wx.Panel(self)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        # Fetch year groups from the database
+        self.sizer.SetMinSize((200, 400))
+
+        # Scrolled window for the checkboxes
+        self.scroll = scrolled.ScrolledPanel(self.panel, -1, style=wx.TAB_TRAVERSAL | wx.VSCROLL)
+        self.scroll.SetScrollRate(5, 5)
+        self.scroll_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Fetch subjects from the database
+        self.load_subjects()
+
+        self.scroll.SetSizer(self.scroll_sizer)
+        self.scroll.SetupScrolling()
+        self.sizer.Add(self.scroll, 1, wx.EXPAND | wx.ALL, 5)
+
+        self.add_button = wx.Button(self.panel, label="Add Subject to Database")
+        self.sizer.Add(self.add_button, 0, wx.ALL | wx.CENTER, 5)
+        self.add_button.Bind(wx.EVT_BUTTON, self.on_add_subject)
+
+        self.ok_button = wx.Button(self.panel, label="OK")
+        self.sizer.Add(self.ok_button, 0, wx.ALL | wx.CENTER, 5)
+        self.ok_button.Bind(wx.EVT_BUTTON, self.on_ok)
+
+        self.panel.SetSizer(self.sizer)
+
+    def load_subjects(self):
         subjects = fetch_subjects()
-        
         self.checkboxes = {}
-        
+
         for subject in subjects:
             subject_id, subject_name = subject
-            checkbox = wx.CheckBox(self.panel, label=subject_name)
-            self.sizer.Add(checkbox, 0, wx.ALL, 5)
+            checkbox = wx.CheckBox(self.scroll, label=subject_name)
+            self.scroll_sizer.Add(checkbox, 0, wx.ALL, 5)
             self.checkboxes[subject_id] = checkbox
-            
+
             # Set checkbox state based on the 'display' field in the database
             cursor.execute("SELECT display FROM Subject WHERE id = ?", (subject_id,))
             display = cursor.fetchone()[0]
             checkbox.SetValue(display == 1)
-        
-        self.ok_button = wx.Button(self.panel, label="OK")
-        self.sizer.Add(self.ok_button, 0, wx.ALL | wx.CENTER, 5)
-        
-        self.ok_button.Bind(wx.EVT_BUTTON, self.on_ok)
-        
-        self.panel.SetSizer(self.sizer)
-    
+
+        self.scroll.Layout()
+        self.scroll.SetupScrolling()
+
     def on_ok(self, event):
         # Update the database based on checkbox states
-        for year_group_id, checkbox in self.checkboxes.items():
+        for subject_id, checkbox in self.checkboxes.items():
             display = 1 if checkbox.GetValue() else 0
-            cursor.execute("UPDATE Subject SET display = ? WHERE id = ?", (display, year_group_id))
-        
+            cursor.execute("UPDATE Subject SET display = ? WHERE id = ?", (display, subject_id))
+
         conn.commit()
         self.Destroy()
+
+    def on_add_subject(self, event):
+        """
+        Open the AddSubjectDialog to add a new subject to the database.
+        """
+        dialog = AddSubjectDialog(self)
+        if dialog.ShowModal() == wx.ID_OK:
+            self.scroll_sizer.Clear(True)
+            self.load_subjects()
+            self.panel.Layout()
+        dialog.Destroy()
+
+class AddSubjectDialog(wx.Dialog):
+    def __init__(self, parent):
+        super().__init__(parent, title="Add Subject", size=(300, 150))
+
+        self.panel = wx.Panel(self)
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.subject_name_label = wx.StaticText(self.panel, label="Subject Name:")
+        self.sizer.Add(self.subject_name_label, 0, wx.ALL | wx.EXPAND, 5)
+        self.subject_name_text = wx.TextCtrl(self.panel)
+        self.sizer.Add(self.subject_name_text, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.ok_button = wx.Button(self.panel, label="OK")
+        self.sizer.Add(self.ok_button, 0, wx.ALL | wx.CENTER, 5)
+        self.ok_button.Bind(wx.EVT_BUTTON, self.on_ok)
+
+        self.panel.SetSizer(self.sizer)
+
+    def on_ok(self, event):
+        subject_name = self.subject_name_text.GetValue().strip()
+        if subject_name:
+            cursor.execute("INSERT INTO Subject (name, display) VALUES (?, 1)", (subject_name,))
+            conn.commit()
+            self.EndModal(wx.ID_OK)
+        else:
+            wx.MessageBox("Please enter a subject name", "Error", wx.OK | wx.ICON_ERROR)
+
 
 class ChangePromptDialog(wx.Dialog):
     def __init__(self, parent):
@@ -899,16 +1035,12 @@ class ManageCommentsDialog(wx.Dialog):
         return rows
     """
 
-
-
-
 class Application(wx.Frame):
     def __init__(self):
         super().__init__(None, title="Comment Bank Selector", size=(800, 900))
 
         self.panel = wx.Panel(self)
-        self.SetMinSize((600,600))
-        
+        self.SetMinSize((600,800))
         self.CreateStatusBar() # A status bar at the bottom of the window
         
         # Setting up the menu
@@ -1015,6 +1147,10 @@ class Application(wx.Frame):
         self.report_text = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY, size=(-1, 150))
         self.sizer.Add(self.report_text, 0, wx.ALL | wx.EXPAND, 5)
 
+        self.copy_button = wx.Button(self.panel, label="Copy to Clipboard")
+        self.sizer.Add(self.copy_button, 0, wx.ALL | wx.CENTER, 5)
+        self.copy_button.Bind(wx.EVT_BUTTON, self.copy_to_clipboard)
+
         self.panel.SetSizer(self.sizer)
 
         # Load subjects and year groups
@@ -1097,12 +1233,17 @@ class Application(wx.Frame):
         dialog.ShowModal()
         dialog.Destroy()
 
-    
     def OnExport(self, events):
         dialog = ExportDialog(self)
         dialog.ShowModal()
         dialog.Destroy()
-    
+
+    def copy_to_clipboard(self, events):
+        #print("Text value = " + self.report_text.GetValue())
+        if wx.TheClipboard.Open():
+            #print("Text value 2 = " + self.report_text.GetValue())
+            wx.TheClipboard.SetData(wx.TextDataObject(self.report_text.GetValue()))
+            wx.TheClipboard.Close()
     
     def OnYearSelect(self, events):
         dialog = YearSelectDialog(self)
@@ -1177,12 +1318,16 @@ class Application(wx.Frame):
         additional_comments = self.additional_comments_text.GetValue().strip()
         subject_name = self.subject_select.GetValue()
         year_group_name = self.year_group_select.GetValue()
-        if subject_name and year_group_name:
+        if subject_name and year_group_name and name and pronouns:
             subject_id = self.subject_map[subject_name]
             year_group_id = self.year_group_map[year_group_name]
             categories = {key: var.GetValue() for key, var in self.comment_vars.items()}
             report = generate_report(name, pronouns, subject_id, year_group_id, additional_comments, categories)
             self.report_text.SetValue(report)
+            if wx.TheClipboard.Open():
+                #print("Text value 2 = " + report)
+                wx.TheClipboard.SetData(wx.TextDataObject(report))
+                wx.TheClipboard.Close()
 
             # Clear the pupil's first name and pronouns
             self.name_entry.SetValue("")
@@ -1194,7 +1339,16 @@ class Application(wx.Frame):
                 comment_var.Clear()
             self.load_categories_and_comments(None)
         else:
-            wx.MessageBox("Please select both subject and year group", "Error", wx.OK | wx.ICON_ERROR)
+            errors_message = []
+            if not name:
+                errors_message.append("the pupil's first name")
+            if not pronouns:
+                errors_message.append("the pupil's pronouns")
+            if not subject_name:
+                errors_message.append("a subject")
+            if not year_group_name:
+                errors_message.append("a year group")
+            wx.MessageBox("Please enter the following information: " + "; ".join(errors_message), "Error", wx.OK | wx.ICON_ERROR)
 
 if __name__ == "__main__":
     app = wx.App(False)
