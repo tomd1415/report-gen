@@ -41,7 +41,7 @@
             <textarea id="reports" rows="10" placeholder="Paste the reports here..."></textarea>
         </div>
 
-        <button class="button" id="genReportButton" onclick="importReports()">Import Reports</button>
+        <button class="button savePrompt" id="genReportButton" onclick="importReports()">Import Reports</button>
     </div>
     </div>
     <div id="result-container" class="result-section"></div>
@@ -73,8 +73,9 @@
 
             const subjectSelect = document.getElementById('subject-select');
             const yearGroupSelect = document.getElementById('year-group-select');
-	    genReportButton = getElementById('genReportButton');
-	    genReportButton.disabled = true;
+	    const genReportButton = document.getElementById('genReportButton');
+	    //genReportButton.disabled = 'false';
+	    genReportButton.className = document.getElementById('genReportButton').className.replace('savePromptDisabled', 'savePrompt')
 
             subjects.forEach(subject => {
                 const option = document.createElement('option');
@@ -102,9 +103,10 @@
                 return;
             }
 
-	    genReportButton = getElementById('genReportButton');
-	    genReportButton.disabled = true;
-
+	    alert('Generating comments and categories.\nThis may take a while.')
+	    
+	    genReportButton.className = document.getElementById('genReportButton').className.replace('savePrompt', 'savePromptDisabled');
+	    //genReportButton.disabled = 'true';
             const response = await fetch('/api/import-reports', {
                 method: 'POST',
                 headers: {
@@ -119,11 +121,14 @@
             });
 
             const result = await response.json();
+	    alert('Finished!')
 
+	    genReportButton.className = document.getElementById('genReportButton').className.replace('savePromptDisabled', 'savePrompt')
             const resultContainer = document.getElementById('result-container');
             resultContainer.innerHTML = `<p>${result.message}</p>`;
         }
 
+	   // genReportButton.disabled = 'false';
         document.addEventListener('DOMContentLoaded', loadSubjectsAndYearGroups);
     </script>
 
