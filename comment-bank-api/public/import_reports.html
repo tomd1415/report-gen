@@ -41,7 +41,7 @@
             <textarea id="reports" rows="10" placeholder="Paste the reports here..."></textarea>
         </div>
 
-        <button class="button" onclick="importReports()">Import Reports</button>
+        <button class="button" id="genReportButton" onclick="importReports()">Import Reports</button>
     </div>
     </div>
     <div id="result-container" class="result-section"></div>
@@ -73,6 +73,8 @@
 
             const subjectSelect = document.getElementById('subject-select');
             const yearGroupSelect = document.getElementById('year-group-select');
+	    genReportButton = getElementById('genReportButton');
+	    genReportButton.disabled = true;
 
             subjects.forEach(subject => {
                 const option = document.createElement('option');
@@ -99,6 +101,9 @@
                 alert('Please fill in all fields.');
                 return;
             }
+
+	    genReportButton = getElementById('genReportButton');
+	    genReportButton.disabled = true;
 
             const response = await fetch('/api/import-reports', {
                 method: 'POST',
