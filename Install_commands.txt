@@ -1,2 +1,0 @@
-sudo mysql -u root -p < add_subject_year_promps.sql 
-npm
