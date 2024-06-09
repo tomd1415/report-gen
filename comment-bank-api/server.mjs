@@ -179,15 +179,16 @@ sequelize.sync({ force: false }).then(() => {
 });
 
 app.use(session({
-  secret: 'your-secret-key',
+  secret: process.env.SECRET_KEY,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: true }
+  cookie: { secure: false },
 }));
 
 // Middleware to protect routes
 function isAuthenticated(req, res, next) {
   if (req.session.user) {
+    //console.log('session authenticated'),
     next();
   } else {
     res.status(401).json({ message: 'Unauthorized' });
@@ -212,8 +213,10 @@ app.post('/api/login', async (req, res) => {
   try {
     const user = await User.findOne({ where: { username } });
     if (user && await bcrypt.compare(password, user.password)) {
-      req.session.user = { id: user.id, isAdmin: user.isAdmin };
+      req.session.user = { id: user.id, username: user.username, isAdmin: user.isAdmin };
+      console.log('Login successful:', req.session.user);
       res.json({ message: 'Login successful' });
+      console.log('Login successful');
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -229,6 +232,10 @@ app.post('/api/logout', (req, res) => {
   req.session.destroy();
   res.json({ message: 'Logout successful' });
 });
+//app.use((req, res, next) => {
+  //console.log('Session data:', req.session);
+ // next();
+//});
 
 // Protect your existing routes
 app.use('/api/subjects', isAuthenticated);
@@ -245,8 +252,10 @@ app.use('/api/import-reports', isAuthenticated);
 // Check if the user is authenticated
 app.get('/api/authenticated', (req, res) => {
   if (req.session.user) {
+    //console.log('session authenticated', req.session.user),
     res.json({ authenticated: true });
   } else {
+    console.log('session NOT authenticated'),
     res.status(401).json({ authenticated: false });
   }
 });
@@ -254,9 +263,9 @@ app.get('/api/authenticated', (req, res) => {
 // Fetch user info
 app.get('/api/user-info', isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findByPk(req.session.userId);
-    if (user) {
-      res.json({ username: user.username });
+    //const user = await User.findByPk(req.session.user);
+    if (req.session.user) {
+      res.json({ username: req.session.user.username, isAdmin: req.session.user.isAdmin });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
@@ -515,7 +524,7 @@ app.get('/api/year-groups', async (req, res) => {
 app.post('/api/categories', async (req, res) => {
   const { name, subjectId, yearGroupId } = req.body;
   try {
-    const userId = req.session.userId;
+    const userId = req.session.user;
     const category = await Category.create({ name, subjectId, yearGroupId, userId });
     res.json(category);
   } catch (error) {
@@ -563,7 +572,7 @@ app.delete('/api/categories/:id', async (req, res) => {
 // Fetch categories and their associated comments based on subject and year group for the logged-in user
 app.get('/api/categories-comments', async (req, res) => {
   const { subjectId, yearGroupId } = req.query;
-  const userId = req.session.userId;
+  const userId = req.session.user;
   try {
     const categories = await Category.findAll({
       where: {
@@ -741,7 +750,7 @@ app.post('/generate-report', async (req, res) => {
 // Endpoint to import reports and generate categories/comments
 app.post('/api/import-reports', async (req, res) => {
   const { subjectId, yearGroupId, pupilNames, reports } = req.body;
-  const userId = req.session.userId;
+  const userId = req.session.user;
 
   try {
     const placeholder = 'PUPIL_NAME';
@@ -1012,7 +1021,7 @@ app.get('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
 // Export categories and comments to CSV
 app.get('/api/export-categories-comments', async (req, res) => {
   const { subjectId, yearGroupId } = req.query;
-  const userId = req.session.userId;
+  const userId = req.session.user;
   try {
     const categories = await Category.findAll({
       where: {
@@ -1051,7 +1060,7 @@ const cleanText = (text) => text ? text.replace(/\s+/g, ' ').trim() : '';
 // Import categories and comments from CSV
 app.post('/api/import-categories-comments', upload.single('file'), async (req, res) => {
   const { subjectId, yearGroupId } = req.body;
-  const userId = req.session.userId;
+  const userId = req.session.user;
   const filePath = req.file.path;
 
   if (!subjectId || !yearGroupId) {
