@@ -61,6 +61,14 @@
                     <button type="button" class="button" onclick="addUser()">Add User</button>
                     <button type="button" class="button delete" onclick="deleteUser()">Delete User</button>
                 </div>
+		<div class="form-section">
+	  	<label for="change-password-username">Username:</label>
+  		<input type="text" id="change-password-username" placeholder="Username for password change">
+  		<label for="new-password">New Password:</label>
+  		<input type="password" id="new-password" placeholder="New Password">
+  		<button class="button" onclick="changePassword()">Change Password</button>
+		</div>
+
             </form>
         </section>
 
@@ -83,6 +91,34 @@
             fetch("footer.html").then(response => response.text()).then(data => {
                 document.getElementById("footer-placeholder").innerHTML = data;
             });
+	    // Check if the user is authenticated
+            fetch('/api/authenticated')
+                .then(response => {
+                    if (!response.ok) {
+                        window.location.href = 'admin-login.html';
+                    }
+                });
+	    
+                checkAdminStatus();
+
+    	    function checkAdminStatus() {
+        	fetch('/api/user-info', {
+             	credentials: 'include'  // Make sure cookies are included with the request
+        	})
+        	.then(response => response.json())
+        	.then(data => {
+            	if (!data.isAdmin) {
+                	alert('Access Denied: You do not have admin privileges.');
+                	window.location.href = 'index.html'; // Redirect non-admins to a different page
+            	}
+        	})
+        	.catch(error => {
+            		console.error('Failed to check admin status:', error);
+            		window.location.href = 'admin-login.html'; // Redirect to login if there's an error
+        	});
+    		}
+ 
+		
             loadYearGroups();
             loadSubjects();
         });
@@ -236,6 +272,31 @@
                 alert('Please enter a username.');
             }
         }
+	async function changePassword() {
+  const username = document.getElementById('change-password-username').value;
+  const newPassword = document.getElementById('new-password').value;
+  if (username && newPassword) {
+    try {
+      const response = await fetch(`/api/admin/user/${username}/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ newPassword })
+      });
+      if (response.ok) {
+        alert('Password changed successfully.');
+      } else {
+        alert('Failed to change password.');
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      alert('Error changing password.');
+    }
+  } else {
+    alert('Please fill in both fields.');
+  }
+}
 
         async function exportDatabase() {
             try {

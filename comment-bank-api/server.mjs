@@ -1147,6 +1147,45 @@ async function backupDatabase() {
   });
 }
 
+app.put('/api/admin/user/:username/password', isAdmin, async (req, res) => {
+  const { username } = req.params;
+  const { newPassword } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const user = await User.findOne({ where: { username } });
+    if (user) {
+      user.password = hashedCharset;
+      await user.save();
+      res.json({ message: 'Password updated successfully' });
+    } else {
+      res.status(404).send('User not found');
+    }
+  } catch (error) {
+    console.error('Error updating password:', error);
+    res.status(500).send('Error updating password');
+  }
+});
+
+app.post('/api/admin/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ where: { username } });
+    if (user && await bcrypt.compare(password, user.password)) {
+      if (user.isAdmin) {
+        req.session.user = { id: user.id, username: user.username, isAdmin: user.isAdmin };
+        res.json({ message: 'Login successful', isAdmin: true });
+      } else {
+        res.status(403).json({ message: 'Access Denied' });
+      }
+    } else {
+      res.status(401).json({ message: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error('Error logging in:', error);
+    res.status(500).send('Error logging in');
+  }
+});
+
 
 // Add this middleware for handling file uploads
 const upload = multer({ dest: 'uploads/' });
