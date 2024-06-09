@@ -15,6 +15,7 @@ import csv from 'csv-parser';
 import fs from 'fs';
 import { pipeline } from 'stream';
 import session from 'express-session';
+import { exec } from 'child_process';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -524,7 +525,7 @@ app.get('/api/year-groups', async (req, res) => {
 app.post('/api/categories', async (req, res) => {
   const { name, subjectId, yearGroupId } = req.body;
   try {
-    const userId = req.session.user;
+    const userId = req.session.user.id;
     const category = await Category.create({ name, subjectId, yearGroupId, userId });
     res.json(category);
   } catch (error) {
@@ -572,7 +573,7 @@ app.delete('/api/categories/:id', async (req, res) => {
 // Fetch categories and their associated comments based on subject and year group for the logged-in user
 app.get('/api/categories-comments', async (req, res) => {
   const { subjectId, yearGroupId } = req.query;
-  const userId = req.session.user;
+  const userId = req.session.user.id;
   try {
     const categories = await Category.findAll({
       where: {
@@ -750,7 +751,7 @@ app.post('/generate-report', async (req, res) => {
 // Endpoint to import reports and generate categories/comments
 app.post('/api/import-reports', async (req, res) => {
   const { subjectId, yearGroupId, pupilNames, reports } = req.body;
-  const userId = req.session.user;
+  const userId = req.session.user.id;
 
   try {
     const placeholder = 'PUPIL_NAME';
@@ -1021,7 +1022,7 @@ app.get('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
 // Export categories and comments to CSV
 app.get('/api/export-categories-comments', async (req, res) => {
   const { subjectId, yearGroupId } = req.query;
-  const userId = req.session.user;
+  const userId = req.session.user.id;
   try {
     const categories = await Category.findAll({
       where: {
@@ -1050,6 +1051,102 @@ app.get('/api/export-categories-comments', async (req, res) => {
     res.status(500).send('Error exporting categories and comments');
   }
 });
+// Admin functions here
+
+// Add a new user
+app.post('/api/users', async (req, res) => {
+  const { username, password, isAdmin } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ username, password: hashedPassword, isAdmin });
+    res.json({ message: 'User added successfully', user });
+  } catch (error) {
+    console.error('Error adding user:', error);
+    res.status(500).send('Error adding user');
+  }
+});
+
+// Delete a user
+app.delete('/api/users/:username', async (req, res) => {
+  const { username } = req.params;
+  try {
+    const user = await User.findOne({ where: { username } });
+    if (user) {
+      await user.destroy();
+      res.sendStatus(204);
+    } else {
+      res.status(404).send('User not found');
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).send('Error deleting user');
+  }
+});
+
+// Export the database
+app.get('/api/export-database', async (req, res) => {
+  try {
+    // Assuming you have a method to export your database
+    const filePath = await exportDatabase();
+    res.download(filePath, 'database-backup.sql');
+  } catch (error) {
+    console.error('Error exporting database:', error);
+    res.status(500).send('Error exporting database');
+  }
+});
+
+// Backup the database
+app.post('/api/backup-database', async (req, res) => {
+  try {
+    // Assuming you have a method to backup your database
+    await backupDatabase();
+    res.json({ message: 'Database backup created successfully' });
+  } catch (error) {
+    console.error('Error creating database backup:', error);
+    res.status(500).send('Error creating database backup');
+  }
+});
+
+async function exportDatabase() {
+  const backupDir = '/home/duguid/apps/report-gen/dbbackup_web';
+  const fileName = `database-backup-${new Date().toISOString().split('T')[0]}.sql`;
+  const sqlFilePath = path.join(backupDir, fileName);
+
+  const command = `mysqldump -u${process.env.DB_USER} -p${process.env.DB_PASSWORD} -h ${process.env.DB_HOST} ${process.env.DB_NAME} > ${sqlFilePath}`;
+
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error exporting database: ${stderr}`);
+        reject(error);
+      } else {
+        console.log(`Database exported to ${sqlFilePath}`);
+        resolve(sqlFilePath);
+      }
+    });
+  });
+}
+
+async function backupDatabase() {
+  const backupDir = '/home/duguid/apps/report-gen/dbbackup_web';
+  const fileName = `database-backup-${new Date().toISOString().split('T')[0]}.sql`;
+  const filePath = path.join(backupDir, fileName);
+
+  const command = `mysqldump -u${process.env.DB_USER} -p${process.env.DB_PASSWORD} -h ${process.env.DB_HOST} ${process.env.DB_NAME} > ${filePath}`;
+
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error backing up database: ${stderr}`);
+        reject(error);
+      } else {
+        console.log(`Database backup created at ${filePath}`);
+        resolve();
+      }
+    });
+  });
+}
+
 
 // Add this middleware for handling file uploads
 const upload = multer({ dest: 'uploads/' });
@@ -1060,7 +1157,7 @@ const cleanText = (text) => text ? text.replace(/\s+/g, ' ').trim() : '';
 // Import categories and comments from CSV
 app.post('/api/import-categories-comments', upload.single('file'), async (req, res) => {
   const { subjectId, yearGroupId } = req.body;
-  const userId = req.session.user;
+  const userId = req.session.user.id;
   const filePath = req.file.path;
 
   if (!subjectId || !yearGroupId) {

@@ -9,38 +9,51 @@
         .warning { color: red; font-weight: bold; }
         .section { margin-bottom: 20px; }
         .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .form-section { margin-bottom: 20px; }
+        .list-container { margin-top: 20px; font-size: 0.9em; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
+        label { display: block; margin: 5px 0; }
+        select, input { width: 100%; padding: 8px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; }
+        .button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+        .button:hover { background-color: #45a049; }
+        .button.delete { background-color: #f44336; }
+        .button.delete:hover { background-color: #e53935; }
     </style>
 </head>
 <body class="bg-light-blue text-dark-gray">
     <div id="header-placeholder"></div>
     <div class="container bg-light-blue rounded-lg shadow-lg">
         <h1 class="main-title">Admin Panel</h1>
-        <div id="user-info">
-            Logged in as: <span id="username"></span>
-        </div>
+        <div id="user-info">Logged in as: <span id="username"></span></div>
+
+        <!-- Manage Year Groups and Subjects Section -->
         <section class="section">
             <h2>Manage Year Groups and Subjects</h2>
-            <form id="manageYearSubjectsForm">
-                <div class="form-section">
-                    <label for="yearGroup">Year Group:</label>
-                    <input type="text" id="yearGroup" class="input-text" placeholder="Enter Year Group">
-                    <button type="button" class="button" onclick="addYearGroup()">Add Year Group</button>
-                    <button type="button" class="button delete" onclick="deleteYearGroup()">Delete Year Group</button>
+            <div class="form-section">
+                <h3>Year Groups</h3>
+                <input type="text" id="year-group-name" placeholder="Enter new year group name">
+                <button class="button" onclick="addYearGroup()">Add Year Group</button>
+                <div class="list-container" id="year-group-list">
+                    <!-- Year groups will be populated here -->
                 </div>
-                <div class="form-section">
-                    <label for="subject">Subject:</label>
-                    <input type="text" id="subject" class="input-text" placeholder="Enter Subject">
-                    <button type="button" class="button" onclick="addSubject()">Add Subject</button>
-                    <button type="button" class="button delete" onclick="deleteSubject()">Delete Subject</button>
+            </div>
+            <div class="form-section">
+                <h3>Subjects</h3>
+                <input type="text" id="subject-name" placeholder="Enter new subject name">
+                <button class="button" onclick="addSubject()">Add Subject</button>
+                <div class="list-container" id="subject-list">
+                    <!-- Subjects will be populated here -->
                 </div>
-            </form>
+            </div>
         </section>
+
+        <!-- Manage Users Section -->
         <section class="section">
             <h2>Manage Users</h2>
             <form id="manageUsersForm">
                 <div class="form-section">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" class="input-text" placeholder="Enter Username">
+                    <label for="username-input">Username:</label>
+                    <input type="text" id="username-input" class="input-text" placeholder="Enter Username">
                     <label for="password">Password:</label>
                     <input type="password" id="password" class="input-text" placeholder="Enter Password">
                     <label for="isAdmin">Admin:</label>
@@ -50,6 +63,8 @@
                 </div>
             </form>
         </section>
+
+        <!-- Database Management Section -->
         <section class="section">
             <h2>Database Management</h2>
             <button type="button" class="button" onclick="exportDatabase()">Export Database</button>
@@ -58,6 +73,7 @@
         </section>
     </div>
     <div id="footer-placeholder"></div>
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             fetchUsername();
@@ -67,6 +83,8 @@
             fetch("footer.html").then(response => response.text()).then(data => {
                 document.getElementById("footer-placeholder").innerHTML = data;
             });
+            loadYearGroups();
+            loadSubjects();
         });
 
         // Fetch username
@@ -84,45 +102,176 @@
             }
         }
 
-        // Functions to handle admin actions
-        async function addYearGroup() {
-            const yearGroup = document.getElementById('yearGroup').value;
-            // Add year group logic
+        // Functions to load and manage year groups
+        async function loadYearGroups() {
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupList = document.getElementById('year-group-list');
+            yearGroupList.innerHTML = '';
+            yearGroups.forEach(yearGroup => {
+                const item = document.createElement('div');
+                item.classList.add('list-item');
+                item.innerHTML = `
+                    <span>${yearGroup.name}</span>
+                    <button class="button delete" onclick="deleteYearGroup(${yearGroup.id})">Delete</button>
+                `;
+                yearGroupList.appendChild(item);
+            });
         }
 
-        async function deleteYearGroup() {
-            const yearGroup = document.getElementById('yearGroup').value;
-            // Delete year group logic
+        async function addYearGroup() {
+            const name = document.getElementById('year-group-name').value;
+            if (name) {
+                const response = await fetch('/api/year-groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (response.ok) {
+                    document.getElementById('year-group-name').value = '';
+                    loadYearGroups();
+                } else {
+                    alert('Error adding year group.');
+                }
+            } else {
+                alert('Please enter a name for the year group.');
+            }
+        }
+
+        async function deleteYearGroup(id) {
+            if (confirm('Are you sure you want to delete this year group?')) {
+                const response = await fetch(`/api/year-groups/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadYearGroups();
+                } else {
+                    alert('Error deleting year group.');
+                }
+            }
+        }
+
+        // Functions to load and manage subjects
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectList = document.getElementById('subject-list');
+            subjectList.innerHTML = '';
+            subjects.forEach(subject => {
+                const item = document.createElement('div');
+                item.classList.add('list-item');
+                item.innerHTML = `
+                    <span>${subject.name}</span>
+                    <button class="button delete" onclick="deleteSubject(${subject.id})">Delete</button>
+                `;
+                subjectList.appendChild(item);
+            });
         }
 
         async function addSubject() {
-            const subject = document.getElementById('subject').value;
-            // Add subject logic
+            const name = document.getElementById('subject-name').value;
+            if (name) {
+                const response = await fetch('/api/subjects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (response.ok) {
+                    document.getElementById('subject-name').value = '';
+                    loadSubjects();
+                } else {
+                    alert('Error adding subject.');
+                }
+            } else {
+                alert('Please enter a name for the subject.');
+            }
         }
 
-        async function deleteSubject() {
-            const subject = document.getElementById('subject').value;
-            // Delete subject logic
+        async function deleteSubject(id) {
+            if (confirm('Are you sure you want to delete this subject?')) {
+                const response = await fetch(`/api/subjects/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadSubjects();
+                } else {
+                    alert('Error deleting subject.');
+                }
+            }
         }
 
+        // Functions to manage users
         async function addUser() {
-            const username = document.getElementById('username').value;
+            const username = document.getElementById('username-input').value;
             const password = document.getElementById('password').value;
             const isAdmin = document.getElementById('isAdmin').checked;
-            // Add user logic
+            if (username && password) {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, isAdmin })
+                });
+                if (response.ok) {
+                    document.getElementById('username-input').value = '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('isAdmin').checked = false;
+                    alert('User added successfully.');
+                } else {
+                    alert('Error adding user.');
+                }
+            } else {
+                alert('Please enter a username and password.');
+            }
         }
 
         async function deleteUser() {
-            const username = document.getElementById('username').value;
-            // Delete user logic
+            const username = document.getElementById('username-input').value;
+            if (username) {
+                const response = await fetch(`/api/users/${username}`, { method: 'DELETE' });
+                if (response.ok) {
+                    document.getElementById('username-input').value = '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('isAdmin').checked = false;
+                    alert('User deleted successfully.');
+                } else {
+                    alert('Error deleting user.');
+                }
+            } else {
+                alert('Please enter a username.');
+            }
         }
 
         async function exportDatabase() {
-            // Export database logic
+            try {
+                const response = await fetch('/api/export-database');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'database-backup.sql';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    alert('Database exported successfully.');
+                } else {
+                    alert('Error exporting database.');
+                }
+            } catch (error) {
+                console.error('Error exporting database:', error);
+                alert('Error exporting database.');
+            }
         }
 
         async function backupDatabase() {
-            // Backup database logic
+            try {
+                const response = await fetch('/api/backup-database', { method: 'POST' });
+                if (response.ok) {
+                    alert('Database backup created successfully.');
+                } else {
+                    alert('Error creating database backup.');
+                }
+            } catch (error) {
+                console.error('Error creating database backup:', error);
+                alert('Error creating database backup.');
+            }
         }
     </script>
 </body>
