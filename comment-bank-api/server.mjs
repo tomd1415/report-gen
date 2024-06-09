@@ -756,7 +756,7 @@ app.post('/api/import-reports', async (req, res) => {
 
     // Call OpenAI to process the reports
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       messages: [{
         role: 'user',
         content: `
@@ -823,7 +823,7 @@ app.post('/api/import-reports', async (req, res) => {
 
       // Call OpenAI to merge the existing and new categories and comments
       const mergeResponse = await openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-4o',
         messages: [{ role: 'user', content: mergePrompt }],
         max_tokens: 4000,
         temperature: 0.6
