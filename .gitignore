@@ -2,3 +2,4 @@ comment-bank-api/uploads
 dbbackup
 .env
 comment-bank-api/.env
+comment-bank-api/*.pem

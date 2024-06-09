@@ -52,7 +52,12 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  isAdmin: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  }
 });
+
 
 const Subject = sequelize.define('Subject', {
   name: {
@@ -177,11 +182,12 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
+  cookie: { secure: true }
 }));
 
 // Middleware to protect routes
 function isAuthenticated(req, res, next) {
-  if (req.session.userId) {
+  if (req.session.user) {
     next();
   } else {
     res.status(401).json({ message: 'Unauthorized' });
@@ -201,13 +207,12 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Login route
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = await User.findOne({ where: { username } });
     if (user && await bcrypt.compare(password, user.password)) {
-      req.session.userId = user.id;
+      req.session.user = { id: user.id, isAdmin: user.isAdmin };
       res.json({ message: 'Login successful' });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
@@ -217,6 +222,7 @@ app.post('/api/login', async (req, res) => {
     res.status(500).send('Error logging in');
   }
 });
+
 
 // Logout route
 app.post('/api/logout', (req, res) => {
@@ -238,7 +244,7 @@ app.use('/api/import-reports', isAuthenticated);
 
 // Check if the user is authenticated
 app.get('/api/authenticated', (req, res) => {
-  if (req.session.userId) {
+  if (req.session.user) {
     res.json({ authenticated: true });
   } else {
     res.status(401).json({ authenticated: false });
@@ -258,6 +264,129 @@ app.get('/api/user-info', isAuthenticated, async (req, res) => {
     console.error('Error fetching user info:', error);
     res.status(500).send('Error fetching user info');
   }
+});
+
+// Middleware to check if the user is an admin
+function isAdmin(req, res, next) {
+  if (req.session.user && req.session.user.isAdmin) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Forbidden' });
+  }
+}
+
+// Add Year Group
+app.post('/api/admin/year-group', isAdmin, async (req, res) => {
+  const { name } = req.body;
+  try {
+    const yearGroup = await YearGroup.create({ name });
+    res.json(yearGroup);
+  } catch (error) {
+    console.error('Error creating year group:', error);
+    res.status(500).send('Error creating year group');
+  }
+});
+
+// Delete Year Group
+app.delete('/api/admin/year-group/:name', isAdmin, async (req, res) => {
+  const { name } = req.params;
+  try {
+    const yearGroup = await YearGroup.findOne({ where: { name } });
+    if (yearGroup) {
+      await yearGroup.destroy();
+      res.sendStatus(204);
+    } else {
+      res.status(404).send('Year group not found');
+    }
+  } catch (error) {
+    console.error('Error deleting year group:', error);
+    res.status(500).send('Error deleting year group');
+  }
+});
+
+// Add Subject
+app.post('/api/admin/subject', isAdmin, async (req, res) => {
+  const { name } = req.body;
+  try {
+    const subject = await Subject.create({ name });
+    res.json(subject);
+  } catch (error) {
+    console.error('Error creating subject:', error);
+    res.status(500).send('Error creating subject');
+  }
+});
+
+// Delete Subject
+app.delete('/api/admin/subject/:name', isAdmin, async (req, res) => {
+  const { name } = req.params;
+  try {
+    const subject = await Subject.findOne({ where: { name } });
+    if (subject) {
+      await subject.destroy();
+      res.sendStatus(204);
+    } else {
+      res.status(404).send('Subject not found');
+    }
+  } catch (error) {
+    console.error('Error deleting subject:', error);
+    res.status(500).send('Error deleting subject');
+  }
+});
+
+// Add User
+app.post('/api/admin/user', isAdmin, async (req, res) => {
+  const { username, password, isAdmin } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ username, password: hashedPassword, isAdmin });
+    res.json(user);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).send('Error creating user');
+  }
+});
+
+// Delete User
+app.delete('/api/admin/user/:username', isAdmin, async (req, res) => {
+  const { username } = req.params;
+  try {
+    const user = await User.findOne({ where: { username } });
+    if (user) {
+      await user.destroy();
+      res.sendStatus(204);
+    } else {
+      res.status(404).send('User not found');
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).send('Error deleting user');
+  }
+});
+
+// Export Database
+app.get('/api/admin/export', isAdmin, (req, res) => {
+  const file = 'backup.sql';
+  exec(`mysqldump -u ${process.env.DB_USER} -p${process.env.DB_PASSWORD} ${process.env.DB_NAME} > ${file}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error exporting database:', error);
+      res.status(500).send('Error exporting database');
+    } else {
+      res.download(file);
+    }
+  });
+});
+
+// Backup Database
+app.post('/api/admin/backup', isAdmin, (req, res) => {
+  const file = `backup_${Date.now()}.sql`;
+  exec(`mysqldump -u ${process.env.DB_USER} -p${process.env.DB_PASSWORD} ${process.env.DB_NAME} > ${file}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error backing up database:', error);
+      res.status(500).send('Error backing up database');
+    } else {
+      res.json({ message: 'Backup successful', file });
+    }
+  });
 });
 
 
@@ -1057,7 +1186,7 @@ async function addSampleData() {
 }
 
 // Uncomment below for initial setup
-// addSampleData();
+//addSampleData();
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

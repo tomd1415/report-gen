@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .warning { color: red; font-weight: bold; }
+        .section { margin-bottom: 20px; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    </style>
+</head>
+<body class="bg-light-blue text-dark-gray">
+    <div id="header-placeholder"></div>
+    <div class="container bg-light-blue rounded-lg shadow-lg">
+        <h1 class="main-title">Admin Panel</h1>
+        <div id="user-info">
+            Logged in as: <span id="username"></span>
+        </div>
+        <section class="section">
+            <h2>Manage Year Groups and Subjects</h2>
+            <form id="manageYearSubjectsForm">
+                <div class="form-section">
+                    <label for="yearGroup">Year Group:</label>
+                    <input type="text" id="yearGroup" class="input-text" placeholder="Enter Year Group">
+                    <button type="button" class="button" onclick="addYearGroup()">Add Year Group</button>
+                    <button type="button" class="button delete" onclick="deleteYearGroup()">Delete Year Group</button>
+                </div>
+                <div class="form-section">
+                    <label for="subject">Subject:</label>
+                    <input type="text" id="subject" class="input-text" placeholder="Enter Subject">
+                    <button type="button" class="button" onclick="addSubject()">Add Subject</button>
+                    <button type="button" class="button delete" onclick="deleteSubject()">Delete Subject</button>
+                </div>
+            </form>
+        </section>
+        <section class="section">
+            <h2>Manage Users</h2>
+            <form id="manageUsersForm">
+                <div class="form-section">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" class="input-text" placeholder="Enter Username">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" class="input-text" placeholder="Enter Password">
+                    <label for="isAdmin">Admin:</label>
+                    <input type="checkbox" id="isAdmin">
+                    <button type="button" class="button" onclick="addUser()">Add User</button>
+                    <button type="button" class="button delete" onclick="deleteUser()">Delete User</button>
+                </div>
+            </form>
+        </section>
+        <section class="section">
+            <h2>Database Management</h2>
+            <button type="button" class="button" onclick="exportDatabase()">Export Database</button>
+            <button type="button" class="button" onclick="backupDatabase()">Backup Database</button>
+            <p class="warning">Warning: These actions can significantly affect the database. Proceed with caution.</p>
+        </section>
+    </div>
+    <div id="footer-placeholder"></div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchUsername();
+            fetch("header.html").then(response => response.text()).then(data => {
+                document.getElementById("header-placeholder").innerHTML = data;
+            });
+            fetch("footer.html").then(response => response.text()).then(data => {
+                document.getElementById("footer-placeholder").innerHTML = data;
+            });
+        });
+
+        // Fetch username
+        async function fetchUsername() {
+            try {
+                const response = await fetch('/api/user-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('username').textContent = data.username;
+                } else {
+                    console.error('Failed to fetch username');
+                }
+            } catch (error) {
+                console.error('Error fetching username:', error);
+            }
+        }
+
+        // Functions to handle admin actions
+        async function addYearGroup() {
+            const yearGroup = document.getElementById('yearGroup').value;
+            // Add year group logic
+        }
+
+        async function deleteYearGroup() {
+            const yearGroup = document.getElementById('yearGroup').value;
+            // Delete year group logic
+        }
+
+        async function addSubject() {
+            const subject = document.getElementById('subject').value;
+            // Add subject logic
+        }
+
+        async function deleteSubject() {
+            const subject = document.getElementById('subject').value;
+            // Delete subject logic
+        }
+
+        async function addUser() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const isAdmin = document.getElementById('isAdmin').checked;
+            // Add user logic
+        }
+
+        async function deleteUser() {
+            const username = document.getElementById('username').value;
+            // Delete user logic
+        }
+
+        async function exportDatabase() {
+            // Export database logic
+        }
+
+        async function backupDatabase() {
+            // Backup database logic
+        }
+    </script>
+</body>
+</html>
+
