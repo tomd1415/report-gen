@@ -13,7 +13,9 @@
     <div id="header-placeholder"></div>
     <div class="container bg-light-blue rounded-lg shadow-lg">
         <h1 class="main-title">Generate Report</h1>
-
+        <div id="user-info">
+            Logged in as: <span id="username"></span>
+        </div>
         <div id="form-container">
             <div class="subject-year">
                 <div class="form-section">
@@ -71,19 +73,38 @@
     </div>
 
     <script>
+
+  // Function to fetch and display the username
+        async function fetchUsername() {
+            try {
+                const response = await fetch('/api/user-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('username').textContent = data.username;
+                } else {
+                    console.error('Failed to fetch username');
+                }
+            } catch (error) {
+                console.error('Error fetching username:', error);
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
+            fetchUsername();
+
             fetch("header.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById("header-placeholder").innerHTML = data;
                 });
+
+            fetch('footer.html')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('footer-placeholder').innerHTML = data;
+                });
         });
 
-        fetch('footer.html')
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('footer-placeholder').innerHTML = data;
-            });
 
 	// Check if the user is authenticated
         fetch('/api/authenticated')
