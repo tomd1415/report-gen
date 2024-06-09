@@ -67,6 +67,14 @@
                 .then(data => {
                     document.getElementById('footer-placeholder').innerHTML = data;
                 });
+	    // Check if the user is authenticated
+            fetch('/api/authenticated')
+                .then(response => {
+                    if (!response.ok) {
+                        window.location.href = 'login.html';
+                    }
+                });
+		
         });
 
         // Function to toggle category visibility

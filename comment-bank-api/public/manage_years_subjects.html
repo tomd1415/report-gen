@@ -82,6 +82,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadYearGroups();
             loadSubjects();
+
+	    // Check if the user is authenticated
+            fetch('/api/authenticated')
+                .then(response => {
+                    if (!response.ok) {
+                        window.location.href = 'login.html';
+                    }
+                });
+
         });
 
         async function loadYearGroups() {

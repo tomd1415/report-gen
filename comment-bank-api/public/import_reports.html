@@ -61,7 +61,15 @@
             .then(data => {
                 document.getElementById('footer-placeholder').innerHTML = data;
             });
-            
+        
+	// Check if the user is authenticated
+        fetch('/api/authenticated')
+            .then(response => {
+                if (!response.ok) {
+                    window.location.href = 'login.html';
+                }
+            });
+
         async function loadSubjectsAndYearGroups() {
             const [subjectsResponse, yearGroupsResponse] = await Promise.all([
                 fetch('/api/subjects'),

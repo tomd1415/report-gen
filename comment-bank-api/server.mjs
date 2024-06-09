@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
@@ -7,17 +9,27 @@ import OpenAI from 'openai';
 import { Sequelize, DataTypes } from 'sequelize';
 import dotenv from 'dotenv';
 import { Parser } from 'json2csv';
-
+import bcrypt from 'bcrypt';
 import multer from 'multer';
 import csv from 'csv-parser';
 import fs from 'fs';
 import { pipeline } from 'stream';
-
+import session from 'express-session';
 // Load environment variables from .env file
 dotenv.config();
 
+//import https from 'https';
+//const fs = require('fs');
+
 const app = express();
-const port = 3000;
+const port = 44344;
+
+/*
+const options = {
+	key: fs.readFileSync('./privkey.pem'),
+	cert: fs.readFileSync('./cert.pem')
+};
+*/
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -39,31 +51,46 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
   logging: console.log
 });
 
+const User = sequelize.define('User', {
+  username: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+});
+
 const Subject = sequelize.define('Subject', {
   name: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
+      unique: true,
   }
-}, {
-  timestamps: false
+}, 	{
+  timestamps: true
 });
 
 const YearGroup = sequelize.define('YearGroup', {
   name: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
+      unique: true,
   }
 }, {
-  timestamps: false
+  timestamps: true
 });
 
 const Category = sequelize.define('Category', {
   name: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
   },
   subjectId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
       references: {
           model: Subject,
           key: 'id'
@@ -71,34 +98,45 @@ const Category = sequelize.define('Category', {
   },
   yearGroupId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
       references: {
           model: YearGroup,
           key: 'id'
       }
-  }
+  },
+  userId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+	  model: User,
+	  key: 'id'
+      }
+  },
 }, {
-  timestamps: false
+  timestamps: true
 });
 
 const Comment = sequelize.define('Comment', {
   text: {
       type: DataTypes.TEXT,
-      allowNull: false
+      allowNull: false,
   },
   categoryId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
       references: {
           model: Category,
           key: 'id'
       }
   }
 }, {
-  timestamps: false
+  timestamps: true
 });
 
 const Prompt = sequelize.define('Prompt', {
   subjectId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
       references: {
           model: Subject,
           key: 'id'
@@ -106,6 +144,7 @@ const Prompt = sequelize.define('Prompt', {
   },
   yearGroupId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
       references: {
           model: YearGroup,
           key: 'id'
@@ -116,7 +155,7 @@ const Prompt = sequelize.define('Prompt', {
       allowNull: false
   }
 }, {
-  timestamps: false
+  timestamps: true
 });
 
 // Define associations
@@ -124,6 +163,7 @@ Subject.hasMany(Category, { foreignKey: 'subjectId' });
 YearGroup.hasMany(Category, { foreignKey: 'yearGroupId' });
 Category.belongsTo(Subject, { foreignKey: 'subjectId' });
 Category.belongsTo(YearGroup, { foreignKey: 'yearGroupId' });
+Category.belongsTo(User, { foreignKey: 'userId' });
 
 Category.hasMany(Comment, { foreignKey: 'categoryId' });
 Comment.belongsTo(Category, { foreignKey: 'categoryId' });
@@ -136,7 +176,6 @@ Prompt.belongsTo(YearGroup, { foreignKey: 'yearGroupId' });
 
 sequelize.sync({ force: false }).then(() => {
   console.log('Database & tables created!');
-
   app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
   });
@@ -144,8 +183,188 @@ sequelize.sync({ force: false }).then(() => {
   console.error('Error syncing database:', err);
 });
 
+/*
+// Start of Middleware authentication
+function basicAuth(req, res, next) {
+	// temp username and password for testing
+	const auth = { login: 'username', password: 'password' };
+	// Parse the Authorization header
+	const b64auth = (req.headers.authorization || ' ').split(' ')[1] || '';
+	console.log(`${b64auth}`);
+	const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+
+	console.log(`${login} --- ${password}`)
+
+	// Chect to see if the entered credientials match the temp ones here
+	if (login && password && login === auth.login && password === auth.password) {
+		console.log('Got In');
+		return next();
+	}
+
+	// If not valid credentials
+	res.set('WWW-Authenticate', 'Basic realm="401"');
+	res.status(401).send('Authentication required.');
+
+}
+*/
+
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+}));
+
+//https.createServer(options, app)
+//app.listen(port, () => {
+//   console.log(`Server running at http://localhost:${port}`);
+//});
+
+//apt.get('/', (req, res) => {
+//	res.send('working');
+//});
+
+
 // CRUD operations for Subjects
 // Create a new subject
+async function addSampleUser() {
+  const username = 'testuser';
+  const password = 'testpassword';
+  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    await User.create({ username, password: hashedPassword });
+    console.log('Sample user added successfully');
+  } catch (error) {
+    console.error('Error adding sample user:', error);
+  }
+}
+
+async function addStartYearGroups() {
+
+	await sequelize.authenticate();
+	console.log('Connection to the database has been established successfully.');
+
+	// Sync models
+	await sequelize.sync();
+	console.log('Database synchronized.');
+
+	console.log('setting up consts');
+	const yearGroups = [
+        	'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6',
+        	'Year 7', 'Year 8', 'Year 9', 'Year 10', 'Year 11', 'Year 12',
+        	'Year 13', 'Year 14'
+    	];
+	console.log('consts setuo');
+	
+	try {
+	console.log('Starting year group setup');
+        	for (const yearGrp of yearGroups) {
+          	await YearGroup.create({ name: yearGrp });
+        	  console.log(`${yearGrp} Setup.`);
+       	}
+	} catch (error) {
+	        console.log('Error setting up Year Groups.', error);
+	}
+}
+async function addSubjects() {
+
+	await sequelize.authenticate();
+	console.log('Connection to the database has been established successfully.');
+
+	// Sync models
+	await sequelize.sync();
+	console.log('Database synchronized.');
+
+	console.log('setting up consts');
+	const subjects = [
+        	'Art', 'Citzenship', 'Computing', 'English', 'Food Technology', 'French',
+        	'Geography', 'History', 'Mathematics', 'PSHE&C', 'Physical Education', 'Registration',
+        	'Religious Education', 'Science', 'Swimming', 'Technology'
+    	];
+	console.log('consts setup');
+	
+	try {
+	console.log('Starting subject setup');
+        	for (const subj of subjects) {
+          	await Subject.create({ name: subj });
+        	  console.log(`${subj} Setup.`);
+       	}
+	} catch (error) {
+	        console.log('Error setting up subjects.', error);
+	}
+}
+// uncomment below for initial setup
+//addSubjects();
+//addStartYearGroups();
+//addSampleUser();
+		
+
+// Middleware to protect routes
+function isAuthenticated(req, res, next) {
+  if (req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ message: 'Unauthorized' });
+  }
+}
+
+// Register route
+app.post('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ username, password: hashedPassword });
+    res.json({ message: 'User registered successfully', user });
+  } catch (error) {
+    console.error('Error registering user:', error);
+    res.status(500).send('Error registering user');
+  }
+});
+
+// Login route
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ where: { username } });
+    if (user && await bcrypt.compare(password, user.password)) {
+      req.session.userId = user.id;
+      res.json({ message: 'Login successful' });
+    } else {
+      res.status(401).json({ message: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error('Error logging in:', error);
+    res.status(500).send('Error logging in');
+  }
+});
+
+// Logout route
+app.post('/api/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ message: 'Logout successful' });
+});
+
+
+// Protect your existing routes
+app.use('/api/subjects', isAuthenticated);
+app.use('/api/year-groups', isAuthenticated);
+app.use('/api/categories-comments', isAuthenticated);
+app.use('/generate-report', isAuthenticated);
+app.use('/api/comments', isAuthenticated);
+app.use('/api/move-comment', isAuthenticated);
+app.use('/api/prompts', isAuthenticated);
+app.use('/api/export-categories-comments', isAuthenticated);
+app.use('/api/import-categories-comments', isAuthenticated);
+app.use('/api/import-reports', isAuthenticated);
+
+// Check if the user is authenticated
+app.get('/api/authenticated', (req, res) => {
+  if (req.session.userId) {
+    res.json({ authenticated: true });
+  } else {
+    res.status(401).json({ authenticated: false });
+  }
+});
+
 app.post('/api/subjects', async (req, res) => {
   const { name } = req.body;
   try {
@@ -466,7 +685,7 @@ app.post('/generate-report', async (req, res) => {
           }
       });
 
-      let prompt = promptPart ? promptPart.promptPart : 'Generate a concision school report for a pupil. This is for Computing lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary';
+      let prompt = promptPart ? promptPart.promptPart : 'Generate a concision school report for a pupil. This is for school lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary';
       const placeholder = 'PUPIL_NAME';
       prompt += `\nI am using the following placeholder for a name: ${placeholder} the pronouns for this pupil are (${pronouns})\n`;
 
@@ -483,7 +702,7 @@ app.post('/generate-report', async (req, res) => {
       const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 500,
+          max_tokens: 600,
           temperature: 0.7
       });
 
@@ -585,7 +804,7 @@ app.post('/api/import-reports', async (req, res) => {
           const mergeResponse = await openai.chat.completions.create({
               model: 'gpt-4o',
               messages: [{ role: 'user', content: mergePrompt }],
-              max_tokens: 3500,
+              max_tokens: 4000,
               temperature: 0.6
           });
 
@@ -864,3 +1083,4 @@ app.post('/api/import-categories-comments', upload.single('file'), async (req, r
     fs.unlinkSync(filePath); // Clean up the uploaded file
   }
 });
+

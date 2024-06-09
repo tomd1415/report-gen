@@ -1,0 +1,77 @@
+
+> comment-bank-api@1.0.0 start
+> node server.mjs
+
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Subjects' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Subjects`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'YearGroups' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `YearGroups`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Categories' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Categories`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Comments' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Comments`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Prompts' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Prompts`
+Database & tables created!
+node:events:495
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1811:16)
+    at listenInCluster (node:net:1859:12)
+    at Server.listen (node:net:1947:7)
+    at Function.listen (/home/duguid/apps/report-gen/comment-bank-api/node_modules/express/lib/application.js:635:24)
+    at file:///home/duguid/apps/report-gen/comment-bank-api/server.mjs:140:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1838:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v18.19.0
+
+> comment-bank-api@1.0.0 start
+> node server.mjs
+
+Server running at http://localhost:44344
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Subjects' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Subjects`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'YearGroups' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `YearGroups`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Categories' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Categories`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Comments' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Comments`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'Prompts' AND TABLE_SCHEMA = 'comment_bank'
+Executing (default): SHOW INDEX FROM `Prompts`
+Database & tables created!
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
+Executing (default): SELECT `id`, `name` FROM `Subjects` AS `Subject`;
+Executing (default): SELECT `id`, `name` FROM `YearGroups` AS `YearGroup`;
