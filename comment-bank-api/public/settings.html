@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Settings</h1>
+        <section>
+            <h2>Year Groups</h2>
+            <div id="year-groups-container">
+                <!-- Year groups checkboxes will be loaded here -->
+            </div>
+        </section>
+        <section>
+            <h2>Subjects</h2>
+            <div id="subjects-container">
+                <!-- Subjects checkboxes will be loaded here -->
+            </div>
+        </section>
+        <section>
+            <h2>Change Password</h2>
+            <label for="new-password">New Password:</label>
+            <input type="password" id="new-password">
+            <button onclick="changePassword()">Change Password</button>
+        </section>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+</html>
+

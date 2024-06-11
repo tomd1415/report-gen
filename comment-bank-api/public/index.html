@@ -14,7 +14,8 @@
     <div class="container bg-light-blue rounded-lg shadow-lg">
         <h1 class="main-title">Generate Report</h1>
         <div id="user-info">
-            Logged in as: <span id="username"></span>
+		<span>Logged in as: <span id="username"></span></span>
+		<button id="logout-btn" class="button">Logout</button>
         </div>
         <div id="form-container">
             <div class="subject-year">
@@ -350,6 +351,23 @@
             loadSubjects();
             loadYearGroups();
         });
+
+  document.getElementById('logout-btn').addEventListener('click', function() {
+    fetch('/api/logout', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then(response => {
+        if (response.ok) {
+            window.location.href = 'login.html'; // Redirect to the login page after logout
+        } else {
+            alert('Failed to logout.');
+        }
+    }).catch(error => {
+        console.error('Logout error:', error);
+    });
+});
     </script>
 
 </body>
