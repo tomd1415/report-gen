@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Subjects and Year Groups</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
 </head>
 <body>
     <!-- Include header -->
@@ -45,39 +49,65 @@
     <div id="result-container" class="result-section"></div>
     <div id="footer-placeholder"></div>
     <script>
+        let globalUserYearGroups = []; // Global variable to store user year groups
+
         // Function to load header
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", async function() {
+            if (!await isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
             fetch("header.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById("header-placeholder").innerHTML = data;
                 });
+
+            fetch("footer.html")
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('footer-placeholder').innerHTML = data;
+                });
+
+            loadSettings();
         });
 
-        fetch('footer.html')
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('footer-placeholder').innerHTML = data;
-            });
-
-        // Check if the user is authenticated
-        fetch('/api/authenticated')
-            .then(response => {
-                if (!response.ok) {
-                    window.location.href = 'login.html';
+        async function isAuthenticated() {
+            try {
+                const response = await fetch('/api/authenticated');
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.authenticated;
+                } else {
+                    return false;
                 }
-            });
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+                return false;
+            }
+        }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadSubjects();
-        });
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/user-selected-settings');
+                const settings = await response.json();
+                loadSubjects(settings.userSubjects);
+                globalUserYearGroups = settings.userYearGroups; // Assign to global variable
+                loadYearGroups(); // Initial load
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
 
-        async function loadSubjects() {
+        async function loadSubjects(userSubjects) {
             const response = await fetch('/api/subjects');
             const subjects = await response.json();
             const subjectSelect = document.getElementById('subject-select');
             subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-            subjects.forEach(subject => {
+
+            const selectedSubjects = userSubjects.length ? userSubjects : subjects;
+            selectedSubjects.forEach(subject => {
                 const option = document.createElement('option');
                 option.value = subject.id;
                 option.textContent = subject.name;
@@ -86,12 +116,13 @@
         }
 
         async function loadYearGroups() {
-            const subjectId = document.getElementById('subject-select').value;
             const response = await fetch('/api/year-groups');
             const yearGroups = await response.json();
             const yearGroupSelect = document.getElementById('year-group-select');
             yearGroupSelect.innerHTML = '<option value="">Select Year Group</option>';
-            yearGroups.forEach(yearGroup => {
+
+            const selectedYearGroups = globalUserYearGroups.length ? globalUserYearGroups : yearGroups;
+            selectedYearGroups.forEach(yearGroup => {
                 const option = document.createElement('option');
                 option.value = yearGroup.id;
                 option.textContent = yearGroup.name;

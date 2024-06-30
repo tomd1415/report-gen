@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Export and Import Categories and Comments</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
 </head>
 <body class="bg-gray-100 text-gray-900">
 
@@ -43,49 +47,82 @@
     <div id="footer-placeholder"></div>
 
     <script>
+        let globalUserSubjects = [];
+        let globalUserYearGroups = [];
+
         // Function to load header and footer
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", async function() {
+            if (!await isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
             fetch("header.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById("header-placeholder").innerHTML = data;
                 });
 
-            fetch('footer.html')
+            fetch("footer.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById('footer-placeholder').innerHTML = data;
                 });
 
-		// Check if the user is authenticated
-            fetch('/api/authenticated')
-                .then(response => {
-                    if (!response.ok) {
-                        window.location.href = 'login.html';
-                    }
-                });
+            loadSettings();
         });
 
-        async function loadSubjectsAndYearGroups() {
-            const [subjectsResponse, yearGroupsResponse] = await Promise.all([
-                fetch('/api/subjects'),
-                fetch('/api/year-groups')
-            ]);
+        async function isAuthenticated() {
+            try {
+                const response = await fetch('/api/authenticated');
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.authenticated;
+                } else {
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+                return false;
+            }
+        }
 
-            const subjects = await subjectsResponse.json();
-            const yearGroups = await yearGroupsResponse.json();
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/user-selected-settings');
+                const settings = await response.json();
+                globalUserSubjects = settings.userSubjects;
+                globalUserYearGroups = settings.userYearGroups;
+                loadSubjects(); // Initial load
+                loadYearGroups(); // Initial load
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
 
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
             const subjectSelect = document.getElementById('subject-select');
-            const yearGroupSelect = document.getElementById('year-group-select');
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
 
-            subjects.forEach(subject => {
+            const selectedSubjects = globalUserSubjects.length ? globalUserSubjects : subjects;
+            selectedSubjects.forEach(subject => {
                 const option = document.createElement('option');
                 option.value = subject.id;
                 option.textContent = subject.name;
                 subjectSelect.appendChild(option);
             });
+        }
 
-            yearGroups.forEach(yearGroup => {
+        async function loadYearGroups() {
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupSelect = document.getElementById('year-group-select');
+            yearGroupSelect.innerHTML = '<option value="">Select Year Group</option>';
+
+            const selectedYearGroups = globalUserYearGroups.length ? globalUserYearGroups : yearGroups;
+            selectedYearGroups.forEach(yearGroup => {
                 const option = document.createElement('option');
                 option.value = yearGroup.id;
                 option.textContent = yearGroup.name;
@@ -163,7 +200,7 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', loadSubjectsAndYearGroups);
+        document.addEventListener('DOMContentLoaded', loadSettings);
     </script>
 </body>
 </html>
