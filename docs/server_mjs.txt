@@ -1,0 +1,95 @@
+Overview
+
+The server.mjs file is a Node.js server application built with Express.js. It includes middleware for handling CORS, body parsing, and static file serving. The server integrates with a PostgreSQL database using Sequelize ORM and interacts with OpenAI's GPT-4 model for generating reports. It also provides endpoints for CRUD operations on several entities and handles CSV import/export.
+Environment Configuration
+
+    dotenv: Loads environment variables from a .env file to configure the application.
+
+Express Server Setup
+
+    Express Initialization: Sets up an Express server on port 3000.
+    Middleware: Includes CORS, body-parser for JSON parsing, and serves static files from the public directory.
+
+OpenAI Integration
+
+    OpenAI Initialization: Configures the OpenAI client with an API key from environment variables.
+
+Sequelize Database Configuration
+
+    Sequelize Initialization: Configures Sequelize to connect to a PostgreSQL database using environment variables.
+    Models: Defines Sequelize models for Subject, YearGroup, Category, Comment, and Prompt.
+
+Database Relationships
+
+    Associations: Establishes relationships between models:
+        Subject has many Category.
+        YearGroup has many Category.
+        Category belongs to Subject and YearGroup.
+        Category has many Comment.
+        Comment belongs to Category.
+        Subject and YearGroup have many Prompt.
+
+CRUD Endpoints
+Subjects
+
+    Create: /api/subjects - Adds a new subject.
+    Read: /api/subjects - Fetches all subjects.
+    Update: /api/subjects/:id - Updates a subject by ID.
+    Delete: /api/subjects/:id - Deletes a subject by ID.
+
+YearGroups
+
+    Create: /api/year-groups - Adds a new year group.
+    Read: /api/year-groups - Fetches all year groups.
+    Update: /api/year-groups/:id - Updates a year group by ID.
+    Delete: /api/year-groups/:id - Deletes a year group by ID.
+
+Categories
+
+    Create: /api/categories - Adds a new category.
+    Read: /api/categories/:id - Fetches a single category by ID.
+    Read: /api/categories-comments - Fetches categories and associated comments based on subject and year group.
+    Update: /api/categories/:id - Updates a category by ID.
+    Delete: /api/categories/:id - Deletes a category by ID.
+
+Comments
+
+    Create: /api/comments - Adds a new comment.
+    Read: /api/comments - Fetches comments based on category.
+    Read: /api/comments/:id - Fetches a single comment by ID.
+    Update: /api/comments/:id - Updates a comment by ID.
+    Delete: /api/comments/:id - Deletes a comment by ID.
+    Move: /api/move-comment - Moves a comment to a different category.
+
+Prompts
+
+    Create/Update: /api/prompts - Creates or updates a prompt.
+    Update: /api/prompts/:subjectId/:yearGroupId - Updates a prompt by subject and year group ID.
+    Delete: /api/prompts/:id - Deletes a prompt by ID.
+    Delete: /api/prompts/:subjectId/:yearGroupId - Deletes a prompt by subject and year group ID.
+    Read: /api/prompts - Fetches all prompts.
+    Read: /api/prompts/:subjectId/:yearGroupId - Fetches a prompt by subject and year group ID.
+
+Report Generation and Import
+
+    Generate Report: /generate-report - Generates a student report based on categories and comments using OpenAI.
+    Import Reports: /api/import-reports - Imports reports, processes them with OpenAI, and updates categories and comments.
+
+CSV Import/Export
+
+    Export: /api/export-categories-comments - Exports categories and comments to CSV.
+    Import: /api/import-categories-comments - Imports categories and comments from CSV.
+
+File Upload Handling
+
+    Multer: Middleware for handling file uploads.
+    Helper Function: Cleans comment text to remove extra whitespace and newlines.
+
+Additional Configuration
+
+    Static File Serving: Serves static files from the public directory.
+    Database Sync: Synchronizes the Sequelize models with the database, ensuring the tables are created.
+
+Error Handling
+
+    Error Logging: Logs errors to the console and sends appropriate HTTP status codes in responses.

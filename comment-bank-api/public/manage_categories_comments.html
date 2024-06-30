@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Comments and Categories</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
 </head>
 <body class="bg-gray-100 text-gray-900">
 
@@ -16,34 +20,34 @@
 
         <div id="form-container">
             <div class="subject-year">
-            <div class="form-section">
-                <!--
-                <label for="subject-select" class="block text-center">Subject:</label>
-                -->
-                <select id="subject-select" onchange="loadCategoriesAndComments()"
-                        class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
-                    <option value="">Select Subject</option>
-                </select>
-            </div>
+                <div class="form-section">
+                    <!--
+                    <label for="subject-select" class="block text-center">Subject:</label>
+                    -->
+                    <select id="subject-select" onchange="loadCategoriesAndComments()"
+                            class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
+                        <option value="">Select Subject</option>
+                    </select>
+                </div>
 
-            <div class="form-section">
-                <!--
-                <label for="year-group-select" class="block text-center">Year Group:</label>
-                -->
-                <select id="year-group-select" onchange="loadCategoriesAndComments()"
-                        class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
-                    <option value="">Select Year Group</option>
-                </select>
-            </div>
+                <div class="form-section">
+                    <!--
+                    <label for="year-group-select" class="block text-center">Year Group:</label>
+                    -->
+                    <select id="year-group-select" onchange="loadCategoriesAndComments()"
+                            class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
+                        <option value="">Select Year Group</option>
+                    </select>
+                </div>
             </div>
 
             <div id="new-category">
-            <div class="form-section">
-                <label for="new-category-name" class="block text-center">New Category Name:</label>
-                <input type="text" id="new-category-name" placeholder="Enter new category name"
-                       class="border border-gray-300 rounded-md shadow-sm mb-0 p-1 text-center">
-                <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="addCategory()">Add Category</button>
-            </div>
+                <div class="form-section">
+                    <label for="new-category-name" class="block text-center">New Category Name:</label>
+                    <input type="text" id="new-category-name" placeholder="Enter new category name"
+                           class="border border-gray-300 rounded-md shadow-sm mb-0 p-1 text-center">
+                    <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="addCategory()">Add Category</button>
+                </div>
             </div>
             <div id="categories-container" class="comment-categories-container">
                 <!-- Categories and comments will be populated here -->
@@ -54,20 +58,88 @@
     <div id="footer-placeholder"></div>
 
     <script>
+        let globalUserSubjects = [];
+        let globalUserYearGroups = [];
+
         // Function to load header and footer
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", async function() {
+            if (!await isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
             fetch("header.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById("header-placeholder").innerHTML = data;
                 });
 
-            fetch('footer.html')
+            fetch("footer.html")
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById('footer-placeholder').innerHTML = data;
                 });
+
+            loadSettings();
         });
+
+        async function isAuthenticated() {
+            try {
+                const response = await fetch('/api/authenticated');
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.authenticated;
+                } else {
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+                return false;
+            }
+        }
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/user-selected-settings');
+                const settings = await response.json();
+                globalUserSubjects = settings.userSubjects;
+                globalUserYearGroups = settings.userYearGroups;
+                loadSubjects(); // Initial load
+                loadYearGroups(); // Initial load
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectSelect = document.getElementById('subject-select');
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+
+            const selectedSubjects = globalUserSubjects.length ? globalUserSubjects : subjects;
+            selectedSubjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                subjectSelect.appendChild(option);
+            });
+        }
+
+        async function loadYearGroups() {
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupSelect = document.getElementById('year-group-select');
+            yearGroupSelect.innerHTML = '<option value="">Select Year Group</option>';
+
+            const selectedYearGroups = globalUserYearGroups.length ? globalUserYearGroups : yearGroups;
+            selectedYearGroups.forEach(yearGroup => {
+                const option = document.createElement('option');
+                option.value = yearGroup.id;
+                option.textContent = yearGroup.name;
+                yearGroupSelect.appendChild(option);
+            });
+        }
 
         // Function to toggle category visibility
         function toggleCategory(categoryDiv) {
@@ -79,48 +151,6 @@
                 categoryDiv.querySelector('.expand').textContent = '-';
             }
             categoryDiv.classList.toggle('collapsed');
-        }
-
-        // Fetch and populate year groups
-        async function loadYearGroups() {
-            try {
-                const response = await fetch('/api/year-groups');
-                if (!response.ok) {
-                    console.error('Failed to fetch year groups:', response.statusText);
-                    return;
-                }
-                const yearGroups = await response.json();
-                const yearGroupSelect = document.getElementById('year-group-select');
-                yearGroups.forEach(yearGroup => {
-                    const option = document.createElement('option');
-                    option.value = yearGroup.id;
-                    option.textContent = yearGroup.name;
-                    yearGroupSelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading year groups:', error);
-            }
-        }
-
-        // Fetch and populate subjects
-        async function loadSubjects() {
-            try {
-                const response = await fetch('/api/subjects');
-                if (!response.ok) {
-                    console.error('Failed to fetch subjects:', response.statusText);
-                    return;
-                }
-                const subjects = await response.json();
-                const subjectSelect = document.getElementById('subject-select');
-                subjects.forEach(subject => {
-                    const option = document.createElement('option');
-                    option.value = subject.id;
-                    option.textContent = subject.name;
-                    subjectSelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading subjects:', error);
-            }
         }
 
         // Fetch and populate categories and comments
@@ -170,8 +200,6 @@
                                 </div>
                             </div>
                         `;
-                        //categoryDiv.addEventListener('drop', drop);
-                        //categoryDiv.addEventListener('dragover', allowDrop);
                         categoriesContainer.appendChild(categoryDiv);
                     });
                 } catch (error) {
@@ -246,12 +274,11 @@
                     }
                     loadCategoriesAndComments();
                 } catch (error) {
-                        console.error('Error deleting category:', error);
-                        alert('Error deleting category.');
-                    }
+                    console.error('Error deleting category:', error);
+                    alert('Error deleting category.');
                 }
             }
-        
+        }
 
         // Add new comment
         async function addComment(categoryId, text) {
@@ -349,46 +376,10 @@
         function allowDrop(event) {
             event.preventDefault();
         }
-/*
-        // Drag comment
-        function drag(event) {
-            event.dataTransfer.setData('text', event.target.getAttribute('data-comment-id'));
-        }
-
-        // Drop comment into a new category
-        async function drop(event) {
-            event.preventDefault();
-            const commentId = event.dataTransfer.getData('text');
-            const newCategoryId = event.target.closest('.category').querySelector('h3').getAttribute('data-category-id');
-            if (commentId && newCategoryId) {
-                try {
-                    const response = await fetch('/api/move-comment', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ commentId, newCategoryId })
-                    });
-                    if (!response.ok) {
-                        console.error('Error moving comment:', response.statusText);
-                        alert('Error moving comment.');
-                        return;
-                    }
-                    loadCategoriesAndComments();
-                } catch (error) {
-                    console.error('Error moving comment:', error);
-                    alert('Error moving comment.');
-                }
-            }
-        } */
 
         // Load subjects and year groups on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            loadSubjects();
-            loadYearGroups();
-        });
+        document.addEventListener('DOMContentLoaded', loadSettings);
     </script>
 
 </body>
 </html>
-

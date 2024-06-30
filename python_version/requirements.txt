@@ -1,6 +1,0 @@
-openai==1.30.5
-wxPython==4.2.0
-simplejson==3.18.3
-types-jsonschema==4.17
-types-simplejson==3.17
-types-ujson==5.5

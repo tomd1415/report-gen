@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .warning { color: red; font-weight: bold; }
+        .section { margin-bottom: 20px; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .form-section { margin-bottom: 20px; }
+        .list-container { margin-top: 20px; font-size: 0.9em; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
+        label { display: block; margin: 5px 0; }
+        select, input { width: 100%; padding: 8px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; }
+        .button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+        .button:hover { background-color: #45a049; }
+        .button.delete { background-color: #f44336; }
+        .button.delete:hover { background-color: #e53935; }
+    </style>
+</head>
+<body class="bg-light-blue text-dark-gray">
+    <div id="header-placeholder"></div>
+    <div class="container bg-light-blue rounded-lg shadow-lg">
+        <h1 class="main-title">Admin Panel</h1>
+        <div id="user-info">Logged in as: <span id="username"></span></div>
+
+        <!-- Manage Year Groups and Subjects Section -->
+        <section class="section">
+            <h2>Manage Year Groups and Subjects</h2>
+            <div class="form-section">
+                <h3>Year Groups</h3>
+                <input type="text" id="year-group-name" placeholder="Enter new year group name">
+                <button class="button" onclick="addYearGroup()">Add Year Group</button>
+                <div class="list-container" id="year-group-list">
+                    <!-- Year groups will be populated here -->
+                </div>
+            </div>
+            <div class="form-section">
+                <h3>Subjects</h3>
+                <input type="text" id="subject-name" placeholder="Enter new subject name">
+                <button class="button" onclick="addSubject()">Add Subject</button>
+                <div class="list-container" id="subject-list">
+                    <!-- Subjects will be populated here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Manage Users Section -->
+        <section class="section">
+            <h2>Manage Users</h2>
+            <form id="manageUsersForm">
+                <div class="form-section">
+                    <label for="username-input">Username:</label>
+                    <input type="text" id="username-input" class="input-text" placeholder="Enter Username">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" class="input-text" placeholder="Enter Password">
+                    <label for="isAdmin">Admin:</label>
+                    <input type="checkbox" id="isAdmin">
+                    <button type="button" class="button" onclick="addUser()">Add User</button>
+                    <button type="button" class="button delete" onclick="deleteUser()">Delete User</button>
+                </div>
+		<div class="form-section">
+	  	<label for="change-password-username">Username:</label>
+  		<input type="text" id="change-password-username" placeholder="Username for password change">
+  		<label for="new-password">New Password:</label>
+  		<input type="password" id="new-password" placeholder="New Password">
+  		<button class="button" onclick="changePassword()">Change Password</button>
+		</div>
+
+            </form>
+        </section>
+
+        <!-- Database Management Section -->
+        <section class="section">
+            <h2>Database Management</h2>
+            <button type="button" class="button" onclick="exportDatabase()">Export Database</button>
+            <button type="button" class="button" onclick="backupDatabase()">Backup Database</button>
+            <p class="warning">Warning: These actions can significantly affect the database. Proceed with caution.</p>
+        </section>
+    </div>
+    <div id="footer-placeholder"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchUsername();
+            fetch("header.html").then(response => response.text()).then(data => {
+                document.getElementById("header-placeholder").innerHTML = data;
+            });
+            fetch("footer.html").then(response => response.text()).then(data => {
+                document.getElementById("footer-placeholder").innerHTML = data;
+            });
+	    // Check if the user is authenticated
+            fetch('/api/authenticated')
+                .then(response => {
+                    if (!response.ok) {
+                        window.location.href = 'admin-login.html';
+                    }
+                });
+	    
+                checkAdminStatus();
+
+    	    function checkAdminStatus() {
+        	fetch('/api/user-info', {
+             	credentials: 'include'  // Make sure cookies are included with the request
+        	})
+        	.then(response => response.json())
+        	.then(data => {
+            	if (!data.isAdmin) {
+                	alert('Access Denied: You do not have admin privileges.');
+                	window.location.href = 'index.html'; // Redirect non-admins to a different page
+            	}
+        	})
+        	.catch(error => {
+            		console.error('Failed to check admin status:', error);
+            		window.location.href = 'admin-login.html'; // Redirect to login if there's an error
+        	});
+    		}
+ 
+		
+            loadYearGroups();
+            loadSubjects();
+        });
+
+        // Fetch username
+        async function fetchUsername() {
+            try {
+                const response = await fetch('/api/user-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('username').textContent = data.username;
+                } else {
+                    console.error('Failed to fetch username');
+                }
+            } catch (error) {
+                console.error('Error fetching username:', error);
+            }
+        }
+
+        // Functions to load and manage year groups
+        async function loadYearGroups() {
+            const response = await fetch('/api/year-groups');
+            const yearGroups = await response.json();
+            const yearGroupList = document.getElementById('year-group-list');
+            yearGroupList.innerHTML = '';
+            yearGroups.forEach(yearGroup => {
+                const item = document.createElement('div');
+                item.classList.add('list-item');
+                item.innerHTML = `
+                    <span>${yearGroup.name}</span>
+                    <button class="button delete" onclick="deleteYearGroup(${yearGroup.id})">Delete</button>
+                `;
+                yearGroupList.appendChild(item);
+            });
+        }
+
+        async function addYearGroup() {
+            const name = document.getElementById('year-group-name').value;
+            if (name) {
+                const response = await fetch('/api/year-groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (response.ok) {
+                    document.getElementById('year-group-name').value = '';
+                    loadYearGroups();
+                } else {
+                    alert('Error adding year group.');
+                }
+            } else {
+                alert('Please enter a name for the year group.');
+            }
+        }
+
+        async function deleteYearGroup(id) {
+            if (confirm('Are you sure you want to delete this year group?')) {
+                const response = await fetch(`/api/year-groups/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadYearGroups();
+                } else {
+                    alert('Error deleting year group.');
+                }
+            }
+        }
+
+        // Functions to load and manage subjects
+        async function loadSubjects() {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            const subjectList = document.getElementById('subject-list');
+            subjectList.innerHTML = '';
+            subjects.forEach(subject => {
+                const item = document.createElement('div');
+                item.classList.add('list-item');
+                item.innerHTML = `
+                    <span>${subject.name}</span>
+                    <button class="button delete" onclick="deleteSubject(${subject.id})">Delete</button>
+                `;
+                subjectList.appendChild(item);
+            });
+        }
+
+        async function addSubject() {
+            const name = document.getElementById('subject-name').value;
+            if (name) {
+                const response = await fetch('/api/subjects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (response.ok) {
+                    document.getElementById('subject-name').value = '';
+                    loadSubjects();
+                } else {
+                    alert('Error adding subject.');
+                }
+            } else {
+                alert('Please enter a name for the subject.');
+            }
+        }
+
+        async function deleteSubject(id) {
+            if (confirm('Are you sure you want to delete this subject?')) {
+                const response = await fetch(`/api/subjects/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadSubjects();
+                } else {
+                    alert('Error deleting subject.');
+                }
+            }
+        }
+
+        // Functions to manage users
+        async function addUser() {
+            const username = document.getElementById('username-input').value;
+            const password = document.getElementById('password').value;
+            const isAdmin = document.getElementById('isAdmin').checked;
+            if (username && password) {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, isAdmin })
+                });
+                if (response.ok) {
+                    document.getElementById('username-input').value = '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('isAdmin').checked = false;
+                    alert('User added successfully.');
+                } else {
+                    alert('Error adding user.');
+                }
+            } else {
+                alert('Please enter a username and password.');
+            }
+        }
+
+        async function deleteUser() {
+            const username = document.getElementById('username-input').value;
+            if (username) {
+                const response = await fetch(`/api/users/${username}`, { method: 'DELETE' });
+                if (response.ok) {
+                    document.getElementById('username-input').value = '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('isAdmin').checked = false;
+                    alert('User deleted successfully.');
+                } else {
+                    alert('Error deleting user.');
+                }
+            } else {
+                alert('Please enter a username.');
+            }
+        }
+	async function changePassword() {
+  const username = document.getElementById('change-password-username').value;
+  const newPassword = document.getElementById('new-password').value;
+  if (username && newPassword) {
+    try {
+      const response = await fetch(`/api/admin/user/${username}/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ newPassword })
+      });
+      if (response.ok) {
+        alert('Password changed successfully.');
+      } else {
+        alert('Failed to change password.');
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      alert('Error changing password.');
+    }
+  } else {
+    alert('Please fill in both fields.');
+  }
+}
+
+        async function exportDatabase() {
+            try {
+                const response = await fetch('/api/export-database');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'database-backup.sql';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    alert('Database exported successfully.');
+                } else {
+                    alert('Error exporting database.');
+                }
+            } catch (error) {
+                console.error('Error exporting database:', error);
+                alert('Error exporting database.');
+            }
+        }
+
+        async function backupDatabase() {
+            try {
+                const response = await fetch('/api/backup-database', { method: 'POST' });
+                if (response.ok) {
+                    alert('Database backup created successfully.');
+                } else {
+                    alert('Error creating database backup.');
+                }
+            } catch (error) {
+                console.error('Error creating database backup:', error);
+                alert('Error creating database backup.');
+            }
+        }
+    </script>
+</body>
+</html>
+
