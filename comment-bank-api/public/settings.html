@@ -67,42 +67,51 @@
         }
 
         async function loadSettings() {
-            const userSettingsResponse = await fetch('/api/user-settings');
-            const userSettings = await userSettingsResponse.json();
+            try {
+                const userSettingsResponse = await fetch('/api/user-settings');
+                const userSettings = await userSettingsResponse.json();
+                console.log('User Settings:', userSettings); // Debug line
 
-            const yearGroupsResponse = await fetch('/api/year-groups');
-            const yearGroups = await yearGroupsResponse.json();
+                const yearGroupsResponse = await fetch('/api/year-groups');
+                const yearGroups = await yearGroupsResponse.json();
+                console.log('Year Groups:', yearGroups); // Debug line
 
-            const subjectsResponse = await fetch('/api/subjects');
-            const subjects = await subjectsResponse.json();
+                const subjectsResponse = await fetch('/api/subjects');
+                const subjects = await subjectsResponse.json();
+                console.log('Subjects:', subjects); // Debug line
 
-            const yearGroupCheckboxes = document.getElementById('year-group-checkboxes');
-            yearGroups.forEach(yearGroup => {
-                const isChecked = userSettings.userYearGroups.some(y => y.yearGroupId === yearGroup.id);
-                const item = document.createElement('div');
-                item.classList.add('checkbox-item');
-                item.innerHTML = `
-                    <label>
-                        <input type="checkbox" value="${yearGroup.id}" ${isChecked ? 'checked' : ''} onchange="toggleYearGroup(${yearGroup.id}, this.checked)">
-                        ${yearGroup.name}
-                    </label>
-                `;
-                yearGroupCheckboxes.appendChild(item);
-            });
+                const yearGroupCheckboxes = document.getElementById('year-group-checkboxes');
+                yearGroupCheckboxes.innerHTML = ''; // Clear previous entries
+                yearGroups.forEach(yearGroup => {
+                    const isChecked = userSettings.userYearGroups.some(y => y.yearGroupId === yearGroup.id);
+                    const item = document.createElement('div');
+                    item.classList.add('checkbox-item');
+                    item.innerHTML = `
+                        <label>
+                            <input type="checkbox" value="${yearGroup.id}" ${isChecked ? 'checked' : ''} onchange="toggleYearGroup(${yearGroup.id}, this.checked)">
+                            ${yearGroup.name}
+                        </label>
+                    `;
+                    yearGroupCheckboxes.appendChild(item);
+                });
 
-            const subjectCheckboxes = document.getElementById('subject-checkboxes');
-            subjects.forEach(subject => {
-                const isChecked = userSettings.userSubjects.some(s => s.subjectId === subject.id);
-                const item = document.createElement('div');
-                item.classList.add('checkbox-item');
-                item.innerHTML = `
-                    <label>
-                        <input type="checkbox" value="${subject.id}" ${isChecked ? 'checked' : ''} onchange="toggleSubject(${subject.id}, this.checked)">
-                        ${subject.name}
-                    </label>
-                `;
-                subjectCheckboxes.appendChild(item);
-            });
+                const subjectCheckboxes = document.getElementById('subject-checkboxes');
+                subjectCheckboxes.innerHTML = ''; // Clear previous entries
+                subjects.forEach(subject => {
+                    const isChecked = userSettings.userSubjects.some(s => s.subjectId === subject.id);
+                    const item = document.createElement('div');
+                    item.classList.add('checkbox-item');
+                    item.innerHTML = `
+                        <label>
+                            <input type="checkbox" value="${subject.id}" ${isChecked ? 'checked' : ''} onchange="toggleSubject(${subject.id}, this.checked)">
+                            ${subject.name}
+                        </label>
+                    `;
+                    subjectCheckboxes.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
         }
 
         async function toggleYearGroup(yearGroupId, selected) {
@@ -137,5 +146,3 @@
     </script>
 </body>
 </html>
-
-

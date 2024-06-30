@@ -42,7 +42,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
   dialect: process.env.DB_DIALECT,
   logging: console.log
 });
-
+// User model
 const User = sequelize.define('User', {
   username: {
     type: DataTypes.STRING,
@@ -59,22 +59,23 @@ const User = sequelize.define('User', {
   }
 });
 
-
+// Subject model
 const Subject = sequelize.define('Subject', {
   name: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
   }
 }, {
   timestamps: true
 });
 
+// YearGroup model
 const YearGroup = sequelize.define('YearGroup', {
   name: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
   }
 }, {
   timestamps: true
@@ -163,8 +164,13 @@ const Prompt = sequelize.define('Prompt', {
   timestamps: true
 });
 
-// Define UserSubjects model
+// UserSubject model
 const UserSubject = sequelize.define('UserSubject', {
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  },
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -181,12 +187,15 @@ const UserSubject = sequelize.define('UserSubject', {
       key: 'id'
     }
   }
-}, {
-  timestamps: true
-});
+}, { timestamps: false });
 
-// Define UserYearGroups model
+// UserYearGroup model
 const UserYearGroup = sequelize.define('UserYearGroup', {
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  },
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -203,9 +212,13 @@ const UserYearGroup = sequelize.define('UserYearGroup', {
       key: 'id'
     }
   }
-}, {
-  timestamps: true
-});
+}, { timestamps: false });
+
+// UserSubject model
+//const UserSubject = sequelize.define('UserSubject', {}, { timestamps: false });
+
+// UserYearGroup model
+//const UserYearGroup = sequelize.define('UserYearGroup', {}, { timestamps: false });
 
 // Define associations
 Subject.hasMany(Category, { foreignKey: 'subjectId' });
@@ -223,6 +236,26 @@ User.hasMany(Prompt, { foreignKey: 'userId' });
 Prompt.belongsTo(Subject, { foreignKey: 'subjectId' });
 Prompt.belongsTo(YearGroup, { foreignKey: 'yearGroupId' });
 Prompt.belongsTo(User, { foreignKey: 'userId' });
+
+//User.belongsToMany(Subject, { through: UserSubject, foreignKey: 'userId' });
+//Subject.belongsToMany(User, { through: UserSubject, foreignKey: 'subjectId' });
+
+User.hasMany(UserYearGroup, {foreignKey: 'userId' });
+UserYearGroup.belongsTo(User, { foreignKey: 'userId' });
+YearGroup.hasMany(UserYearGroup, {foreignKey: 'yearGroupId' });
+UserYearGroup.belongsTo(YearGroup, {foreignKey: 'yearGroupId' });
+User.belongsToMany(YearGroup, { through: UserYearGroup, foreignKey: 'userId' });
+YearGroup.belongsToMany(User, { through: UserYearGroup, foreignKey: 'yearGroupId' });
+
+User.hasMany(UserSubject, {foreignKey: 'userId' });
+UserSubject.belongsTo(User, { foreignKey: 'userId' });
+Subject.hasMany(UserSubject, {foreignKey: 'subjectId' });
+UserSubject.belongsTo(Subject, {foreignKey: 'subjectId' });
+User.belongsToMany(Subject, { through: UserSubject, foreignKey: 'userId' });
+Subject.belongsToMany(User, { through: UserSubject, foreignKey: 'subjectId' });
+
+//User.belongsToMany(UserYearGroup, { foreignKey: 'userId' });
+//UserYearGroup.belongsTo(User, { foreignKey: 'userId' });
 
 sequelize.sync({ force: false }).then(() => {
   console.log('Database & tables created!');
@@ -1357,6 +1390,30 @@ app.get('/api/user-settings', isAuthenticated, async (req, res) => {
     res.status(500).send('Error fetching user settings');
   }
 });
+
+// Fetch user settings
+app.get('/api/user-selected-settings', isAuthenticated, async (req, res) => {
+  const userId = req.session.user.id;
+  //console.error('User ID gathered', userId)
+  try {
+    const userSubjects = await UserSubject.findAll({ 
+      where: { userId },
+      include: [{ model: Subject }]
+    });
+    const userYearGroups = await UserYearGroup.findAll({ 
+      where: { userId },
+      include: [{ model: YearGroup }]
+    });
+
+    res.json({ 
+      userSubjects: userSubjects.map(us => us.Subject),
+      userYearGroups: userYearGroups.map(uyg => uyg.YearGroup)
+    });
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    res.status(500).send('Error fetching user settings');
+  }
+});
 // Initial setup function to add sample user and data
 async function addSampleData() {
   await sequelize.authenticate();
@@ -1438,7 +1495,7 @@ async function addSampleData() {
 }
 
 // Uncomment below for initial setup
-//addSampleData();
+// addSampleData();
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
