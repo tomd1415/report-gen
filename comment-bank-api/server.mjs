@@ -163,6 +163,50 @@ const Prompt = sequelize.define('Prompt', {
   timestamps: true
 });
 
+// Define UserSubjects model
+const UserSubject = sequelize.define('UserSubject', {
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+  subjectId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Subject,
+      key: 'id'
+    }
+  }
+}, {
+  timestamps: true
+});
+
+// Define UserYearGroups model
+const UserYearGroup = sequelize.define('UserYearGroup', {
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+  yearGroupId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: YearGroup,
+      key: 'id'
+    }
+  }
+}, {
+  timestamps: true
+});
+
 // Define associations
 Subject.hasMany(Category, { foreignKey: 'subjectId' });
 YearGroup.hasMany(Category, { foreignKey: 'yearGroupId' });
@@ -1267,7 +1311,52 @@ app.post('/api/import-categories-comments', upload.single('file'), async (req, r
     fs.unlinkSync(filePath); // Clean up the uploaded file
   }
 });
+// Add or remove a subject for the user
+app.post('/api/user-subjects', isAuthenticated, async (req, res) => {
+  const { subjectId, selected } = req.body;
+  const userId = req.session.user.id;
+  try {
+    if (selected) {
+      await UserSubject.findOrCreate({ where: { userId, subjectId } });
+    } else {
+      await UserSubject.destroy({ where: { userId, subjectId } });
+    }
+    res.json({ message: 'User subject updated successfully' });
+  } catch (error) {
+    console.error('Error updating user subject:', error);
+    res.status(500).send('Error updating user subject');
+  }
+});
 
+// Add or remove a year group for the user
+app.post('/api/user-year-groups', isAuthenticated, async (req, res) => {
+  const { yearGroupId, selected } = req.body;
+  const userId = req.session.user.id;
+  try {
+    if (selected) {
+      await UserYearGroup.findOrCreate({ where: { userId, yearGroupId } });
+    } else {
+      await UserYearGroup.destroy({ where: { userId, yearGroupId } });
+    }
+    res.json({ message: 'User year group updated successfully' });
+  } catch (error) {
+    console.error('Error updating user year group:', error);
+    res.status(500).send('Error updating user year group');
+  }
+});
+
+// Fetch user settings
+app.get('/api/user-settings', isAuthenticated, async (req, res) => {
+  const userId = req.session.user.id;
+  try {
+    const userSubjects = await UserSubject.findAll({ where: { userId } });
+    const userYearGroups = await UserYearGroup.findAll({ where: { userId } });
+    res.json({ userSubjects, userYearGroups });
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    res.status(500).send('Error fetching user settings');
+  }
+});
 // Initial setup function to add sample user and data
 async function addSampleData() {
   await sequelize.authenticate();
