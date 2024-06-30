@@ -147,14 +147,6 @@ const Prompt = sequelize.define('Prompt', {
           key: 'id'
       }
   },
-  userId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-          model: User,
-          key: 'id'
-      }
-  },
   promptPart: {
       type: DataTypes.TEXT,
       allowNull: false
@@ -175,10 +167,8 @@ Comment.belongsTo(Category, { foreignKey: 'categoryId' });
 
 Subject.hasMany(Prompt, { foreignKey: 'subjectId' });
 YearGroup.hasMany(Prompt, { foreignKey: 'yearGroupId' });
-User.hasMany(Prompt, { foreignKey: 'userId' });
 Prompt.belongsTo(Subject, { foreignKey: 'subjectId' });
 Prompt.belongsTo(YearGroup, { foreignKey: 'yearGroupId' });
-Prompt.belongsTo(User, { foreignKey: 'userId' });
 
 sequelize.sync({ force: false }).then(() => {
   console.log('Database & tables created!');
@@ -896,13 +886,11 @@ app.post('/api/import-reports', async (req, res) => {
 // Create or update a prompt by subjectId and yearGroupId
 app.post('/api/prompts', async (req, res) => {
   const { subjectId, yearGroupId, promptPart } = req.body;
-  const userId = req.session.user.id; 
   try {
     const [prompt, created] = await Prompt.findOrCreate({
       where: {
         subjectId: subjectId,
-        yearGroupId: yearGroupId,
-        userId: userId
+        yearGroupId: yearGroupId
       },
       defaults: {
         promptPart: promptPart
@@ -924,14 +912,12 @@ app.post('/api/prompts', async (req, res) => {
 // Update a prompt by subjectId and yearGroupId
 app.put('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
   const { subjectId, yearGroupId } = req.params;
-  const userId = req.session.user.id; 
   const { promptPart } = req.body;
   try {
     const prompt = await Prompt.findOne({
       where: {
         subjectId: subjectId,
-        yearGroupId: yearGroupId,
-        userId: userId
+        yearGroupId: yearGroupId
       }
     });
     if (prompt) {
@@ -986,13 +972,11 @@ app.delete('/api/prompts/:id', async (req, res) => {
 // Delete a prompt by subjectId and yearGroupId
 app.delete('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
   const { subjectId, yearGroupId } = req.params;
-  const userId = req.session.user.id;
   try {
     const prompt = await Prompt.findOne({
       where: {
         subjectId: subjectId,
-        yearGroupId: yearGroupId,
-        userId: userId
+        yearGroupId: yearGroupId
       }
     });
     if (prompt) {
@@ -1021,13 +1005,11 @@ app.get('/api/prompts', async (req, res) => {
 // Fetch a prompt by subjectId and yearGroupId
 app.get('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
   const { subjectId, yearGroupId } = req.params;
-  const userId = req.session.user.id; 
   try {
     const prompt = await Prompt.findOne({
       where: {
         subjectId: subjectId,
-        yearGroupId: yearGroupId,
-        userId: userId
+        yearGroupId: yearGroupId
       }
     });
     res.json(prompt ? prompt.promptPart : '');

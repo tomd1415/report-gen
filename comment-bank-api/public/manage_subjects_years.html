@@ -5,45 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Subjects and Year Groups</title>
     <link rel="stylesheet" href="styles.css">
- 
 </head>
 <body>
     <!-- Include header -->
     <div id="header-placeholder"></div>
     <div class="container">
-    <h1 class="main-title">Manage Subjects and Year Groups</h1>
+        <h1 class="main-title">Manage Subjects and Year Groups</h1>
 
-    <div id="form-container">
-        <div class="subject-year">
-        <div class="form-section">
-            <!-- <label for="subject-select">Select Subject:</label> -->
-            <select id="subject-select" onchange="loadYearGroups()">
-                <option value="">Select Subject</option>
-                <!-- Options will be populated dynamically -->
-            </select>
+        <div id="form-container">
+            <div class="subject-year">
+                <div class="form-section">
+                    <select id="subject-select" onchange="loadYearGroups()">
+                        <option value="">Select Subject</option>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-section">
+                    <select id="year-group-select" onchange="loadPrompt()">
+                        <option value="">Select Year Group</option>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
             </div>
-            <div class="form-section">
-            <!-- <label for="year-group-select">Select Year Group:</label> -->
-            <select id="year-group-select" onchange="loadPrompt()">
-                <option value="">Select Year Group</option>
-                <!-- Options will be populated dynamically -->
-            </select>
-        </div>
-        </div>
 
-        <div class="form-section">
-            <label for="prompt-text">Prompt Text:</label>
-            <textarea id="prompt-text" rows="4"></textarea>
-            <p class="sample-prompt" id="sample-prompt"><b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in Year 7 Computing lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition. 
-<br />
+            <div class="form-section">
+                <label for="prompt-text">Prompt Text:</label>
+                <textarea id="prompt-text" rows="4"></textarea>
+                <p class="sample-prompt" id="sample-prompt"><b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in Year 7 Computing lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition. 
+                <br />
                 <br />Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.
-      <br />          
+                <br />          
                 <br />Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in Computing.
                 </p>
-        </div>
+            </div>
 
-        <button class="button savePromptDisabled" id="savePrompt" disabled onclick="savePrompt()">Save Prompt</button>
-    </div>
+            <button class="button savePromptDisabled" id="savePrompt" disabled onclick="savePrompt()">Save Prompt</button>
+        </div>
     </div>
     <div id="result-container" class="result-section"></div>
     <div id="footer-placeholder"></div>
@@ -63,7 +60,7 @@
                 document.getElementById('footer-placeholder').innerHTML = data;
             });
 
-	// Check if the user is authenticated
+        // Check if the user is authenticated
         fetch('/api/authenticated')
             .then(response => {
                 if (!response.ok) {
@@ -174,6 +171,5 @@ Make sure to highlight the pupil's strengths, areas for improvement, and any not
             }
         }
     </script>
-
 </body>
 </html>
