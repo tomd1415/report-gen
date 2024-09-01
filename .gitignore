@@ -3,5 +3,4 @@ dbbackup
 .env
 comment-bank-api/.env
 comment-bank-api/*.pem
-
-
+comment-bank-api/cookies.txt
