@@ -1549,6 +1549,6 @@ async function addSampleData() {
 // Uncomment below for initial setup
 // addSampleData();
 
-//app.listen(port, () => {
-//  console.log(`Server running at http://localhost:${port}`);
-//});
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
