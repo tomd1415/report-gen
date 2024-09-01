@@ -68,7 +68,7 @@ select, input, textarea, button {
 }
 
 textarea {
-    width: 100%; class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>
+    width: 100%; /* class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>*/
 
 }
 
@@ -108,7 +108,7 @@ textarea {
     gap: 20px;
     margin-top: 20px;
 }
-
+/* category on the edit page */
 .category {
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -298,6 +298,7 @@ nav ul li a:hover {
     display: none;
     justify-content: center;
     gap: 1rem;
+    align-items: center;
     margin-bottom: 20px;
 }
 
@@ -460,4 +461,97 @@ nav ul li a:hover {
 	padding: 4px;
 	width: 10em;
     
+}
+
+.comment-actions .button.delete {
+    display: inline;
+    width: 6em;
+    float:none;
+}
+.comment-actions select {
+    display: inline;
+    width: 12em;
+}
+.comment-actions {
+    float: none;
+    display: block;
+    width: 100%;
+    
+}
+.comment-content {
+    float: none;
+    display: block;
+    width: 100%;
+}
+.comment {
+    display:block;
+    clear: both;
+}
+.category .button {
+    display: block;
+    float:none;
+    clear: both;
+}
+.comments-container {
+    display: block;
+}
+
+/* Add media query for mobile screens */
+@media (max-width: 600px) {
+    .subject-year {
+        flex-direction: column;
+    }
+
+    .subject-year .form-section {
+        margin-bottom: 10px;
+    }
+    .comment-category {
+        flex: 1 1 calc(100% - 20px);
+    }
+    #name-pronoun-section {
+        flex-direction: column;
+    }
+
+    #name-pronoun-section input[type="text"] {
+        margin-bottom: 10px;
+    }
+}
+
+/* Add media query for mobile screens */
+@media (max-width: 800px) {
+    .category {
+        width: calc(100% - 20px);
+    }
+    .comment-actions .button.delete {
+        display: inline;
+        width: 6em;
+        float:none;
+    }
+    .comment-actions select {
+        display: inline;
+        width: 12em;
+    }
+    .comment-actions {
+        float: none;
+        display: block;
+        width: 100%;
+        
+    }
+    .comment-content {
+        float: none;
+        display: block;
+        width: 100%;
+    }
+    .comment {
+        display:block;
+        clear: both;
+    }
+    .category .button {
+        display: block;
+        float:none;
+        clear: both;
+    }
+    .comments-container {
+        display: block;
+    }
 }

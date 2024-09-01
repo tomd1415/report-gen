@@ -272,31 +272,39 @@
                 alert('Please enter a username.');
             }
         }
-	async function changePassword() {
+        async function changePassword() {
   const username = document.getElementById('change-password-username').value;
   const newPassword = document.getElementById('new-password').value;
   if (username && newPassword) {
     try {
-      const response = await fetch(`/api/admin/user/${username}/password`, {
+      console.log('Sending password change request:', newPassword); // Debug log
+      const response = await fetch(`/api/admin/user/${encodeURIComponent(username)}/password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ newPassword })
+        body: JSON.stringify({ newPassword }),
+        credentials: 'include' // Include credentials with the request
       });
-      if (response.ok) {
-        alert('Password changed successfully.');
+
+      // Check if response is not ok
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        console.error('Failed to change password:', response.statusText, errorMessage);
+        alert('Failed to change password: ' + errorMessage);
       } else {
-        alert('Failed to change password.');
+        alert('Password changed successfully.');
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      alert('Error changing password.');
+      alert('Error changing password: ' + error.message);
     }
   } else {
     alert('Please fill in both fields.');
   }
 }
+
+
 
         async function exportDatabase() {
             try {

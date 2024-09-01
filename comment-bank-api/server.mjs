@@ -24,6 +24,12 @@ const app = express();
 const port = 44344;
 
 app.use(cors());
+//const cors = require('cors');
+//app.use(cors({
+//  origin: 'http://reportgen.org.uk', // replace with your client domain
+//  credentials: true
+//}));
+
 app.use(bodyParser.json());
 
 const __filename = fileURLToPath(import.meta.url);
@@ -213,6 +219,13 @@ const UserYearGroup = sequelize.define('UserYearGroup', {
     }
   }
 }, { timestamps: false });
+
+//const cors = require('cors');
+//app.use(cors({
+//  origin: 'https:www.reportgen.org.uk', // replace with your client domain
+//  credentials: true
+//}));
+
 
 // UserSubject model
 //const UserSubject = sequelize.define('UserSubject', {}, { timestamps: false });
@@ -1025,7 +1038,7 @@ app.put('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
 });
 
 // Update a prompt by ID
-app.put('/api/prompts/:id', async (req, res) => {
+('/api/prompts/:id', async (req, res) => {
   const { id } = req.params;
   const { promptPart } = req.body;
   try {
@@ -1245,21 +1258,27 @@ async function backupDatabase() {
 app.put('/api/admin/user/:username/password', isAdmin, async (req, res) => {
   const { username } = req.params;
   const { newPassword } = req.body;
+  const userId = req.session.user.id;
+  console.log(`Password change requested for user: ${userId}`); // Debug log
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const user = await User.findOne({ where: { username } });
     if (user) {
-      user.password = hashedCharset;
+      user.password = hashedPassword;
       await user.save();
+      console.log('Password updated successfully'); // Debug log
       res.json({ message: 'Password updated successfully' });
     } else {
+      console.log('User not found'); // Debug log
       res.status(404).send('User not found');
     }
   } catch (error) {
-    console.error('Error updating password:', error);
+    console.error('Error updating password:', error); // Debug log
     res.status(500).send('Error updating password');
   }
 });
+
+
 
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
@@ -1414,6 +1433,39 @@ app.get('/api/user-selected-settings', isAuthenticated, async (req, res) => {
     res.status(500).send('Error fetching user settings');
   }
 });
+// Add this route to handle password change requests
+app.post('/api/change-password', isAuthenticated, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.session.user.id;
+
+  try {
+    // Fetch the current user
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if the current password is correct
+    const isPasswordCorrect = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).send('Error changing password');
+  }
+});
+
 // Initial setup function to add sample user and data
 async function addSampleData() {
   await sequelize.authenticate();
@@ -1497,6 +1549,6 @@ async function addSampleData() {
 // Uncomment below for initial setup
 // addSampleData();
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+//app.listen(port, () => {
+//  console.log(`Server running at http://localhost:${port}`);
+//});
