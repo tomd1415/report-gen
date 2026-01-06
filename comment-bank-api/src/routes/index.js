@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import csv from 'csv-parser';
 import fs from 'fs';
@@ -11,6 +12,70 @@ import { sequelize } from '../db/sequelize.js';
 const upload = multer({ dest: 'uploads/' });
 
 const cleanText = (text) => (text ? text.replace(/\s+/g, ' ').trim() : '');
+const hashIdentifier = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
+const getSafetyIdentifier = (req) => {
+  const userId = req.session?.user?.id;
+  return userId ? hashIdentifier(userId) : 'anonymous';
+};
+const logRequestId = (response, label) => {
+  if (response?._request_id) {
+    console.log(`${label} request id: ${response._request_id}`);
+  }
+};
+
+const categorySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    categories: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          name: { type: 'string' },
+          comments: {
+            type: 'array',
+            items: { type: 'string' }
+          }
+        },
+        required: ['name', 'comments']
+      }
+    }
+  },
+  required: ['categories']
+};
+
+const normalizeCategories = (categories) => {
+  const normalized = {};
+  for (const category of categories) {
+    const name = cleanText(category?.name);
+    if (!name) {
+      continue;
+    }
+    const comments = Array.isArray(category?.comments) ? category.comments : [];
+    const cleaned = comments.map((comment) => cleanText(comment)).filter(Boolean);
+    if (!normalized[name]) {
+      normalized[name] = new Set();
+    }
+    cleaned.forEach((comment) => normalized[name].add(comment));
+  }
+  return normalized;
+};
+
+const serializeCategoryMap = (categoryMap) => {
+  return Object.entries(categoryMap).map(([name, comments]) => ({
+    name,
+    comments: Array.from(comments)
+  }));
+};
+
+const buildOpenAIParams = (req) => ({
+  model: config.openai.model,
+  reasoning: { effort: config.openai.reasoningEffort },
+  store: false,
+  safety_identifier: getSafetyIdentifier(req)
+});
 
 export function registerRoutes(app, { models, openai }) {
   const {
@@ -496,12 +561,14 @@ export function registerRoutes(app, { models, openai }) {
 
   app.post('/generate-report', async (req, res) => {
     const { name, pronouns, subjectId, yearGroupId, additionalComments, ...categories } = req.body;
+    const userId = req.session.user.id;
 
     try {
       const promptPart = await Prompt.findOne({
         where: {
           subjectId: subjectId,
-          yearGroupId: yearGroupId
+          yearGroupId: yearGroupId,
+          userId: userId
         }
       });
 
@@ -519,14 +586,20 @@ export function registerRoutes(app, { models, openai }) {
         prompt += `The following additional comments should be woven into the whole report: ${additionalComments}\n`;
       }
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 600,
+      const response = await openai.responses.create({
+        ...buildOpenAIParams(req),
+        input: [{ role: 'user', content: prompt }],
+        max_output_tokens: 700,
         temperature: 0.7
       });
+      logRequestId(response, 'generate-report');
 
-      let report = response.choices[0].message.content.trim();
+      const reportText = response.output_text?.trim() || '';
+      if (!reportText) {
+        return res.status(500).send('Error generating report');
+      }
+
+      let report = reportText;
       report = report.replace(new RegExp(placeholder, 'g'), name);
 
       res.json({ report });
@@ -542,62 +615,46 @@ export function registerRoutes(app, { models, openai }) {
 
     try {
       const placeholder = 'PUPIL_NAME';
-      const namesArray = pupilNames.split(',').map(name => name.trim());
-      let reportsWithPlaceholder = reports;
+      const namesArray = (pupilNames || '')
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+      let reportsWithPlaceholder = reports || '';
 
-      namesArray.forEach(name => {
+      namesArray.forEach((name) => {
         const regex = new RegExp(`\\b${name}\\b`, 'g');
         reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, placeholder);
       });
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{
-          role: 'user',
-          content: `
-        Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports. There should be no more than 8 categories and similar categories should be merged. Ensure that the comments are concise, clear, and avoid any redundancy. Each category should have no more than 8 comments, and similar comments should be merged or removed. The final category should be 'Targets', containing specific and actionable targets for students, with the last target being "***Generate a target for this pupil and add to the report***". 
-        
-        Please try to make each category have the comments cover a variety of abilities and behaviors. Please order the comments from least able to most able. 
+      const extractionPrompt = `
+Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports.
+- No more than 8 categories; merge similar categories.
+- No more than 8 comments per category; merge or remove similar comments.
+- Include a 'Targets' category with specific, actionable targets; the final target must be "***Generate a target for this pupil and add to the report***".
+- Order comments from least able to most able; cover a range of abilities/behaviors.
 
-        Format the output as follows:
-        Category: [Category Name]
-        [Comment 1]
-        [Comment 2]
-        ...
+Reports:
+${reportsWithPlaceholder}
+`;
 
-        Here is an example of the desired output:
-        Category: Interest and Engagement
-        Shows good attitude initially but sometimes struggles to maintain focus.
-        Brings a quiet confidence to all computing lessons but can sometimes lose focus.
-
-        Category: Independent Study
-        Keen to learn quickly but sometimes rushes and misses mistakes.
-        Prefers independence and self-study, often completing work outside of school.
-
-        The reports start here:
-
-        ${reportsWithPlaceholder}
-        `
-        }],
-        max_tokens: 3500,
+      const extractResponse = await openai.responses.parse({
+        ...buildOpenAIParams(req),
+        input: [{ role: 'user', content: extractionPrompt }],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'category_bank',
+            schema: categorySchema,
+            strict: true
+          }
+        },
+        max_output_tokens: 2000,
         temperature: 0.6
       });
+      logRequestId(extractResponse, 'import-reports-extract');
 
-      const newExtractedText = response.choices[0].message.content.trim();
-
-      const newCategories = {};
-      const lines = newExtractedText.split('\n');
-      let currentCategory = null;
-
-      lines.forEach(line => {
-        const categoryMatch = line.match(/^Category: (.+)$/);
-        if (categoryMatch) {
-          currentCategory = categoryMatch[1];
-          newCategories[currentCategory] = new Set();
-        } else if (currentCategory && line.trim()) {
-          newCategories[currentCategory].add(line.trim());
-        }
-      });
+      const extracted = extractResponse.output_parsed || {};
+      const newCategories = normalizeCategories(extracted.categories || []);
 
       const existingCategories = await Category.findAll({
         where: { subjectId, yearGroupId, userId },
@@ -605,35 +662,31 @@ export function registerRoutes(app, { models, openai }) {
       });
 
       if (existingCategories.length > 0) {
-        const existingFormattedCategories = existingCategories.reduce((acc, category) => {
-          acc[category.name] = category.Comments.map(comment => comment.text);
-          return acc;
-        }, {});
+        const existingCategoryPayload = existingCategories.map((category) => ({
+          name: category.name,
+          comments: category.Comments.map((comment) => cleanText(comment.text)).filter(Boolean)
+        }));
 
-        const mergePrompt = `I have two sets of categories and comments for student reports. Please merge them, ensuring no more than 8 categories and no more than 8 comments per category. If categories are similar, please merge them. Prioritize clarity and conciseness. Please try and keep the order of the comments (ordered by ability and behaviour) and give priority to the New categories and comments.\n\nExisting categories and comments:\n\n${JSON.stringify(existingFormattedCategories, null, 2)}\n\nNew categories and comments:\n\n${JSON.stringify(newCategories, null, 2)}\n\nFormat the output as follows:\nCategory: [Category Name]\n[Comment 1]\n[Comment 2]\n...\n`;
+        const mergePrompt = `I have two sets of categories and comments for student reports. Merge them, ensuring no more than 8 categories and no more than 8 comments per category. If categories are similar, merge them. Prioritize clarity and conciseness. Keep the order of comments (ordered by ability/behaviour) and give priority to the New categories and comments.\n\nExisting categories and comments:\n${JSON.stringify(existingCategoryPayload, null, 2)}\n\nNew categories and comments:\n${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}\n`;
 
-        const mergeResponse = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: mergePrompt }],
-          max_tokens: 4000,
+        const mergeResponse = await openai.responses.parse({
+          ...buildOpenAIParams(req),
+          input: [{ role: 'user', content: mergePrompt }],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'category_bank_merge',
+              schema: categorySchema,
+              strict: true
+            }
+          },
+          max_output_tokens: 2000,
           temperature: 0.6
         });
+        logRequestId(mergeResponse, 'import-reports-merge');
 
-        const mergedText = mergeResponse.choices[0].message.content.trim();
-
-        const mergedCategories = {};
-        const mergedLines = mergedText.split('\n');
-        let mergedCurrentCategory = null;
-
-        mergedLines.forEach(line => {
-          const categoryMatch = line.match(/^Category: (.+)$/);
-          if (categoryMatch) {
-            mergedCurrentCategory = categoryMatch[1];
-            mergedCategories[mergedCurrentCategory] = [];
-          } else if (mergedCurrentCategory && line.trim()) {
-            mergedCategories[mergedCurrentCategory].push(line.trim());
-          }
-        });
+        const mergedParsed = mergeResponse.output_parsed || {};
+        const mergedCategories = normalizeCategories(mergedParsed.categories || []);
 
         await Category.destroy({ where: { subjectId, yearGroupId, userId } });
 

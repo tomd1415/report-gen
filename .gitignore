@@ -11,3 +11,4 @@ openapiinfo/
 .venv/
 dbbackup_web/
 comment-bank-api/dbbackup_web/
+testdata/

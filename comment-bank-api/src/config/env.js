@@ -34,7 +34,9 @@ export const config = {
     logging: toBool(process.env.DB_LOGGING, false)
   },
   openai: {
-    apiKey: process.env.OPENAI_API_KEY || ''
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-5.2',
+    reasoningEffort: process.env.OPENAI_REASONING_EFFORT || 'none'
   },
   session: {
     secret: sessionSecret,
