@@ -6,6 +6,7 @@ comment-bank-api/*.pem
 comment-bank-api/cookies.*
 
 node_modules/
+comment-bank-api/node_modules/
 openapiinfo/
 .venv/
 dbbackup_web/

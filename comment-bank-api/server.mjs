@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import express from 'express';
-import bodyParser from 'body-parser';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -30,7 +29,7 @@ app.use(cors());
 //  credentials: true
 //}));
 
-app.use(bodyParser.json());
+app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
