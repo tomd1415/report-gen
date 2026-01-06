@@ -67,6 +67,12 @@ select, input, textarea, button {
     box-sizing: border-box;
 }
 
+input[type="checkbox"] {
+    width: auto;
+    margin: 0 8px 0 0;
+    padding: 0;
+}
+
 textarea {
     width: 100%; /* class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>*/
 
@@ -235,20 +241,78 @@ nav ul li a:hover {
 /* Category and Comment Category Styles */
 .comment-categories-container {
     display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
+    flex-direction: column;
+    gap: 24px;
 }
 
 .comment-category {
-    flex: 1 1 calc(50% - 20px);
+    flex: 1 1 100%;
     box-sizing: border-box;
     background-color: rgb(171, 230, 225);
     border: 2px solid #002D72;
     border-radius: 8px;
     margin-top: 5px;
     margin-bottom: 5px;
-    padding: 10px;
+    padding: 16px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.comment-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.comment-category-title {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.comment-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 8px 16px;
+    margin-top: 12px;
+}
+
+.comment-category.is-collapsed .comment-options,
+.comment-category.is-collapsed .addcomment {
+    display: none;
+}
+
+.category-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.inline-button {
+    width: auto;
+    margin: 0;
+    padding: 6px 12px;
+}
+
+.checkbox-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 4px 0;
+    font-weight: normal;
+    background: #f7fbff;
+    border: 1px solid #cde2f3;
+    border-radius: 6px;
+    padding: 6px 8px;
+    line-height: 1.4;
+}
+
+.checkbox-option span {
+    flex: 1;
+}
+
+#the-report {
+    white-space: pre-line;
 }
 
 .comment-category select {
@@ -261,11 +325,6 @@ nav ul li a:hover {
     background-color: #e3f2fd;
 }
 
-.comment-category label {
-    font-weight: bold;
-    text-align: center;
-    font-size: larger;
-}
 
 /* Styling for Subject-Year and Name-Pronoun Sections */
 .subject-year {
@@ -506,7 +565,7 @@ nav ul li a:hover {
         margin-bottom: 10px;
     }
     .comment-category {
-        flex: 1 1 calc(100% - 20px);
+        flex: 1 1 100%;
     }
     #name-pronoun-section {
         flex-direction: column;

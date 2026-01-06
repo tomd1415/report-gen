@@ -12,6 +12,16 @@ import { sequelize } from '../db/sequelize.js';
 const upload = multer({ dest: 'uploads/' });
 
 const cleanText = (text) => (text ? text.replace(/\s+/g, ' ').trim() : '');
+const parseWordLimit = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+};
 const hashIdentifier = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 const getSafetyIdentifier = (req) => {
   const userId = req.session?.user?.id;
@@ -44,6 +54,20 @@ const categorySchema = {
     }
   },
   required: ['categories']
+};
+
+const reportSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    paragraphs: {
+      type: 'array',
+      minItems: 4,
+      maxItems: 4,
+      items: { type: 'string' }
+    }
+  },
+  required: ['paragraphs']
 };
 
 const normalizeCategories = (categories) => {
@@ -85,6 +109,7 @@ export function registerRoutes(app, { models, openai }) {
     Category,
     Comment,
     Prompt,
+    SubjectContext,
     UserSubject,
     UserYearGroup
   } = models;
@@ -96,6 +121,7 @@ export function registerRoutes(app, { models, openai }) {
   app.use('/api/comments', isAuthenticated);
   app.use('/api/move-comment', isAuthenticated);
   app.use('/api/prompts', isAuthenticated);
+  app.use('/api/subject-context', isAuthenticated);
   app.use('/api/export-categories-comments', isAuthenticated);
   app.use('/api/import-categories-comments', isAuthenticated);
   app.use('/api/import-reports', isAuthenticated);
@@ -560,25 +586,62 @@ export function registerRoutes(app, { models, openai }) {
   });
 
   app.post('/generate-report', async (req, res) => {
-    const { name, pronouns, subjectId, yearGroupId, additionalComments, ...categories } = req.body;
+    const { name, pronouns, subjectId, yearGroupId, additionalComments, wordLimit, ...categories } = req.body;
     const userId = req.session.user.id;
+    const safeName = typeof name === 'string' ? name.trim() : '';
+    const safePronouns = typeof pronouns === 'string' ? pronouns.trim() : '';
+
+    if (!safeName || !safePronouns) {
+      return res.status(400).json({ message: 'Name and pronouns are required.' });
+    }
 
     try {
-      const promptPart = await Prompt.findOne({
-        where: {
-          subjectId: subjectId,
-          yearGroupId: yearGroupId,
-          userId: userId
-        }
-      });
+      const [promptPart, subjectContext] = await Promise.all([
+        Prompt.findOne({
+          where: {
+            subjectId: subjectId,
+            yearGroupId: yearGroupId,
+            userId: userId
+          }
+        }),
+        SubjectContext.findOne({
+          where: {
+            subjectId: subjectId,
+            yearGroupId: yearGroupId,
+            userId: userId
+          }
+        })
+      ]);
 
-      let prompt = promptPart ? promptPart.promptPart : 'Generate a concise school report for a pupil. This is for school lessons and I would like it to be friendly and formal. I would like it to be between 100 and 170 words long and flow nicely with no repetition. Below are categories and comments to base the report on. There should be no headings on the report. It could have up to 3 paragraphs if necessary';
+      const subjectDescription = subjectContext?.subjectDescription
+        ? subjectContext.subjectDescription.trim()
+        : '';
+      const effectiveWordLimit = parseWordLimit(wordLimit) ?? subjectContext?.wordLimit ?? null;
+
+      let prompt = promptPart
+        ? promptPart.promptPart
+        : 'Write a friendly, formal school report for a pupil using the selected comments as evidence.';
       const placeholder = 'PUPIL_NAME';
-      prompt += `\nI am using the following placeholder for a name: ${placeholder} the pronouns for this pupil are (${pronouns})\n`;
+      prompt += `\nI am using the following placeholder for a name: ${placeholder} the pronouns for this pupil are (${safePronouns}).\n`;
+
+      if (subjectDescription) {
+        prompt += `Subject description (context only; do not repeat in the report): ${subjectDescription}\n`;
+      }
+
+      prompt += `Report requirements:\n- Exactly 4 paragraphs.\n- Paragraph 1: Topics / areas studied so far. Key knowledge and skills acquired (do not repeat the subject description).\n- Paragraph 2: Effort / motivation / attendance to lesson.\n- Paragraph 3: Strengths and particular achievements.\n- Paragraph 4: Areas of development to bolster the pupil's progress and achieve end of year Teacher Target.\n- No headings or bullet points.\n`;
+
+      if (effectiveWordLimit) {
+        prompt += `Target length: about ${effectiveWordLimit} words total.\n`;
+      } else {
+        prompt += 'Keep it concise and avoid repetition.\n';
+      }
 
       for (const [category, comment] of Object.entries(categories)) {
-        if (comment) {
-          prompt += `${category.replace(/-/g, ' ')}: ${comment}\n`;
+        const selectedComments = Array.isArray(comment)
+          ? comment.map((item) => cleanText(item)).filter(Boolean)
+          : [cleanText(comment)].filter(Boolean);
+        if (selectedComments.length > 0) {
+          prompt += `${category.replace(/-/g, ' ')}: ${selectedComments.join('; ')}\n`;
         }
       }
 
@@ -586,23 +649,42 @@ export function registerRoutes(app, { models, openai }) {
         prompt += `The following additional comments should be woven into the whole report: ${additionalComments}\n`;
       }
 
-      const response = await openai.responses.create({
+      const response = await openai.responses.parse({
         ...buildOpenAIParams(req),
         input: [{ role: 'user', content: prompt }],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'report_paragraphs',
+            schema: reportSchema,
+            strict: true
+          }
+        },
         max_output_tokens: 700,
         temperature: 0.7
       });
       logRequestId(response, 'generate-report');
 
-      const reportText = response.output_text?.trim() || '';
-      if (!reportText) {
+      const parsed = response.output_parsed || {};
+      let paragraphs = Array.isArray(parsed.paragraphs) ? parsed.paragraphs : [];
+
+      if (paragraphs.length !== 4) {
+        const fallbackText = response.output_text?.trim() || '';
+        if (fallbackText) {
+          paragraphs = fallbackText.split(/\n\s*\n/).map((text) => cleanText(text)).filter(Boolean);
+        }
+      }
+
+      if (paragraphs.length === 0) {
         return res.status(500).send('Error generating report');
       }
 
-      let report = reportText;
-      report = report.replace(new RegExp(placeholder, 'g'), name);
+      const finalParagraphs = paragraphs.map((paragraph) =>
+        paragraph.replace(new RegExp(placeholder, 'g'), safeName)
+      );
+      const report = finalParagraphs.join('\n\n');
 
-      res.json({ report });
+      res.json({ report, paragraphs: finalParagraphs });
     } catch (error) {
       console.error('Error generating report:', error);
       res.status(500).send('Error generating report');
@@ -628,10 +710,18 @@ export function registerRoutes(app, { models, openai }) {
 
       const extractionPrompt = `
 Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports.
-- No more than 8 categories; merge similar categories.
+Rules:
+- Use no more than 5 categories aligned to the report structure:
+  1) Topics studied / knowledge / skills acquired
+  2) Effort / motivation / attendance
+  3) Strengths / achievements
+  4) Areas for development / targets toward end-of-year Teacher Target
+  5) General / Other (only for comments that do not fit above)
+- Use the category names above (shorten slightly if needed but keep clear alignment).
 - No more than 8 comments per category; merge or remove similar comments.
-- Include a 'Targets' category with specific, actionable targets; the final target must be "***Generate a target for this pupil and add to the report***".
-- Order comments from least able to most able; cover a range of abilities/behaviors.
+- Keep each comment concise and standalone (aim for 12 words or fewer).
+- Order comments from least able to most able; cover a range of abilities/behaviours.
+- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "***Generate a target for this pupil and add to the report***".
 
 Reports:
 ${reportsWithPlaceholder}
@@ -667,7 +757,27 @@ ${reportsWithPlaceholder}
           comments: category.Comments.map((comment) => cleanText(comment.text)).filter(Boolean)
         }));
 
-        const mergePrompt = `I have two sets of categories and comments for student reports. Merge them, ensuring no more than 8 categories and no more than 8 comments per category. If categories are similar, merge them. Prioritize clarity and conciseness. Keep the order of comments (ordered by ability/behaviour) and give priority to the New categories and comments.\n\nExisting categories and comments:\n${JSON.stringify(existingCategoryPayload, null, 2)}\n\nNew categories and comments:\n${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}\n`;
+        const mergePrompt = `I have two sets of categories and comments for student reports. Merge them into a single set aligned to the report structure.
+Rules:
+- Use no more than 5 categories aligned to:
+  1) Topics studied / knowledge / skills acquired
+  2) Effort / motivation / attendance
+  3) Strengths / achievements
+  4) Areas for development / targets toward end-of-year Teacher Target
+  5) General / Other (only for comments that do not fit above)
+- If categories are similar, merge them. Use the category names above (shorten slightly if needed but keep clear alignment).
+- No more than 8 comments per category; merge or remove similar comments.
+- Keep each comment concise and standalone (aim for 12 words or fewer).
+- Keep comments ordered from least able to most able.
+- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "***Generate a target for this pupil and add to the report***".
+- Give priority to the New categories and comments.
+
+Existing categories and comments:
+${JSON.stringify(existingCategoryPayload, null, 2)}
+
+New categories and comments:
+${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
+`;
 
         const mergeResponse = await openai.responses.parse({
           ...buildOpenAIParams(req),
@@ -709,6 +819,61 @@ ${reportsWithPlaceholder}
     } catch (error) {
       console.error('Error importing reports:', error);
       res.status(500).send('Error importing reports');
+    }
+  });
+
+  app.get('/api/subject-context', async (req, res) => {
+    const { subjectId, yearGroupId } = req.query;
+    const userId = req.session.user.id;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    try {
+      const context = await SubjectContext.findOne({
+        where: { subjectId, yearGroupId, userId }
+      });
+      res.json({
+        subjectDescription: context?.subjectDescription || '',
+        wordLimit: context?.wordLimit ?? null
+      });
+    } catch (error) {
+      console.error('Error fetching subject context:', error);
+      res.status(500).send('Error fetching subject context');
+    }
+  });
+
+  app.post('/api/subject-context', async (req, res) => {
+    const { subjectId, yearGroupId, subjectDescription, wordLimit } = req.body;
+    const userId = req.session.user.id;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    const cleanedDescription = typeof subjectDescription === 'string' ? subjectDescription.trim() : null;
+    const parsedWordLimit = parseWordLimit(wordLimit);
+
+    try {
+      const [context, created] = await SubjectContext.findOrCreate({
+        where: { subjectId, yearGroupId, userId },
+        defaults: {
+          subjectDescription: cleanedDescription || null,
+          wordLimit: parsedWordLimit
+        }
+      });
+
+      if (!created) {
+        context.subjectDescription = cleanedDescription || null;
+        context.wordLimit = parsedWordLimit;
+        await context.save();
+      }
+
+      res.json(context);
+    } catch (error) {
+      console.error('Error saving subject context:', error);
+      res.status(500).send('Error saving subject context');
     }
   });
 

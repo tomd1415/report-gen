@@ -46,6 +46,21 @@
                 </div>
             </div>
 
+            <div class="form-section" id="subject-description-wrapper" style="display: none;">
+                <label for="subject-description">Subject description (context only, not included in report):</label>
+                <textarea id="subject-description" rows="4" readonly placeholder="No subject description set for this subject/year."></textarea>
+            </div>
+
+            <div class="form-section" id="word-limit-wrapper" style="display: none;">
+                <label for="word-limit">Target word limit (optional):</label>
+                <input type="number" id="word-limit" min="1" placeholder="e.g. 140">
+            </div>
+
+            <div class="category-controls" id="category-controls" style="display: none;">
+                <button type="button" class="button inline-button" onclick="expandAllCategories()">Expand all</button>
+                <button type="button" class="button inline-button" onclick="collapseAllCategories()">Collapse all</button>
+            </div>
+
             <div id="categories-container" class="comment-categories-container">
                 <!-- Dynamic content will be added here -->
             </div>
@@ -168,96 +183,131 @@
                 document.getElementById('name-pronoun-section').style.display = 'flex';
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
 
-                const [categoriesResponse, promptPartResponse] = await Promise.all([
+                const [categoriesResponse, promptPartResponse, subjectContextResponse] = await Promise.all([
                     fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
-                    fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
+                    fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
+                    fetch(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
                 ]);
 
                 const categories = await categoriesResponse.json();
                 promptPart = await promptPartResponse.text();
+                const subjectContext = subjectContextResponse.ok ? await subjectContextResponse.json() : {};
 
                 console.log('Fetched categories:', categories);
                 console.log('Fetched prompt part:', promptPart);
+                console.log('Fetched subject context:', subjectContext);
+
+                document.getElementById('subject-description').value = subjectContext.subjectDescription || '';
+                document.getElementById('word-limit').value = subjectContext.wordLimit || '';
+                document.getElementById('subject-description-wrapper').style.display = 'block';
+                document.getElementById('word-limit-wrapper').style.display = 'block';
 
                 const categoriesContainer = document.getElementById('categories-container');
                 categoriesContainer.innerHTML = ''; // Clear previous options
 
-                categories.forEach(category => {
+                categories.forEach((category) => {
                     const categoryDiv = document.createElement('div');
                     categoryDiv.classList.add('form-section', 'comment-category');
+                    categoryDiv.dataset.categoryId = category.id;
+                    categoryDiv.dataset.categoryName = category.name;
 
-                    const label = document.createElement('label');
-                    label.for = category.name.toLowerCase().replace(' ', '-');
-                    label.textContent = category.name + ':';
-                    categoryDiv.appendChild(label);
+                    const header = document.createElement('div');
+                    header.classList.add('comment-category-header');
 
-                    const select = document.createElement('select');
-                    select.id = category.name.toLowerCase().replace(' ', '-');
-                    select.innerHTML = '<option value="">-- Select Comment --</option>';
-                    select.classList.add('dropdown');
+                    const title = document.createElement('h3');
+                    title.classList.add('comment-category-title');
+                    title.textContent = category.name;
+                    header.appendChild(title);
 
-                    category.Comments.forEach(comment => {
-                        const option = document.createElement('option');
-                        option.value = comment.text;
-                        option.textContent = comment.text;
-                        select.appendChild(option);
+                    const toggleButton = document.createElement('button');
+                    toggleButton.type = 'button';
+                    toggleButton.classList.add('button', 'inline-button', 'toggle-button');
+                    toggleButton.textContent = 'Collapse';
+                    toggleButton.setAttribute('aria-expanded', 'true');
+                    toggleButton.addEventListener('click', () => {
+                        toggleCategory(categoryDiv, toggleButton);
+                    });
+                    header.appendChild(toggleButton);
+
+                    categoryDiv.appendChild(header);
+
+                    const optionsContainer = document.createElement('div');
+                    optionsContainer.classList.add('comment-options');
+
+                    category.Comments.forEach((comment) => {
+                        appendCommentCheckbox(optionsContainer, comment.text, category.id);
                     });
 
-                    // Add option to add new comment
-                    const addOption = document.createElement('option');
-                    addOption.value = "add-new";
-                    addOption.textContent = "Add new comment";
-                    select.appendChild(addOption);
+                    categoryDiv.appendChild(optionsContainer);
 
-                    select.addEventListener('change', () => {
-                        if (select.value === "add-new") {
-                            currentCategorySelect = select; // Keep track of the current select element
-                            openModal(category.id);
-                        }
+                    const addButton = document.createElement('button');
+                    addButton.type = 'button';
+                    addButton.classList.add('button', 'inline-button', 'addcomment');
+                    addButton.textContent = 'Add comment';
+                    addButton.addEventListener('click', () => {
+                        openModal(category.id);
                     });
-
-                    categoryDiv.appendChild(select);
+                    categoryDiv.appendChild(addButton);
                     categoriesContainer.appendChild(categoryDiv);
                 });
+                document.getElementById('category-controls').style.display = categories.length ? 'flex' : 'none';
                 document.getElementById('additional-comments-wrapper').style.display = 'block';
                 document.getElementById('generate-report').style.display = 'block';
             }
         }
 
-        let currentCategorySelect = null;
+        let currentCategoryContainer = null;
 
-        async function addNewComment(categoryId, selectElement) {
-            const commentText = prompt('Enter the new comment:');
-            if (commentText) {
-                try {
-                    const response = await fetch('/api/comments', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ text: commentText, categoryId })
-                    });
-                    if (!response.ok) {
-                        console.error('Error adding comment:', response.statusText);
-                        alert('Error adding comment.');
-                        return;
-                    }
-                    const newComment = await response.json();
-                    const option = document.createElement('option');
-                    option.value = newComment.text;
-                    option.textContent = newComment.text;
-                    selectElement.appendChild(option);
-                    selectElement.value = newComment.text; // Select the newly added comment
-                } catch (error) {
-                    console.error('Error adding comment:', error);
-                    alert('Error adding comment.');
+        function appendCommentCheckbox(container, text, categoryId, checked = false) {
+            const label = document.createElement('label');
+            label.classList.add('checkbox-option');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = text;
+            checkbox.name = `category-${categoryId}`;
+            checkbox.checked = checked;
+
+            const span = document.createElement('span');
+            span.textContent = text;
+
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            container.appendChild(label);
+        }
+
+        function toggleCategory(categoryDiv, toggleButton) {
+            const isCollapsed = categoryDiv.classList.toggle('is-collapsed');
+            toggleButton.textContent = isCollapsed ? 'Expand' : 'Collapse';
+            toggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+        }
+
+        function setAllCategoriesCollapsed(collapsed) {
+            const categorySections = document.querySelectorAll('.comment-category');
+            categorySections.forEach(section => {
+                section.classList.toggle('is-collapsed', collapsed);
+                const toggle = section.querySelector('.toggle-button');
+                if (toggle) {
+                    toggle.textContent = collapsed ? 'Expand' : 'Collapse';
+                    toggle.setAttribute('aria-expanded', String(!collapsed));
                 }
-            }
+            });
+        }
+
+        function expandAllCategories() {
+            setAllCategoriesCollapsed(false);
+        }
+
+        function collapseAllCategories() {
+            setAllCategoriesCollapsed(true);
         }
 
         function openModal(categoryId) {
             document.getElementById('add-comment-modal').classList.remove('hidden');
             document.getElementById('add-comment-modal').dataset.categoryId = categoryId;
+            currentCategoryContainer = document.querySelector(
+                `.comment-category[data-category-id="${categoryId}"] .comment-options`
+            );
         }
 
         function closeModal() {
@@ -267,7 +317,7 @@
 
         async function saveNewComment() {
             const categoryId = document.getElementById('add-comment-modal').dataset.categoryId;
-            const commentText = document.getElementById('new-comment-text').value;
+            const commentText = document.getElementById('new-comment-text').value.trim();
 
             if (commentText) {
                 try {
@@ -284,11 +334,9 @@
                         return;
                     }
                     const newComment = await response.json();
-                    const option = document.createElement('option');
-                    option.value = newComment.text;
-                    option.textContent = newComment.text;
-                    currentCategorySelect.appendChild(option);
-                    currentCategorySelect.value = newComment.text; // Select the newly added comment
+                    if (currentCategoryContainer) {
+                        appendCommentCheckbox(currentCategoryContainer, newComment.text, categoryId, true);
+                    }
                     closeModal();
                 } catch (error) {
                     console.error('Error adding comment:', error);
@@ -297,28 +345,126 @@
             }
         }
 
+        const categoryGroups = [
+            {
+                key: 'topics',
+                label: 'Topics / Knowledge / Skills',
+                patterns: [/topic/i, /area/i, /studied/i, /knowledge/i, /skill/i, /curriculum/i]
+            },
+            {
+                key: 'effort',
+                label: 'Effort / Motivation / Attendance',
+                patterns: [/effort/i, /motivation/i, /attendance/i, /engagement/i, /participation/i, /attitude/i]
+            },
+            {
+                key: 'strengths',
+                label: 'Strengths / Achievements',
+                patterns: [/strength/i, /achievement/i, /success/i, /progress/i, /attainment/i]
+            },
+            {
+                key: 'development',
+                label: 'Areas for Development / Targets',
+                patterns: [/development/i, /target/i, /improve/i, /next step/i, /progression/i]
+            }
+        ];
+
+        function matchCategoryGroup(name) {
+            if (!name) {
+                return null;
+            }
+            const lowered = name.toLowerCase();
+            if (/general|other/i.test(lowered)) {
+                return null;
+            }
+            for (const group of categoryGroups) {
+                if (group.patterns.some((pattern) => pattern.test(lowered))) {
+                    return group.key;
+                }
+            }
+            return null;
+        }
+
+        function collectSelections() {
+            const categoriesContainer = document.getElementById('categories-container');
+            const categorySections = Array.from(categoriesContainer.querySelectorAll('.comment-category'));
+            const selections = {};
+            const availableGroups = {
+                topics: false,
+                effort: false,
+                strengths: false,
+                development: false
+            };
+            const selectedGroups = {
+                topics: false,
+                effort: false,
+                strengths: false,
+                development: false
+            };
+
+            categorySections.forEach(section => {
+                const categoryName = section.dataset.categoryName || '';
+                const checked = Array.from(section.querySelectorAll('input[type="checkbox"]:checked'))
+                    .map(input => input.value)
+                    .filter(Boolean);
+
+                if (checked.length > 0) {
+                    selections[categoryName] = checked;
+                }
+
+                const groupKey = matchCategoryGroup(categoryName);
+                if (groupKey) {
+                    availableGroups[groupKey] = true;
+                    if (checked.length > 0) {
+                        selectedGroups[groupKey] = true;
+                    }
+                }
+            });
+
+            const missingGroups = categoryGroups
+                .filter(group => availableGroups[group.key] && !selectedGroups[group.key])
+                .map(group => group.label);
+
+            return { selections, missingGroups };
+        }
+
         async function generateReport() {
-            const pupilName = document.getElementById('pupil-name').value;
-            const pupilPronouns = document.getElementById('pupil-pronouns').value;
+            const pupilName = document.getElementById('pupil-name').value.trim();
+            const pupilPronouns = document.getElementById('pupil-pronouns').value.trim();
             const additionalComments = document.getElementById('additional-comments').value;
+            const wordLimit = document.getElementById('word-limit').value;
 
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
 
-            const categoriesContainer = document.getElementById('categories-container');
-            const categorySelects = categoriesContainer.getElementsByTagName('select');
+            if (!pupilName) {
+                alert('Please enter the pupil name before generating a report.');
+                document.getElementById('pupil-name').focus();
+                return;
+            }
+
+            if (!pupilPronouns) {
+                alert('Please enter the pupil pronouns before generating a report.');
+                document.getElementById('pupil-pronouns').focus();
+                return;
+            }
+
+            const { selections, missingGroups } = collectSelections();
+            if (missingGroups.length > 0) {
+                alert(`Please select at least one comment for: ${missingGroups.join(', ')}.`);
+                return;
+            }
 
             const pupil = {
                 name: pupilName,
                 pronouns: pupilPronouns,
                 subjectId: subjectId,
                 yearGroupId: yearGroupId,
-                additionalComments: additionalComments
+                additionalComments: additionalComments,
+                wordLimit: wordLimit
             };
 
-            Array.from(categorySelects).forEach(select => {
-                const categoryName = select.id.replace('-', ' ');
-                pupil[categoryName] = select.value;
+            Object.entries(selections).forEach(([categoryName, selectedComments]) => {
+                pupil[categoryName] = selectedComments;
             });
             document.getElementById('result-container').style.display = 'block';
             let resultContainer = document.getElementById('result-container');
@@ -333,23 +479,37 @@
                     },
                     body: JSON.stringify(pupil)
                 });
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    throw new Error(errorPayload.message || 'There was an error generating the report.');
+                }
                 const data = await response.json();
-                let report = data.report;
+                const report = data.report;
                 resultContainer.innerHTML = `<button id="copy-report-btn" class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>`;
-                resultContainer.innerHTML += `<div id="the-report">${report}</div>`;
+                resultContainer.innerHTML += `<div id="the-report"></div>`;
+                const reportContainer = document.getElementById('the-report');
+                if (Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
+                    reportContainer.textContent = data.paragraphs.join('\n\n');
+                } else {
+                    reportContainer.textContent = report;
+                }
             } catch (error) {
                 console.error('Error:', error);
-                resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
+                resultContainer.innerHTML += `<p>${error.message}</p>`;
             }
-            document.getElementById('copy-report-btn').style.display = 'block';
+            const copyButton = document.getElementById('copy-report-btn');
+            if (copyButton) {
+                copyButton.style.display = 'block';
+            }
             // Clear the form fields
             document.getElementById('pupil-name').value = '';
             document.getElementById('pupil-pronouns').value = '';
             document.getElementById('additional-comments').value = '';
 
-            // Reset all comment selections to "-- Select Comment --"
-            Array.from(categorySelects).forEach(select => {
-                select.selectedIndex = 0;
+            // Reset all comment selections
+            const checkboxes = document.querySelectorAll('#categories-container input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
             });
         }
 

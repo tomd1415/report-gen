@@ -120,6 +120,47 @@ export const Prompt = sequelize.define('Prompt', {
   timestamps: true
 });
 
+export const SubjectContext = sequelize.define('SubjectContext', {
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+  subjectId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Subject,
+      key: 'id'
+    }
+  },
+  yearGroupId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: YearGroup,
+      key: 'id'
+    }
+  },
+  subjectDescription: {
+    type: DataTypes.TEXT
+  },
+  wordLimit: {
+    type: DataTypes.INTEGER
+  }
+}, {
+  timestamps: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['userId', 'subjectId', 'yearGroupId']
+    }
+  ]
+});
+
 export const UserSubject = sequelize.define('UserSubject', {
   id: {
     type: DataTypes.INTEGER,
@@ -197,6 +238,13 @@ Prompt.belongsTo(Subject, { foreignKey: 'subjectId' });
 Prompt.belongsTo(YearGroup, { foreignKey: 'yearGroupId' });
 Prompt.belongsTo(User, { foreignKey: 'userId' });
 
+SubjectContext.belongsTo(Subject, { foreignKey: 'subjectId' });
+SubjectContext.belongsTo(YearGroup, { foreignKey: 'yearGroupId' });
+SubjectContext.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(SubjectContext, { foreignKey: 'userId' });
+Subject.hasMany(SubjectContext, { foreignKey: 'subjectId' });
+YearGroup.hasMany(SubjectContext, { foreignKey: 'yearGroupId' });
+
 export const models = {
   User,
   Subject,
@@ -204,6 +252,7 @@ export const models = {
   Category,
   Comment,
   Prompt,
+  SubjectContext,
   UserSubject,
   UserYearGroup
 };

@@ -33,14 +33,19 @@
             </div>
 
             <div class="form-section">
+                <label for="subject-description">Subject description (context only, not included in report):</label>
+                <textarea id="subject-description" rows="4"></textarea>
+            </div>
+
+            <div class="form-section">
+                <label for="word-limit">Default word limit (optional):</label>
+                <input type="number" id="word-limit" min="1" placeholder="e.g. 140">
+            </div>
+
+            <div class="form-section">
                 <label for="prompt-text">Prompt Text:</label>
                 <textarea id="prompt-text" rows="4"></textarea>
-                <p class="sample-prompt" id="sample-prompt"><b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in Year 7 Computing lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition. 
-                <br />
-                <br />Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.
-                <br />          
-                <br />Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in Computing.
-                </p>
+                <p class="sample-prompt" id="sample-prompt"><b>Sample Prompt:</b><br />Write a friendly, formal school report for the pupil. Use exactly four paragraphs: (1) topics/areas studied so far and key knowledge/skills acquired (do not repeat the subject description), (2) effort/motivation/attendance, (3) strengths and particular achievements, (4) areas for development to bolster progress and achieve the end of year Teacher Target. Use the selected comments as evidence, do not use headings or bullet points, and keep within the target word limit if set.</p>
             </div>
 
             <button class="button savePromptDisabled" id="savePrompt" disabled onclick="savePrompt()">Save Prompt</button>
@@ -140,20 +145,21 @@
             if (subjectId && yearGroupId) {
                 document.getElementById('savePrompt').disabled = false;
                 document.getElementById('savePrompt').className = document.getElementById('savePrompt').className.replace('savePromptDisabled', 'savePrompt')
-                const response = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
-                const promptPart = await response.json();
+                const [promptResponse, contextResponse] = await Promise.all([
+                    fetch(`/api/prompts/${subjectId}/${yearGroupId}`),
+                    fetch(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
+                ]);
+                const promptPart = await promptResponse.json();
+                const subjectContext = contextResponse.ok ? await contextResponse.json() : {};
 
-                const defaultPrompt = `Generate a detailed and concise school report for the pupil, who is in ${yearGroupText} ${subjectText} lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition.
+                const defaultPrompt = `Write a friendly yet formal school report for the pupil in ${yearGroupText} ${subjectText} lessons. The subject description (provided separately) is context only and should not be repeated in the report. Use exactly four paragraphs: (1) topics/areas studied so far and key knowledge/skills acquired, (2) effort/motivation/attendance, (3) strengths and particular achievements, (4) areas for development to bolster progress and achieve the end of year Teacher Target. Use the selected comments as evidence, do not use headings or bullet points, and keep within the target word limit if set.`;
 
-Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.
+                document.getElementById('sample-prompt').innerHTML = `<b>Sample Prompt:</b><br />Write a friendly yet formal school report for the pupil in ${yearGroupText} ${subjectText} lessons. The subject description (provided separately) is context only and should not be repeated in the report.<br /><br />
+Use exactly four paragraphs: (1) topics/areas studied so far and key knowledge/skills acquired, (2) effort/motivation/attendance, (3) strengths and particular achievements, (4) areas for development to bolster progress and achieve the end of year Teacher Target.<br /><br />
+Use the selected comments as evidence, do not use headings or bullet points, and keep within the target word limit if set.`;
 
-Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in ${subjectText}. `;
-
-                document.getElementById('sample-prompt').innerHTML = `<b>Sample Prompt:</b><br />Generate a detailed and concise school report for the pupil, who is in ${yearGroupText} ${subjectText} lessons. The tone of the report should be friendly yet formal. The report should be between 100 and 170 words and should flow smoothly without any repetition.<br /><br />
-
-Below are categories and comments to base the report on. Each comment should be integrated seamlessly into the report without explicit headings. The report can be organized into up to three paragraphs, ensuring that each paragraph addresses different aspects of the pupil's performance and behaviour.<br /><br />
-
-Make sure to highlight the pupil's strengths, areas for improvement, and any notable achievements. If applicable, provide specific examples or incidents that illustrate these points. Conclude with a positive outlook on the pupil's potential and future progress in ${subjectText}. `;
+                document.getElementById('subject-description').value = subjectContext.subjectDescription || '';
+                document.getElementById('word-limit').value = subjectContext.wordLimit || '';
 
                 if (!promptPart || promptPart === '') {
                     document.getElementById('prompt-text').value = defaultPrompt;
@@ -167,6 +173,8 @@ Make sure to highlight the pupil's strengths, areas for improvement, and any not
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             const promptPart = document.getElementById('prompt-text').value;
+            const subjectDescription = document.getElementById('subject-description').value;
+            const wordLimit = document.getElementById('word-limit').value;
 
             // Check if the prompt exists
             const checkResponse = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
@@ -195,8 +203,21 @@ Make sure to highlight the pupil's strengths, areas for improvement, and any not
                 })
             });
 
-            if (responseSave.ok) {
-                alert('Prompt saved successfully!');
+            const contextSave = await fetch('/api/subject-context', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    subjectId,
+                    yearGroupId,
+                    subjectDescription,
+                    wordLimit
+                })
+            });
+
+            if (responseSave.ok && contextSave.ok) {
+                alert('Prompt and subject context saved successfully!');
             } else {
                 alert('Error saving prompt.');
             }
