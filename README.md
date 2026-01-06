@@ -51,6 +51,26 @@ UPDATE Users SET isAdmin = 1 WHERE username = 'yourname';
 ```
 Log out and back in so the session picks up the admin flag.
 
+## Tests (Vitest + Supertest)
+
+Install dev dependencies (if you haven’t already):
+```
+cd comment-bank-api
+npm install
+```
+
+Run the test suite:
+```
+cd comment-bank-api
+npm test
+```
+
+Watch mode:
+```
+cd comment-bank-api
+npm run test:watch
+```
+
 ## Environment Variables
 
 The app uses `comment-bank-api/.env` (see `comment-bank-api/.env.example`).

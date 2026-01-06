@@ -89,6 +89,7 @@
         </div>
     </div>
 
+    <script type="module" src="report-selection.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", async function () {
             if (!await isAuthenticated()) {
@@ -345,88 +346,6 @@
             }
         }
 
-        const categoryGroups = [
-            {
-                key: 'topics',
-                label: 'Topics / Knowledge / Skills',
-                patterns: [/topic/i, /area/i, /studied/i, /knowledge/i, /skill/i, /curriculum/i]
-            },
-            {
-                key: 'effort',
-                label: 'Effort / Motivation / Attendance',
-                patterns: [/effort/i, /motivation/i, /attendance/i, /engagement/i, /participation/i, /attitude/i]
-            },
-            {
-                key: 'strengths',
-                label: 'Strengths / Achievements',
-                patterns: [/strength/i, /achievement/i, /success/i, /progress/i, /attainment/i]
-            },
-            {
-                key: 'development',
-                label: 'Areas for Development / Targets',
-                patterns: [/development/i, /target/i, /improve/i, /next step/i, /progression/i]
-            }
-        ];
-
-        function matchCategoryGroup(name) {
-            if (!name) {
-                return null;
-            }
-            const lowered = name.toLowerCase();
-            if (/general|other/i.test(lowered)) {
-                return null;
-            }
-            for (const group of categoryGroups) {
-                if (group.patterns.some((pattern) => pattern.test(lowered))) {
-                    return group.key;
-                }
-            }
-            return null;
-        }
-
-        function collectSelections() {
-            const categoriesContainer = document.getElementById('categories-container');
-            const categorySections = Array.from(categoriesContainer.querySelectorAll('.comment-category'));
-            const selections = {};
-            const availableGroups = {
-                topics: false,
-                effort: false,
-                strengths: false,
-                development: false
-            };
-            const selectedGroups = {
-                topics: false,
-                effort: false,
-                strengths: false,
-                development: false
-            };
-
-            categorySections.forEach(section => {
-                const categoryName = section.dataset.categoryName || '';
-                const checked = Array.from(section.querySelectorAll('input[type="checkbox"]:checked'))
-                    .map(input => input.value)
-                    .filter(Boolean);
-
-                if (checked.length > 0) {
-                    selections[categoryName] = checked;
-                }
-
-                const groupKey = matchCategoryGroup(categoryName);
-                if (groupKey) {
-                    availableGroups[groupKey] = true;
-                    if (checked.length > 0) {
-                        selectedGroups[groupKey] = true;
-                    }
-                }
-            });
-
-            const missingGroups = categoryGroups
-                .filter(group => availableGroups[group.key] && !selectedGroups[group.key])
-                .map(group => group.label);
-
-            return { selections, missingGroups };
-        }
-
         async function generateReport() {
             const pupilName = document.getElementById('pupil-name').value.trim();
             const pupilPronouns = document.getElementById('pupil-pronouns').value.trim();
@@ -448,7 +367,15 @@
                 return;
             }
 
-            const { selections, missingGroups } = collectSelections();
+            const selectionHelper = window.ReportSelection;
+            if (!selectionHelper || typeof selectionHelper.collectSelections !== 'function') {
+                alert('Unable to validate category selections. Please refresh the page.');
+                return;
+            }
+
+            const { selections, missingGroups } = selectionHelper.collectSelections(
+                document.getElementById('categories-container')
+            );
             if (missingGroups.length > 0) {
                 alert(`Please select at least one comment for: ${missingGroups.join(', ')}.`);
                 return;

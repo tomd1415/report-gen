@@ -844,8 +844,11 @@ export function registerRoutes(app, { models, openai }) {
       let reportsWithPlaceholder = safeReports;
 
       namesArray.forEach((name) => {
-        const regex = new RegExp(`\\b${escapeRegex(name)}\\b`, 'g');
-        reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, placeholder);
+        const escapedName = escapeRegex(name);
+        const regex = new RegExp(`(^|[^\\w])${escapedName}([^\\w]|$)`, 'g');
+        reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, (match, prefix, suffix) => {
+          return `${prefix || ''}${placeholder}${suffix || ''}`;
+        });
       });
 
       const extractionPrompt = `
