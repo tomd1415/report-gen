@@ -100,6 +100,12 @@ The app uses `comment-bank-api/.env` (see `comment-bank-api/.env.example`).
 - `SESSION_TRUST_PROXY`
   - Values: `true` or `false` (set `true` when behind a reverse proxy)
 
+### Rate Limiting (OpenAI Endpoints)
+- `RATE_LIMIT_WINDOW_MS`
+  - Window size in milliseconds (default: `60000`)
+- `RATE_LIMIT_MAX`
+  - Max requests per window per user/IP (default: `30`)
+
 ### Database Backups (Admin Only)
 - `ENABLE_DB_BACKUP`
   - Values: `true` or `false` (default: `false`)

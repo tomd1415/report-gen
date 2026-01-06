@@ -16,6 +16,7 @@
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.2",
     "json2csv": "^6.0.0-alpha.2",
     "mariadb": "^3.4.5",

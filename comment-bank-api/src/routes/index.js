@@ -4,14 +4,43 @@ import csv from 'csv-parser';
 import fs from 'fs';
 import multer from 'multer';
 import { Parser } from 'json2csv';
+import rateLimit from 'express-rate-limit';
 import { isAuthenticated, isAdmin } from '../middleware/auth.js';
 import { exportDatabase, backupDatabase } from '../services/dbBackup.js';
 import { config } from '../config/env.js';
 import { sequelize } from '../db/sequelize.js';
 
-const upload = multer({ dest: 'uploads/' });
+const LIMITS = {
+  name: 80,
+  pronouns: 60,
+  additionalComments: 1000,
+  promptPart: 5000,
+  subjectDescription: 2000,
+  commentText: 300,
+  selectedComment: 1000,
+  categoryName: 120,
+  pupilNames: 2000,
+  reports: 60000,
+  maxSelectedComments: 8,
+  maxCategories: 50,
+  maxCommentsPerCategory: 50
+};
+
+const UPLOAD_LIMIT_BYTES = 5 * 1024 * 1024;
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: UPLOAD_LIMIT_BYTES }
+});
 
 const cleanText = (text) => (text ? text.replace(/\s+/g, ' ').trim() : '');
+const cleanAndLimit = (value, maxLength) => {
+  const cleaned = cleanText(value);
+  if (!cleaned) {
+    return '';
+  }
+  return cleaned.length > maxLength ? cleaned.slice(0, maxLength) : cleaned;
+};
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const parseWordLimit = (value) => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -114,17 +143,26 @@ export function registerRoutes(app, { models, openai }) {
     UserYearGroup
   } = models;
 
+  const openAiLimiter = rateLimit({
+    windowMs: config.rateLimit.windowMs,
+    limit: config.rateLimit.max,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    keyGenerator: (req) => req.session?.user?.id?.toString() || req.ip,
+    message: { message: 'Rate limit exceeded. Try again later.' }
+  });
+
   app.use('/api/subjects', isAuthenticated);
   app.use('/api/year-groups', isAuthenticated);
   app.use('/api/categories-comments', isAuthenticated);
-  app.use('/generate-report', isAuthenticated);
+  app.use('/generate-report', isAuthenticated, openAiLimiter);
   app.use('/api/comments', isAuthenticated);
   app.use('/api/move-comment', isAuthenticated);
   app.use('/api/prompts', isAuthenticated);
   app.use('/api/subject-context', isAuthenticated);
   app.use('/api/export-categories-comments', isAuthenticated);
   app.use('/api/import-categories-comments', isAuthenticated);
-  app.use('/api/import-reports', isAuthenticated);
+  app.use('/api/import-reports', isAuthenticated, openAiLimiter);
 
   app.get('/api/authenticated', (req, res) => {
     if (req.session.user) {
@@ -204,7 +242,14 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/api/admin/year-group', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
-      const yearGroup = await YearGroup.create({ name });
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Year group name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Year group name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
+      const yearGroup = await YearGroup.create({ name: cleanedName });
       res.json(yearGroup);
     } catch (error) {
       console.error('Error creating year group:', error);
@@ -231,7 +276,14 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/api/admin/subject', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
-      const subject = await Subject.create({ name });
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Subject name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Subject name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
+      const subject = await Subject.create({ name: cleanedName });
       res.json(subject);
     } catch (error) {
       console.error('Error creating subject:', error);
@@ -312,7 +364,14 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/api/subjects', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
-      const subject = await Subject.create({ name });
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Subject name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Subject name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
+      const subject = await Subject.create({ name: cleanedName });
       res.json(subject);
     } catch (error) {
       console.error('Error creating subject:', error);
@@ -324,9 +383,16 @@ export function registerRoutes(app, { models, openai }) {
     const { id } = req.params;
     const { name } = req.body;
     try {
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Subject name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Subject name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
       const subject = await Subject.findByPk(id);
       if (subject) {
-        subject.name = name;
+        subject.name = cleanedName;
         await subject.save();
         res.json(subject);
       } else {
@@ -367,7 +433,14 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/api/year-groups', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
-      const yearGroup = await YearGroup.create({ name });
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Year group name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Year group name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
+      const yearGroup = await YearGroup.create({ name: cleanedName });
       res.json(yearGroup);
     } catch (error) {
       console.error('Error creating year group:', error);
@@ -379,9 +452,16 @@ export function registerRoutes(app, { models, openai }) {
     const { id } = req.params;
     const { name } = req.body;
     try {
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Year group name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Year group name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
       const yearGroup = await YearGroup.findByPk(id);
       if (yearGroup) {
-        yearGroup.name = name;
+        yearGroup.name = cleanedName;
         await yearGroup.save();
         res.json(yearGroup);
       } else {
@@ -423,7 +503,14 @@ export function registerRoutes(app, { models, openai }) {
     const { name, subjectId, yearGroupId } = req.body;
     const userId = req.session.user.id;
     try {
-      const category = await Category.create({ name, subjectId, yearGroupId, userId });
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Category name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Category name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
+      const category = await Category.create({ name: cleanedName, subjectId, yearGroupId, userId });
       res.json(category);
     } catch (error) {
       console.error('Error creating category:', error);
@@ -435,9 +522,16 @@ export function registerRoutes(app, { models, openai }) {
     const { id } = req.params;
     const { name } = req.body;
     try {
+      const cleanedName = cleanText(name);
+      if (!cleanedName) {
+        return res.status(400).json({ message: 'Category name is required.' });
+      }
+      if (cleanedName.length > LIMITS.categoryName) {
+        return res.status(400).json({ message: `Category name must be ${LIMITS.categoryName} characters or fewer.` });
+      }
       const category = await Category.findByPk(id);
       if (category) {
-        category.name = name;
+        category.name = cleanedName;
         await category.save();
         res.json(category);
       } else {
@@ -498,7 +592,14 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/api/comments', async (req, res) => {
     const { text, categoryId } = req.body;
     try {
-      const comment = await Comment.create({ text, categoryId });
+      const cleanedText = cleanText(text);
+      if (!cleanedText) {
+        return res.status(400).json({ message: 'Comment text is required.' });
+      }
+      if (cleanedText.length > LIMITS.commentText) {
+        return res.status(400).json({ message: `Comment must be ${LIMITS.commentText} characters or fewer.` });
+      }
+      const comment = await Comment.create({ text: cleanedText, categoryId });
       res.json(comment);
     } catch (error) {
       console.error('Error creating comment:', error);
@@ -510,9 +611,16 @@ export function registerRoutes(app, { models, openai }) {
     const { id } = req.params;
     const { text } = req.body;
     try {
+      const cleanedText = cleanText(text);
+      if (!cleanedText) {
+        return res.status(400).json({ message: 'Comment text is required.' });
+      }
+      if (cleanedText.length > LIMITS.commentText) {
+        return res.status(400).json({ message: `Comment must be ${LIMITS.commentText} characters or fewer.` });
+      }
       const comment = await Comment.findByPk(id);
       if (comment) {
-        comment.text = text;
+        comment.text = cleanedText;
         await comment.save();
         res.json(comment);
       } else {
@@ -588,11 +696,21 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/generate-report', async (req, res) => {
     const { name, pronouns, subjectId, yearGroupId, additionalComments, wordLimit, ...categories } = req.body;
     const userId = req.session.user.id;
-    const safeName = typeof name === 'string' ? name.trim() : '';
-    const safePronouns = typeof pronouns === 'string' ? pronouns.trim() : '';
+    const safeName = cleanText(name);
+    const safePronouns = cleanText(pronouns);
+    const cleanedAdditionalComments = cleanText(additionalComments);
 
     if (!safeName || !safePronouns) {
       return res.status(400).json({ message: 'Name and pronouns are required.' });
+    }
+    if (safeName.length > LIMITS.name) {
+      return res.status(400).json({ message: `Name must be ${LIMITS.name} characters or fewer.` });
+    }
+    if (safePronouns.length > LIMITS.pronouns) {
+      return res.status(400).json({ message: `Pronouns must be ${LIMITS.pronouns} characters or fewer.` });
+    }
+    if (cleanedAdditionalComments && cleanedAdditionalComments.length > LIMITS.additionalComments) {
+      return res.status(400).json({ message: `Additional comments must be ${LIMITS.additionalComments} characters or fewer.` });
     }
 
     try {
@@ -637,16 +755,25 @@ export function registerRoutes(app, { models, openai }) {
       }
 
       for (const [category, comment] of Object.entries(categories)) {
-        const selectedComments = Array.isArray(comment)
-          ? comment.map((item) => cleanText(item)).filter(Boolean)
-          : [cleanText(comment)].filter(Boolean);
-        if (selectedComments.length > 0) {
-          prompt += `${category.replace(/-/g, ' ')}: ${selectedComments.join('; ')}\n`;
+        const selectedComments = Array.isArray(comment) ? comment : [comment];
+        const cleanedSelections = selectedComments
+          .map((item) => cleanText(item))
+          .filter(Boolean);
+        if (cleanedSelections.length > LIMITS.maxSelectedComments) {
+          return res.status(400).json({ message: `Too many comments selected for ${category}.` });
+        }
+        for (const selection of cleanedSelections) {
+          if (selection.length > LIMITS.selectedComment) {
+            return res.status(400).json({ message: 'Selected comments are too long.' });
+          }
+        }
+        if (cleanedSelections.length > 0) {
+          prompt += `${category.replace(/-/g, ' ')}: ${cleanedSelections.join('; ')}\n`;
         }
       }
 
-      if (additionalComments) {
-        prompt += `The following additional comments should be woven into the whole report: ${additionalComments}\n`;
+      if (cleanedAdditionalComments) {
+        prompt += `The following additional comments should be woven into the whole report: ${cleanedAdditionalComments}\n`;
       }
 
       const response = await openai.responses.parse({
@@ -697,14 +824,27 @@ export function registerRoutes(app, { models, openai }) {
 
     try {
       const placeholder = 'PUPIL_NAME';
-      const namesArray = (pupilNames || '')
+      const safePupilNames = typeof pupilNames === 'string' ? pupilNames.trim() : '';
+      const safeReports = typeof reports === 'string' ? reports.trim() : '';
+
+      if (!safeReports) {
+        return res.status(400).json({ message: 'Reports are required.' });
+      }
+      if (safePupilNames.length > LIMITS.pupilNames) {
+        return res.status(400).json({ message: `Pupil names must be ${LIMITS.pupilNames} characters or fewer.` });
+      }
+      if (safeReports.length > LIMITS.reports) {
+        return res.status(400).json({ message: `Reports must be ${LIMITS.reports} characters or fewer.` });
+      }
+
+      const namesArray = safePupilNames
         .split(',')
-        .map((name) => name.trim())
-        .filter(Boolean);
-      let reportsWithPlaceholder = reports || '';
+        .map((name) => cleanText(name))
+        .filter((name) => name && name.length <= LIMITS.name);
+      let reportsWithPlaceholder = safeReports;
 
       namesArray.forEach((name) => {
-        const regex = new RegExp(`\\b${name}\\b`, 'g');
+        const regex = new RegExp(`\\b${escapeRegex(name)}\\b`, 'g');
         reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, placeholder);
       });
 
@@ -852,7 +992,10 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
       return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
     }
 
-    const cleanedDescription = typeof subjectDescription === 'string' ? subjectDescription.trim() : null;
+    const cleanedDescription = typeof subjectDescription === 'string' ? subjectDescription.trim() : '';
+    if (cleanedDescription.length > LIMITS.subjectDescription) {
+      return res.status(400).json({ message: `Subject description must be ${LIMITS.subjectDescription} characters or fewer.` });
+    }
     const parsedWordLimit = parseWordLimit(wordLimit);
 
     try {
@@ -881,6 +1024,10 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
     const { subjectId, yearGroupId, promptPart } = req.body;
     const userId = req.session.user.id;
     try {
+      const trimmedPrompt = typeof promptPart === 'string' ? promptPart.trim() : '';
+      if (trimmedPrompt.length > LIMITS.promptPart) {
+        return res.status(400).json({ message: `Prompt text must be ${LIMITS.promptPart} characters or fewer.` });
+      }
       const [prompt, created] = await Prompt.findOrCreate({
         where: {
           subjectId: subjectId,
@@ -888,12 +1035,12 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
           userId: userId
         },
         defaults: {
-          promptPart: promptPart
+          promptPart: trimmedPrompt
         }
       });
 
       if (!created) {
-        prompt.promptPart = promptPart;
+        prompt.promptPart = trimmedPrompt;
         await prompt.save();
       }
 
@@ -909,6 +1056,10 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
     const userId = req.session.user.id;
     const { promptPart } = req.body;
     try {
+      const trimmedPrompt = typeof promptPart === 'string' ? promptPart.trim() : '';
+      if (trimmedPrompt.length > LIMITS.promptPart) {
+        return res.status(400).json({ message: `Prompt text must be ${LIMITS.promptPart} characters or fewer.` });
+      }
       const prompt = await Prompt.findOne({
         where: {
           subjectId: subjectId,
@@ -917,7 +1068,7 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
         }
       });
       if (prompt) {
-        prompt.promptPart = promptPart;
+        prompt.promptPart = trimmedPrompt;
         await prompt.save();
         res.json(prompt);
       } else {
@@ -933,9 +1084,13 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
     const { id } = req.params;
     const { promptPart } = req.body;
     try {
+      const trimmedPrompt = typeof promptPart === 'string' ? promptPart.trim() : '';
+      if (trimmedPrompt.length > LIMITS.promptPart) {
+        return res.status(400).json({ message: `Prompt text must be ${LIMITS.promptPart} characters or fewer.` });
+      }
       const prompt = await Prompt.findByPk(id);
       if (prompt) {
-        prompt.promptPart = promptPart;
+        prompt.promptPart = trimmedPrompt;
         await prompt.save();
         res.json(prompt);
       } else {
@@ -1160,17 +1315,32 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
     }
 
     const categories = {};
+    let skippedRows = 0;
 
     try {
       await new Promise((resolve, reject) => {
         fs.createReadStream(filePath)
           .pipe(csv())
           .on('data', (data) => {
-            const categoryName = data['categoryName'];
-            const commentText = cleanText(data['commentText']);
+            const categoryName = cleanAndLimit(data['categoryName'], LIMITS.categoryName);
+            const commentText = cleanAndLimit(data['commentText'], LIMITS.commentText);
+
+            if (!categoryName || !commentText) {
+              skippedRows += 1;
+              return;
+            }
 
             if (!categories[categoryName]) {
+              if (Object.keys(categories).length >= LIMITS.maxCategories) {
+                skippedRows += 1;
+                return;
+              }
               categories[categoryName] = [];
+            }
+
+            if (categories[categoryName].length >= LIMITS.maxCommentsPerCategory) {
+              skippedRows += 1;
+              return;
             }
 
             categories[categoryName].push(commentText);
@@ -1193,7 +1363,14 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
         }
       });
 
-      res.json({ message: 'Categories and comments imported successfully.' });
+      const totalCategories = Object.keys(categories).length;
+      const totalComments = Object.values(categories).reduce((sum, comments) => sum + comments.length, 0);
+      res.json({
+        message: 'Categories and comments imported successfully.',
+        totalCategories,
+        totalComments,
+        skippedRows
+      });
     } catch (error) {
       console.error('Error importing categories and comments:', error);
       res.status(500).send('Error importing categories and comments');

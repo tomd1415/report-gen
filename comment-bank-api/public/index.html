@@ -37,11 +37,11 @@
 
             <div id="name-pronoun-section" class="flex-center">
                 <div class="flex-col-center">
-                    <input type="text" id="pupil-name" required placeholder="Pupil's First Name" class="input-text">
+                    <input type="text" id="pupil-name" required maxlength="80" placeholder="Pupil's First Name" class="input-text">
                     <label for="pupil-name" class="block text-center">Pupil's First Name</label>
                 </div>
                 <div class="flex-col-center">
-                    <input type="text" id="pupil-pronouns" placeholder="Pupil's Pronouns" class="input-text">
+                    <input type="text" id="pupil-pronouns" maxlength="60" placeholder="Pupil's Pronouns" class="input-text">
                     <label for="pupil-pronouns" class="block text-center">Pronouns</label>
                 </div>
             </div>
@@ -67,7 +67,7 @@
 
             <div class="form-section" id="additional-comments-wrapper">
                 <label for="additional-comments">Additional Comments:</label>
-                <textarea id="additional-comments" rows="4" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
+                <textarea id="additional-comments" rows="4" maxlength="1000" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
             </div>
 
             <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
@@ -81,7 +81,7 @@
     <div id="add-comment-modal" class="modal hidden">
         <div class="modal-content">
             <h2 class="modal-title">Add New Comment</h2>
-            <textarea id="new-comment-text" rows="4" class="textarea mb-4" placeholder="Enter new comment"></textarea>
+            <textarea id="new-comment-text" rows="4" maxlength="300" class="textarea mb-4" placeholder="Enter new comment"></textarea>
             <div class="modal-buttons">
                 <button class="button cancel" onclick="closeModal()">Cancel</button>
                 <button class="button save" onclick="saveNewComment()">Save Comment</button>

@@ -46,6 +46,10 @@ export const config = {
     maxAgeMs: toInt(process.env.SESSION_MAX_AGE_MS, 14 * 24 * 60 * 60 * 1000),
     trustProxy: toBool(process.env.SESSION_TRUST_PROXY, false)
   },
+  rateLimit: {
+    windowMs: toInt(process.env.RATE_LIMIT_WINDOW_MS, 60 * 1000),
+    max: toInt(process.env.RATE_LIMIT_MAX, 30)
+  },
   backup: {
     enabled: toBool(process.env.ENABLE_DB_BACKUP, false),
     dir: process.env.DB_BACKUP_DIR || './dbbackup_web'
