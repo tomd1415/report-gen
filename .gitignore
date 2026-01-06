@@ -1,6 +1,11 @@
-comment-bank-api/uploads
-dbbackup
+comment-bank-api/uploads/
+dbbackup/
 .env
 comment-bank-api/.env
 comment-bank-api/*.pem
-comment-bank-api/cookies.txt
+comment-bank-api/cookies.*
+
+node_modules/
+openapiinfo/
+.venv/
+dbbackup_web/

@@ -502,7 +502,7 @@ app.post('/api/admin/backup', isAdmin, (req, res) => {
 
 // CRUD operations for Subjects
 // Create a new subject
-app.post('/api/subjects', async (req, res) => {
+app.post('/api/subjects', isAdmin, async (req, res) => {
   const { name } = req.body;
   try {
     const subject = await Subject.create({ name });
@@ -514,7 +514,7 @@ app.post('/api/subjects', async (req, res) => {
 });
 
 // Update an existing subject
-app.put('/api/subjects/:id', async (req, res) => {
+app.put('/api/subjects/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
   try {
@@ -533,7 +533,7 @@ app.put('/api/subjects/:id', async (req, res) => {
 });
 
 // Delete a subject
-app.delete('/api/subjects/:id', async (req, res) => {
+app.delete('/api/subjects/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const subject = await Subject.findByPk(id);
@@ -562,7 +562,7 @@ app.get('/api/subjects', async (req, res) => {
 
 // CRUD operations for YearGroups
 // Create a new year group
-app.post('/api/year-groups', async (req, res) => {
+app.post('/api/year-groups', isAdmin, async (req, res) => {
   const { name } = req.body;
   try {
     const yearGroup = await YearGroup.create({ name });
@@ -574,7 +574,7 @@ app.post('/api/year-groups', async (req, res) => {
 });
 
 // Update an existing year group
-app.put('/api/year-groups/:id', async (req, res) => {
+app.put('/api/year-groups/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
   try {
@@ -593,7 +593,7 @@ app.put('/api/year-groups/:id', async (req, res) => {
 });
 
 // Delete a year group
-app.delete('/api/year-groups/:id', async (req, res) => {
+app.delete('/api/year-groups/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const yearGroup = await YearGroup.findByPk(id);
@@ -1038,7 +1038,7 @@ app.put('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
 });
 
 // Update a prompt by ID
-('/api/prompts/:id', async (req, res) => {
+app.put('/api/prompts/:id', async (req, res) => {
   const { id } = req.params;
   const { promptPart } = req.body;
   try {
@@ -1099,7 +1099,22 @@ app.delete('/api/prompts/:subjectId/:yearGroupId', async (req, res) => {
 
 // Fetch all prompts
 app.get('/api/prompts', async (req, res) => {
+  const { subjectId, yearGroupId } = req.query;
+  const userId = req.session.user.id;
   try {
+    if (subjectId && yearGroupId) {
+      const prompt = await Prompt.findOne({
+        where: {
+          subjectId: subjectId,
+          yearGroupId: yearGroupId,
+          userId: userId
+        }
+      });
+      res.type('text/plain');
+      res.send(prompt ? prompt.promptPart : '');
+      return;
+    }
+
     const prompts = await Prompt.findAll();
     res.json(prompts);
   } catch (error) {
@@ -1162,7 +1177,19 @@ app.get('/api/export-categories-comments', async (req, res) => {
 // Admin functions here
 
 // Add a new user
-app.post('/api/users', async (req, res) => {
+app.get('/api/users', isAdmin, async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'isAdmin']
+    });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).send('Error fetching users');
+  }
+});
+
+app.post('/api/users', isAdmin, async (req, res) => {
   const { username, password, isAdmin } = req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -1175,7 +1202,7 @@ app.post('/api/users', async (req, res) => {
 });
 
 // Delete a user
-app.delete('/api/users/:username', async (req, res) => {
+app.delete('/api/users/:username', isAdmin, async (req, res) => {
   const { username } = req.params;
   try {
     const user = await User.findOne({ where: { username } });
@@ -1192,7 +1219,7 @@ app.delete('/api/users/:username', async (req, res) => {
 });
 
 // Export the database
-app.get('/api/export-database', async (req, res) => {
+app.get('/api/export-database', isAdmin, async (req, res) => {
   try {
     // Assuming you have a method to export your database
     const filePath = await exportDatabase();
@@ -1204,7 +1231,7 @@ app.get('/api/export-database', async (req, res) => {
 });
 
 // Backup the database
-app.post('/api/backup-database', async (req, res) => {
+app.post('/api/backup-database', isAdmin, async (req, res) => {
   try {
     // Assuming you have a method to backup your database
     await backupDatabase();
