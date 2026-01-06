@@ -10,3 +10,4 @@ comment-bank-api/node_modules/
 openapiinfo/
 .venv/
 dbbackup_web/
+comment-bank-api/dbbackup_web/

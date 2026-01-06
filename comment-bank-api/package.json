@@ -23,7 +23,9 @@
     "mysql2": "^3.16.0",
     "openai": "^6.15.0",
     "sequelize": "^6.37.7",
-    "bcrypt": "^6.0.0"
+    "bcrypt": "^6.0.0",
+    "connect-session-sequelize": "^8.0.4",
+    "umzug": "^3.8.2"
   },
   "description": ""
 }
