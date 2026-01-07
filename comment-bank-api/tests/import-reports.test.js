@@ -90,4 +90,55 @@ describe('import-reports', () => {
     expect(response.body.message).toMatch(/Reports must be/i);
     expect(openai.responses.parse).not.toHaveBeenCalled();
   });
+
+  it('filters out-of-scope comments during import using the subject description', async () => {
+    models.SubjectContext.findOne.mockResolvedValue({
+      subjectDescription: 'Mathematics covering number, fractions, and basic geometry.'
+    });
+    models.Category.findAll.mockResolvedValue([]);
+    models.Category.create.mockResolvedValue({ id: 10 });
+    models.Comment.create.mockResolvedValue({});
+
+    openai.responses.parse
+      .mockResolvedValueOnce({
+        output_parsed: {
+          categories: [
+            {
+              name: 'Topics studied / knowledge / skills acquired',
+              comments: ['3D modelling', 'Fractions']
+            },
+            {
+              name: 'Effort / motivation / attendance',
+              comments: ['Works hard']
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce({
+        output_parsed: {
+          flagged: [
+            {
+              category: 'Topics studied / knowledge / skills acquired',
+              comment: '3D modelling',
+              reason: 'Out of scope'
+            }
+          ]
+        }
+      });
+
+    const response = await request(app)
+      .post('/api/import-reports')
+      .send({
+        subjectId: 1,
+        yearGroupId: 2,
+        pupilNames: 'Alex',
+        reports: 'Alex is confident in fractions. Alex models 3D shapes.'
+      });
+
+    expect(response.status).toBe(200);
+    const createdComments = models.Comment.create.mock.calls.map((call) => call[0].text);
+    expect(createdComments).toContain('Fractions');
+    expect(createdComments).toContain('Works hard');
+    expect(createdComments).not.toContain('3D modelling');
+  });
 });

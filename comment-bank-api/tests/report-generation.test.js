@@ -148,6 +148,122 @@ describe('generate-report', () => {
     expect(response.status).toBe(500);
   });
 
+  it('returns 422 when relevance flags a selected comment', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    models.SubjectContext.findOne.mockResolvedValue({
+      subjectDescription: 'History curriculum overview.',
+      wordLimit: null
+    });
+
+    openai.responses.parse.mockResolvedValueOnce({
+      output_parsed: {
+        flagged: [
+          {
+            category: 'Topics studied / knowledge / skills acquired',
+            comment: '3D modelling',
+            reason: 'Not in subject description'
+          }
+        ]
+      }
+    });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        'Topics studied / knowledge / skills acquired': ['3D modelling']
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.flagged).toHaveLength(1);
+    expect(openai.responses.parse).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the target placeholder comment in relevance checks', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    models.SubjectContext.findOne.mockResolvedValue({
+      subjectDescription: 'Mathematics curriculum overview.',
+      wordLimit: null
+    });
+
+    openai.responses.parse
+      .mockResolvedValueOnce({ output_parsed: { flagged: [] } })
+      .mockResolvedValueOnce({
+        output_parsed: { paragraphs: ['p1', 'p2', 'p3', 'p4'] }
+      });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        'Areas for development / targets toward end-of-year Teacher Target': [
+          '***Generate a target for this pupil and add to the report***',
+          'Needs to check work carefully'
+        ]
+      });
+
+    expect(response.status).toBe(200);
+    const relevancePrompt = openai.responses.parse.mock.calls[0][0].input[0].content;
+    expect(relevancePrompt).toContain('Needs to check work carefully');
+    const commentsSection = relevancePrompt.split('Comments to review')[1] || '';
+    expect(commentsSection).not.toContain('***Generate a target for this pupil and add to the report***');
+  });
+
+  it('includes strength focus in the generation prompt', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    models.SubjectContext.findOne.mockResolvedValue(null);
+
+    openai.responses.parse.mockResolvedValueOnce({
+      output_parsed: { paragraphs: ['p1', 'p2', 'p3', 'p4'] }
+    });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        strengthFocus: [{ topic: 'Fractions', level: 'strong' }]
+      });
+
+    expect(response.status).toBe(200);
+    const prompt = openai.responses.parse.mock.calls[0][0].input[0].content;
+    expect(prompt).toContain('Subject strength focus for paragraph 3 (include at least one): Fractions (strong)');
+  });
+
+  it('rejects too many strength focus items', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    models.SubjectContext.findOne.mockResolvedValue(null);
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        strengthFocus: [
+          { topic: 'Topic 1', level: 'strong' },
+          { topic: 'Topic 2', level: 'strong' },
+          { topic: 'Topic 3', level: 'strong' },
+          { topic: 'Topic 4', level: 'strong' },
+          { topic: 'Topic 5', level: 'strong' },
+          { topic: 'Topic 6', level: 'strong' }
+        ]
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/strength focus items/i);
+    expect(openai.responses.parse).not.toHaveBeenCalled();
+  });
+
   it('rejects too many selected comments for a category', async () => {
     models.Prompt.findOne.mockResolvedValue(null);
     models.SubjectContext.findOne.mockResolvedValue(null);
