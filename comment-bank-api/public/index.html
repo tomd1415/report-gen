@@ -59,35 +59,20 @@
             </div>
 
             <div class="report-builder" id="report-builder" style="display: none;">
-                <aside class="builder-rail">
-                    <div class="rail-section">
-                        <h2 class="rail-title">Paragraphs</h2>
-                        <div class="step-tabs" id="step-tabs"></div>
-                    </div>
-
-                    <div class="rail-section summary-card">
-                        <div class="summary-header">
-                            <h2>Selections</h2>
-                            <p>Quick view of chosen comments.</p>
-                        </div>
-                        <div id="selection-summary" class="selection-summary"></div>
-                    </div>
-
-                    <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
-                </aside>
-
                 <section class="builder-main">
-                    <div class="builder-toolbar">
-                        <div class="filter-bar">
-                            <input type="text" id="comment-filter" class="filter-input" placeholder="Search comments in this paragraph...">
-                            <label class="toggle-pill">
-                                <input type="checkbox" id="selected-only">
-                                <span>Selected only</span>
-                            </label>
-                        </div>
-                        <div class="category-controls" id="category-controls" style="display: none;">
-                            <button type="button" class="button inline-button" onclick="expandAllCategories()">Expand all</button>
-                            <button type="button" class="button inline-button" onclick="collapseAllCategories()">Collapse all</button>
+                    <div class="builder-header">
+                        <div class="step-tabs" id="step-tabs"></div>
+                        <div class="builder-toolbar">
+                            <div class="filter-bar">
+                                <input type="text" id="comment-filter" class="filter-input" placeholder="Search comments in this paragraph...">
+                                <label class="toggle-pill">
+                                    <input type="checkbox" id="selected-only">
+                                    <span>Selected only</span>
+                                </label>
+                            </div>
+                            <div class="category-controls" id="category-controls" style="display: none;">
+                                <button type="button" class="button inline-button" id="toggle-categories" onclick="toggleAllCategories()">Collapse all</button>
+                            </div>
                         </div>
                     </div>
 
@@ -125,6 +110,17 @@
                         <p class="preview-placeholder">Generated report will appear here after you click Generate.</p>
                     </div>
                 </section>
+
+                <aside class="builder-summary">
+                    <div class="summary-card">
+                        <div class="summary-header">
+                            <h2>Selections</h2>
+                            <p>Quick view of chosen comments.</p>
+                        </div>
+                        <div id="selection-summary" class="selection-summary"></div>
+                    </div>
+                    <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
+                </aside>
             </div>
         </div>
 
@@ -290,10 +286,20 @@
                     const header = document.createElement('div');
                     header.classList.add('comment-category-header');
 
+                    const headerLeft = document.createElement('div');
+                    headerLeft.classList.add('comment-category-label');
+
                     const title = document.createElement('h3');
                     title.classList.add('comment-category-title');
                     title.textContent = category.name;
-                    header.appendChild(title);
+                    headerLeft.appendChild(title);
+
+                    const countBadge = document.createElement('span');
+                    countBadge.classList.add('category-selected-count');
+                    countBadge.textContent = '0 selected';
+                    headerLeft.appendChild(countBadge);
+
+                    header.appendChild(headerLeft);
 
                     const toggleButton = document.createElement('button');
                     toggleButton.type = 'button';
@@ -332,6 +338,8 @@
                 setupFilters();
                 setupAdditionalCommentPreview();
                 setupStrengthFocus();
+                setValidationState(false);
+                setAllCategoriesCollapsed(false);
                 document.getElementById('category-controls').style.display = categories.length ? 'flex' : 'none';
                 document.getElementById('additional-comments-wrapper').style.display = 'block';
                 document.getElementById('generate-report').style.display = 'block';
@@ -342,6 +350,8 @@
         let activeStep = 'topics';
         let filterInitialized = false;
         let additionalListenerBound = false;
+        let validationActive = false;
+        let categoriesCollapsed = false;
 
         const stepDefinitions = [
             { key: 'topics', label: 'Paragraph 1', subtitle: 'Topics and skills' },
@@ -391,6 +401,7 @@
         }
 
         function setAllCategoriesCollapsed(collapsed) {
+            categoriesCollapsed = collapsed;
             const categorySections = document.querySelectorAll('.comment-category');
             categorySections.forEach(section => {
                 section.classList.toggle('is-collapsed', collapsed);
@@ -400,6 +411,10 @@
                     toggle.setAttribute('aria-expanded', String(!collapsed));
                 }
             });
+            const toggleButton = document.getElementById('toggle-categories');
+            if (toggleButton) {
+                toggleButton.textContent = collapsed ? 'Expand all' : 'Collapse all';
+            }
         }
 
         function expandAllCategories() {
@@ -408,6 +423,10 @@
 
         function collapseAllCategories() {
             setAllCategoriesCollapsed(true);
+        }
+
+        function toggleAllCategories() {
+            setAllCategoriesCollapsed(!categoriesCollapsed);
         }
 
         function setupStepTabs(stepPresence) {
@@ -428,6 +447,7 @@
                 button.innerHTML = `
                     <span class="step-title">${step.label}</span>
                     <span class="step-subtitle">${step.subtitle}</span>
+                    <span class="step-status"></span>
                     <span class="step-count">0</span>
                 `;
                 button.addEventListener('click', () => setActiveStep(step.key));
@@ -471,6 +491,14 @@
             if (additional) {
                 additional.addEventListener('input', updateSelectionSummary);
                 additionalListenerBound = true;
+            }
+        }
+
+        function setValidationState(active) {
+            validationActive = active;
+            const builder = document.getElementById('report-builder');
+            if (builder) {
+                builder.classList.toggle('validation-active', active);
             }
         }
 
@@ -625,6 +653,12 @@
                 const groupKey = section.dataset.group;
                 const categoryName = section.dataset.categoryName;
                 const checked = Array.from(section.querySelectorAll('input[type="checkbox"]:checked'));
+                const selectedCount = checked.length;
+                const countBadge = section.querySelector('.category-selected-count');
+                if (countBadge) {
+                    countBadge.textContent = selectedCount ? `${selectedCount} selected` : '0 selected';
+                    countBadge.classList.toggle('has-selection', selectedCount > 0);
+                }
                 counts[groupKey] += checked.length;
                 checked.forEach(input => {
                     groupedSelections[groupKey].push({ category: categoryName, comment: input.value });
@@ -665,8 +699,10 @@
                     focusHeading.textContent = 'Subject strengths focus';
                     section.appendChild(focusHeading);
                     const focusList = document.createElement('ul');
+                    focusList.classList.add('summary-tag-list');
                     strengthFocusItems.forEach(item => {
                         const li = document.createElement('li');
+                        li.classList.add('summary-tag');
                         li.textContent = `${item.topic} (${item.level})`;
                         focusList.appendChild(li);
                     });
@@ -688,14 +724,32 @@
                 summaryContainer.appendChild(extraSection);
             }
 
+            const missingRequiredKeys = stepDefinitions
+                .filter(step => !step.optional && (counts[step.key] || 0) === 0)
+                .map(step => step.key);
+
+            if (validationActive && missingRequiredKeys.length === 0) {
+                setValidationState(false);
+            }
+
             document.querySelectorAll('.step-tab').forEach(tab => {
                 const key = tab.dataset.step;
                 const count = counts[key] || 0;
                 const countNode = tab.querySelector('.step-count');
+                const statusNode = tab.querySelector('.step-status');
+                const stepMeta = stepDefinitions.find(step => step.key === key);
                 if (countNode) {
                     countNode.textContent = count;
                 }
+                if (statusNode && stepMeta) {
+                    if (!stepMeta.optional) {
+                        statusNode.textContent = count > 0 ? 'Done' : 'Needs selection';
+                    } else {
+                        statusNode.textContent = count > 0 ? 'Selected' : 'Optional';
+                    }
+                }
                 tab.classList.toggle('has-selection', count > 0);
+                tab.classList.toggle('needs-selection', missingRequiredKeys.includes(key));
             });
         }
 
@@ -835,9 +889,11 @@
                 document.getElementById('categories-container')
             );
             if (missingGroups.length > 0) {
+                setValidationState(true);
                 alert(`Please select at least one comment for: ${missingGroups.join(', ')}.`);
                 return;
             }
+            setValidationState(false);
 
             const strengthFocus = collectStrengthFocus();
             if (strengthFocus.incomplete.length > 0) {
