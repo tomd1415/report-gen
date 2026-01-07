@@ -189,6 +189,8 @@ All variables live in `comment-bank-api/.env`.
 ### Core
 - `NODE_ENV`: `development`, `test`, `production`
 - `PORT`: numeric port for Express (default `44344`)
+- `CORS_ORIGINS`: comma-separated allowed origins for production (example `https://reportgen.example.com`)
+- `ALLOW_REGISTRATION_IN_PROD`: `true` or `false` (default `false`); when `false` and `NODE_ENV=production`, `/api/register` is disabled
 
 ### OpenAI
 - `OPENAI_API_KEY`: your API key

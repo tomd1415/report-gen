@@ -24,6 +24,12 @@ if (sessionSecret === 'dev-insecure-secret') {
 export const config = {
   env,
   port: toInt(process.env.PORT, 44344),
+  cors: {
+    allowedOrigins: (process.env.CORS_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  },
   db: {
     host: process.env.DB_HOST || '127.0.0.1',
     port: toInt(process.env.DB_PORT, 3306),
@@ -53,5 +59,8 @@ export const config = {
   backup: {
     enabled: toBool(process.env.ENABLE_DB_BACKUP, false),
     dir: process.env.DB_BACKUP_DIR || './dbbackup_web'
+  },
+  auth: {
+    allowRegistrationInProd: toBool(process.env.ALLOW_REGISTRATION_IN_PROD, false)
   }
 };

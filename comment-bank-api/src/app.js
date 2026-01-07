@@ -29,7 +29,24 @@ export async function createApp() {
     app.set('trust proxy', 1);
   }
 
-  app.use(cors());
+  if (config.env === 'production') {
+    app.use(cors({
+      origin: (origin, callback) => {
+        if (!origin) {
+          return callback(null, true);
+        }
+        if (config.cors.allowedOrigins.length === 0) {
+          return callback(new Error('CORS blocked'), false);
+        }
+        return config.cors.allowedOrigins.includes(origin)
+          ? callback(null, true)
+          : callback(new Error('CORS blocked'), false);
+      },
+      credentials: true
+    }));
+  } else {
+    app.use(cors({ origin: true, credentials: true }));
+  }
   app.use(express.json());
   app.use(session({
     store: sessionStore,

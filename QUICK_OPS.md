@@ -82,6 +82,21 @@ sudo systemctl restart reportgen
 
 ---
 
+## Production Safety Toggles
+
+Set these in `comment-bank-api/.env` for production hardening:
+
+- `NODE_ENV=production`
+- `CORS_ORIGINS=https://your-domain.example`
+- `ALLOW_REGISTRATION_IN_PROD=false`
+
+Restart after changes:
+```
+sudo systemctl restart reportgen
+```
+
+---
+
 ## Admin Tasks
 
 ### Promote user to admin
@@ -136,4 +151,3 @@ node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(console.
 - Paragraph 3 includes a subject-specific strength.
 - Placeholder names replaced correctly.
 - Relevance warning appears only for out-of-scope comments.
-

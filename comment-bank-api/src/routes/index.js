@@ -275,6 +275,9 @@ export function registerRoutes(app, { models, openai }) {
   app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     try {
+      if (config.env === 'production' && !config.auth.allowRegistrationInProd) {
+        return res.status(403).json({ message: 'Registration is disabled in production.' });
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await User.create({ username, password: hashedPassword });
       res.json({ message: 'User registered successfully', user });
