@@ -72,10 +72,12 @@ describe('generate-report', () => {
       wordLimit: 140
     });
 
-    openai.responses.parse.mockResolvedValue({
-      output_parsed: { paragraphs },
-      _request_id: 'req_test'
-    });
+    openai.responses.parse
+      .mockResolvedValueOnce({ output_parsed: { flagged: [] } })
+      .mockResolvedValueOnce({
+        output_parsed: { paragraphs },
+        _request_id: 'req_test'
+      });
 
     const response = await request(app)
       .post('/generate-report')
@@ -94,8 +96,9 @@ describe('generate-report', () => {
     expect(response.body.report).toContain('\n\n');
     expect(response.body.report).not.toContain('PUPIL_NAME');
 
-    const prompt = openai.responses.parse.mock.calls[0][0].input[0].content;
-    expect(prompt).toContain('Subject description (context only; do not repeat in the report): Mathematics focusing on algebra and geometry.');
+    const prompt = openai.responses.parse.mock.calls[1][0].input[0].content;
+    expect(prompt).toContain('Subject description (context only; do not repeat in the report). This description will be printed immediately before the report:');
+    expect(prompt).toContain('Mathematics focusing on algebra and geometry.');
     expect(prompt).toContain('Target length: about 140 words total.');
     expect(prompt).toContain('Strengths / achievements: Works well in groups; Shows creativity');
     expect(prompt).toContain('PUPIL_NAME');
@@ -109,7 +112,7 @@ describe('generate-report', () => {
       wordLimit: 140
     });
 
-    openai.responses.parse.mockResolvedValue({
+    openai.responses.parse.mockResolvedValueOnce({
       output_parsed: { paragraphs: ['p1', 'p2', 'p3', 'p4'] }
     });
 

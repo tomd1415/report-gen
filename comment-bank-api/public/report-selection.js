@@ -2,7 +2,7 @@ export const categoryGroups = [
   {
     key: 'topics',
     label: 'Topics / Knowledge / Skills',
-    patterns: [/topic/i, /area/i, /studied/i, /knowledge/i, /skill/i, /curriculum/i]
+    patterns: [/topic/i, /areas?\s+studied/i, /studied/i, /knowledge/i, /skill/i, /curriculum/i]
   },
   {
     key: 'effort',

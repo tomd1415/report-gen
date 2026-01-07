@@ -62,4 +62,8 @@ describe('report selection helpers', () => {
   it('treats General/Other as non-core', () => {
     expect(matchCategoryGroup('General / Other')).toBeNull();
   });
+
+  it('maps development categories before topics/areas', () => {
+    expect(matchCategoryGroup('Areas for development / targets toward end-of-year Teacher Target')).toBe('development');
+  });
 });

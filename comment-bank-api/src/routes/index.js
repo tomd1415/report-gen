@@ -23,8 +23,17 @@ const LIMITS = {
   reports: 60000,
   maxSelectedComments: 8,
   maxCategories: 50,
-  maxCommentsPerCategory: 50
+  maxCommentsPerCategory: 50,
+  strengthFocusMax: 5,
+  strengthFocusTopic: 80,
+  strengthFocusLevel: 30
 };
+
+const TARGET_PLACEHOLDER_COMMENT = '***Generate a target for this pupil and add to the report***';
+const TARGET_PLACEHOLDER_PATTERN = /generate a target for this pupil/i;
+const isTargetPlaceholderComment = (value) => TARGET_PLACEHOLDER_PATTERN.test(String(value || ''));
+const normalizeKey = (category, comment) =>
+  `${cleanText(category).toLowerCase()}||${cleanText(comment).toLowerCase()}`;
 
 const UPLOAD_LIMIT_BYTES = 5 * 1024 * 1024;
 const upload = multer({
@@ -99,6 +108,27 @@ const reportSchema = {
   required: ['paragraphs']
 };
 
+const relevanceSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    flagged: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          category: { type: 'string' },
+          comment: { type: 'string' },
+          reason: { type: 'string' }
+        },
+        required: ['category', 'comment', 'reason']
+      }
+    }
+  },
+  required: ['flagged']
+};
+
 const normalizeCategories = (categories) => {
   const normalized = {};
   for (const category of categories) {
@@ -122,6 +152,63 @@ const serializeCategoryMap = (categoryMap) => {
     comments: Array.from(comments)
   }));
 };
+
+const buildCommentItems = (categoryMap) => {
+  const items = [];
+  for (const [categoryName, comments] of Object.entries(categoryMap)) {
+    for (const comment of comments) {
+      if (isTargetPlaceholderComment(comment)) {
+        continue;
+      }
+      items.push({ category: categoryName, comment });
+    }
+  }
+  return items;
+};
+
+const filterCategoryMapByRelevance = (categoryMap, flaggedItems) => {
+  const flaggedKeys = new Set(
+    flaggedItems
+      .filter((item) => !isTargetPlaceholderComment(item.comment))
+      .map((item) => normalizeKey(item.category, item.comment))
+  );
+
+  if (flaggedKeys.size === 0) {
+    return categoryMap;
+  }
+
+  const filtered = {};
+  for (const [categoryName, comments] of Object.entries(categoryMap)) {
+    const kept = [];
+    for (const comment of comments) {
+      const key = normalizeKey(categoryName, comment);
+      if (!flaggedKeys.has(key)) {
+        kept.push(comment);
+      }
+    }
+    if (kept.length > 0) {
+      filtered[categoryName] = new Set(kept);
+    }
+  }
+  return filtered;
+};
+
+const buildRelevancePrompt = (subjectDescription, commentItems) => `
+You are checking whether selected report comments are in-scope for the subject description.
+Subject description (scope for this year group):
+${subjectDescription}
+
+Rules:
+- Effort, motivation, attendance, behaviour, collaboration, organisation, and general learning habits are always relevant.
+- Knowledge/skills content must be clearly supported by the subject description.
+- If unsure, mark the comment as relevant.
+- Use the category string exactly as provided.
+- The placeholder comment "${TARGET_PLACEHOLDER_COMMENT}" is always allowed.
+- Return only comments that are out of scope.
+
+Comments to review (category + comment):
+${JSON.stringify(commentItems, null, 2)}
+`;
 
 const buildOpenAIParams = (req) => ({
   model: config.openai.model,
@@ -694,11 +781,23 @@ export function registerRoutes(app, { models, openai }) {
   });
 
   app.post('/generate-report', async (req, res) => {
-    const { name, pronouns, subjectId, yearGroupId, additionalComments, wordLimit, ...categories } = req.body;
+    const {
+      name,
+      pronouns,
+      subjectId,
+      yearGroupId,
+      additionalComments,
+      wordLimit,
+      overrideIrrelevant,
+      strengthFocus,
+      ...categories
+    } = req.body;
     const userId = req.session.user.id;
     const safeName = cleanText(name);
     const safePronouns = cleanText(pronouns);
     const cleanedAdditionalComments = cleanText(additionalComments);
+    const allowIrrelevant = overrideIrrelevant === true || overrideIrrelevant === 'true';
+    const strengthFocusItems = Array.isArray(strengthFocus) ? strengthFocus : [];
 
     if (!safeName || !safePronouns) {
       return res.status(400).json({ message: 'Name and pronouns are required.' });
@@ -711,6 +810,9 @@ export function registerRoutes(app, { models, openai }) {
     }
     if (cleanedAdditionalComments && cleanedAdditionalComments.length > LIMITS.additionalComments) {
       return res.status(400).json({ message: `Additional comments must be ${LIMITS.additionalComments} characters or fewer.` });
+    }
+    if (strengthFocusItems.length > LIMITS.strengthFocusMax) {
+      return res.status(400).json({ message: `You can add up to ${LIMITS.strengthFocusMax} strength focus items.` });
     }
 
     try {
@@ -743,10 +845,11 @@ export function registerRoutes(app, { models, openai }) {
       prompt += `\nI am using the following placeholder for a name: ${placeholder} the pronouns for this pupil are (${safePronouns}).\n`;
 
       if (subjectDescription) {
-        prompt += `Subject description (context only; do not repeat in the report): ${subjectDescription}\n`;
+        prompt += 'Subject description (context only; do not repeat in the report). This description will be printed immediately before the report:\n';
+        prompt += `${subjectDescription}\n`;
       }
 
-      prompt += `Report requirements:\n- Exactly 4 paragraphs.\n- Paragraph 1: Topics / areas studied so far. Key knowledge and skills acquired (do not repeat the subject description).\n- Paragraph 2: Effort / motivation / attendance to lesson.\n- Paragraph 3: Strengths and particular achievements.\n- Paragraph 4: Areas of development to bolster the pupil's progress and achieve end of year Teacher Target.\n- No headings or bullet points.\n`;
+      prompt += `Report requirements:\n- Exactly 4 paragraphs.\n- Paragraph 1: Topics / areas studied so far. Key knowledge and skills acquired (do not repeat the subject description).\n- Paragraph 2: Effort / motivation / attendance to lesson.\n- Paragraph 3: Strengths and particular achievements. Include at least one subject-specific strength tied to a topic or aspect of the subject.\n- Paragraph 4: Areas of development to bolster the pupil's progress and achieve end of year Teacher Target.\n- No headings or bullet points.\n`;
 
       if (effectiveWordLimit) {
         prompt += `Target length: about ${effectiveWordLimit} words total.\n`;
@@ -754,7 +857,10 @@ export function registerRoutes(app, { models, openai }) {
         prompt += 'Keep it concise and avoid repetition.\n';
       }
 
+      const selectedItems = [];
       for (const [category, comment] of Object.entries(categories)) {
+        const categoryName = String(category);
+        const categoryLabel = cleanText(categoryName) || categoryName;
         const selectedComments = Array.isArray(comment) ? comment : [comment];
         const cleanedSelections = selectedComments
           .map((item) => cleanText(item))
@@ -766,15 +872,77 @@ export function registerRoutes(app, { models, openai }) {
           if (selection.length > LIMITS.selectedComment) {
             return res.status(400).json({ message: 'Selected comments are too long.' });
           }
+          if (!isTargetPlaceholderComment(selection)) {
+            selectedItems.push({ category: categoryName, comment: selection });
+          }
         }
         if (cleanedSelections.length > 0) {
-          prompt += `${category.replace(/-/g, ' ')}: ${cleanedSelections.join('; ')}\n`;
+          prompt += `${categoryLabel}: ${cleanedSelections.join('; ')}\n`;
         }
+      }
+
+      const cleanedStrengthFocus = strengthFocusItems
+        .map((item) => {
+          if (!item) {
+            return null;
+          }
+          if (typeof item === 'string') {
+            const topic = cleanAndLimit(item, LIMITS.strengthFocusTopic);
+            return topic ? { topic, level: 'strong' } : null;
+          }
+          const topic = cleanAndLimit(item.topic, LIMITS.strengthFocusTopic);
+          const level = cleanAndLimit(item.level, LIMITS.strengthFocusLevel);
+          if (!topic || !level) {
+            return null;
+          }
+          return { topic, level };
+        })
+        .filter(Boolean);
+
+      if (cleanedStrengthFocus.length > 0) {
+        const focusSummary = cleanedStrengthFocus
+          .map((item) => `${item.topic} (${item.level})`)
+          .join('; ');
+        prompt += `Subject strength focus for paragraph 3 (include at least one): ${focusSummary}\n`;
+        cleanedStrengthFocus.forEach((item) => {
+          selectedItems.push({ category: 'Strength focus', comment: `${item.topic} (${item.level})` });
+        });
       }
 
       if (cleanedAdditionalComments) {
         prompt += `The following additional comments should be woven into the whole report: ${cleanedAdditionalComments}\n`;
       }
+
+      if (subjectDescription && selectedItems.length > 0 && !allowIrrelevant) {
+        const relevanceResponse = await openai.responses.parse({
+          ...buildOpenAIParams(req),
+          input: [{ role: 'user', content: buildRelevancePrompt(subjectDescription, selectedItems) }],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'comment_relevance',
+              schema: relevanceSchema,
+              strict: true
+            }
+          },
+          max_output_tokens: 800,
+          temperature: 0.2
+        });
+        logRequestId(relevanceResponse, 'comment-relevance');
+
+        const relevance = relevanceResponse.output_parsed || {};
+        const flagged = Array.isArray(relevance.flagged) ? relevance.flagged : [];
+        const filteredFlagged = flagged.filter((item) => !isTargetPlaceholderComment(item.comment));
+
+        if (filteredFlagged.length > 0) {
+          return res.status(422).json({
+            message: 'Some selected comments may be out of scope for the subject description.',
+            flagged: filteredFlagged
+          });
+        }
+      }
+
+      prompt += 'Write the report in a natural, human voice as if written by the class teacher. Use specific detail from the selected comments, avoid generic filler, and keep it personal to the pupil. Paragraph 3 must include at least one subject-specific strength tied to a topic or aspect of the subject. Do not introduce topics that are not supported by the subject description or selected comments. Weave any additional comments across the whole report rather than in a single paragraph.\n';
 
       const response = await openai.responses.parse({
         ...buildOpenAIParams(req),
@@ -823,6 +991,13 @@ export function registerRoutes(app, { models, openai }) {
     const userId = req.session.user.id;
 
     try {
+      const subjectContext = await SubjectContext.findOne({
+        where: { subjectId, yearGroupId, userId }
+      });
+      const subjectDescription = subjectContext?.subjectDescription
+        ? subjectContext.subjectDescription.trim()
+        : '';
+
       const placeholder = 'PUPIL_NAME';
       const safePupilNames = typeof pupilNames === 'string' ? pupilNames.trim() : '';
       const safeReports = typeof reports === 'string' ? reports.trim() : '';
@@ -853,6 +1028,8 @@ export function registerRoutes(app, { models, openai }) {
 
       const extractionPrompt = `
 Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports.
+Subject description (scope for this year group):
+${subjectDescription || 'Not provided.'}
 Rules:
 - Use no more than 5 categories aligned to the report structure:
   1) Topics studied / knowledge / skills acquired
@@ -861,10 +1038,12 @@ Rules:
   4) Areas for development / targets toward end-of-year Teacher Target
   5) General / Other (only for comments that do not fit above)
 - Use the category names above (shorten slightly if needed but keep clear alignment).
-- No more than 8 comments per category; merge or remove similar comments.
+- No more than 10 comments per category (including any new comments you add); merge or remove similar comments.
 - Keep each comment concise and standalone (aim for 12 words or fewer).
 - Order comments from least able to most able; cover a range of abilities/behaviours.
-- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "***Generate a target for this pupil and add to the report***".
+- Keep knowledge/skills comments aligned to the subject description. Effort/behaviour/attendance comments are always allowed.
+- Add 1-3 helpful new comments per category to fill likely gaps, grounded in the subject description and typical classroom expectations. If you cannot justify a new comment from the subject description, do not add it.
+- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "${TARGET_PLACEHOLDER_COMMENT}".
 
 Reports:
 ${reportsWithPlaceholder}
@@ -887,7 +1066,29 @@ ${reportsWithPlaceholder}
       logRequestId(extractResponse, 'import-reports-extract');
 
       const extracted = extractResponse.output_parsed || {};
-      const newCategories = normalizeCategories(extracted.categories || []);
+      let newCategories = normalizeCategories(extracted.categories || []);
+      const newItems = subjectDescription ? buildCommentItems(newCategories) : [];
+
+      if (subjectDescription && newItems.length > 0) {
+        const relevanceResponse = await openai.responses.parse({
+          ...buildOpenAIParams(req),
+          input: [{ role: 'user', content: buildRelevancePrompt(subjectDescription, newItems) }],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'comment_relevance_import',
+              schema: relevanceSchema,
+              strict: true
+            }
+          },
+          max_output_tokens: 1200,
+          temperature: 0.2
+        });
+        logRequestId(relevanceResponse, 'import-reports-relevance');
+        const relevance = relevanceResponse.output_parsed || {};
+        const flagged = Array.isArray(relevance.flagged) ? relevance.flagged : [];
+        newCategories = filterCategoryMapByRelevance(newCategories, flagged);
+      }
 
       const existingCategories = await Category.findAll({
         where: { subjectId, yearGroupId, userId },
@@ -901,6 +1102,8 @@ ${reportsWithPlaceholder}
         }));
 
         const mergePrompt = `I have two sets of categories and comments for student reports. Merge them into a single set aligned to the report structure.
+Subject description (scope for this year group):
+${subjectDescription || 'Not provided.'}
 Rules:
 - Use no more than 5 categories aligned to:
   1) Topics studied / knowledge / skills acquired
@@ -909,10 +1112,12 @@ Rules:
   4) Areas for development / targets toward end-of-year Teacher Target
   5) General / Other (only for comments that do not fit above)
 - If categories are similar, merge them. Use the category names above (shorten slightly if needed but keep clear alignment).
-- No more than 8 comments per category; merge or remove similar comments.
+- No more than 10 comments per category (including any new comments you add); merge or remove similar comments.
 - Keep each comment concise and standalone (aim for 12 words or fewer).
 - Keep comments ordered from least able to most able.
-- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "***Generate a target for this pupil and add to the report***".
+- Keep knowledge/skills comments aligned to the subject description. Effort/behaviour/attendance comments are always allowed.
+- Add 1-3 helpful new comments per category to fill likely gaps, grounded in the subject description and typical classroom expectations. If you cannot justify a new comment from the subject description, do not add it.
+- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "${TARGET_PLACEHOLDER_COMMENT}".
 - Give priority to the New categories and comments.
 
 Existing categories and comments:
@@ -939,7 +1144,28 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
         logRequestId(mergeResponse, 'import-reports-merge');
 
         const mergedParsed = mergeResponse.output_parsed || {};
-        const mergedCategories = normalizeCategories(mergedParsed.categories || []);
+        let mergedCategories = normalizeCategories(mergedParsed.categories || []);
+        const mergedItems = subjectDescription ? buildCommentItems(mergedCategories) : [];
+        if (subjectDescription && mergedItems.length > 0) {
+          const relevanceResponse = await openai.responses.parse({
+            ...buildOpenAIParams(req),
+            input: [{ role: 'user', content: buildRelevancePrompt(subjectDescription, mergedItems) }],
+            text: {
+              format: {
+                type: 'json_schema',
+                name: 'comment_relevance_merge',
+                schema: relevanceSchema,
+                strict: true
+              }
+            },
+            max_output_tokens: 1200,
+            temperature: 0.2
+          });
+          logRequestId(relevanceResponse, 'import-reports-merge-relevance');
+          const relevance = relevanceResponse.output_parsed || {};
+          const flagged = Array.isArray(relevance.flagged) ? relevance.flagged : [];
+          mergedCategories = filterCategoryMapByRelevance(mergedCategories, flagged);
+        }
 
         await Category.destroy({ where: { subjectId, yearGroupId, userId } });
 
