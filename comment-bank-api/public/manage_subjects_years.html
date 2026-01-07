@@ -105,6 +105,22 @@
             }
         }
 
+        function resolveSubjectOption(subject) {
+            const nested = subject?.Subject || subject?.subject;
+            return {
+                id: nested?.id ?? subject?.subjectId ?? subject?.id ?? '',
+                name: nested?.name ?? subject?.name ?? ''
+            };
+        }
+
+        function resolveYearGroupOption(yearGroup) {
+            const nested = yearGroup?.YearGroup || yearGroup?.yearGroup;
+            return {
+                id: nested?.id ?? yearGroup?.yearGroupId ?? yearGroup?.id ?? '',
+                name: nested?.name ?? yearGroup?.name ?? ''
+            };
+        }
+
         async function loadSubjects(userSubjects) {
             const response = await fetch('/api/subjects');
             const subjects = await response.json();
@@ -113,9 +129,13 @@
 
             const selectedSubjects = userSubjects.length ? userSubjects : subjects;
             selectedSubjects.forEach(subject => {
+                const { id, name } = resolveSubjectOption(subject);
+                if (!id || !name) {
+                    return;
+                }
                 const option = document.createElement('option');
-                option.value = subject.id;
-                option.textContent = subject.name;
+                option.value = id;
+                option.textContent = name;
                 subjectSelect.appendChild(option);
             });
         }
@@ -128,9 +148,13 @@
 
             const selectedYearGroups = globalUserYearGroups.length ? globalUserYearGroups : yearGroups;
             selectedYearGroups.forEach(yearGroup => {
+                const { id, name } = resolveYearGroupOption(yearGroup);
+                if (!id || !name) {
+                    return;
+                }
                 const option = document.createElement('option');
-                option.value = yearGroup.id;
-                option.textContent = yearGroup.name;
+                option.value = id;
+                option.textContent = name;
                 yearGroupSelect.appendChild(option);
             });
         }
