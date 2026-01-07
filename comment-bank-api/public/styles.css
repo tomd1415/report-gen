@@ -1,27 +1,34 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
-/* Custom styles for Exhall Grange Specialist School */
-body {
-    font-family: 'Arial', sans-serif;
-    margin: 20px;
-    background-color: #f8f9fa;
-    color: #333;
-}
-
-.report-page {
+/* Theme tokens */
+:root {
     --ink: #1e1f24;
     --muted: #5b6472;
     --panel: #ffffff;
     --panel-alt: #f5f7fb;
     --accent: #1c6b7b;
     --accent-dark: #0f4f5c;
+    --accent-soft: #e6f3f7;
     --highlight: #f1d48b;
     --warning: #b45309;
+    --danger: #c2410c;
+    --border: rgba(28, 107, 123, 0.2);
+    --shadow: 0 12px 40px rgba(30, 31, 36, 0.12);
+}
+
+/* Custom styles for Exhall Grange Specialist School */
+body {
     font-family: 'Manrope', 'Noto Sans', sans-serif;
-    color: var(--ink);
+    margin: 20px;
     background: radial-gradient(circle at 20% 20%, #f9f2e4 0%, transparent 45%),
         radial-gradient(circle at 80% 0%, #e6f3f7 0%, transparent 50%),
         #f3f1ec;
+    color: var(--ink);
+    line-height: 1.5;
+}
+
+.report-page {
+    color: var(--ink);
 }
 
 .report-page h1,
@@ -34,10 +41,49 @@ body {
     font-family: 'Space Grotesk', 'Manrope', sans-serif;
 }
 
+h1,
+h2,
+h3,
+h4,
+nav a,
+.button,
+.step-tab {
+    font-family: 'Space Grotesk', 'Manrope', sans-serif;
+}
+
+.bg-light-blue {
+    background-color: var(--panel-alt);
+}
+
+.border-blue {
+    border-color: var(--accent);
+}
+
+.text-dark-blue {
+    color: var(--accent-dark);
+}
+
+.text-dark-gray {
+    color: var(--muted);
+}
+
+.text-yellow {
+    color: var(--highlight);
+}
+
+a {
+    color: var(--accent-dark);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
 .report-page .container {
     background-color: var(--panel);
     border-radius: 16px;
-    box-shadow: 0 12px 40px rgba(30, 31, 36, 0.12);
+    box-shadow: var(--shadow);
 }
 
 .report-page .button {
@@ -64,12 +110,20 @@ body {
 }
 
 /* Header and Footer Styles */
-header, footer {
-    background-color: #ffffff;
-    color: #002D72;
+header {
+    background-color: var(--panel);
+    color: var(--accent-dark);
     padding: 15px 20px;
     text-align: center;
-    border-bottom: 4px solid #002D72;
+    border-bottom: 2px solid var(--accent);
+}
+
+footer {
+    background-color: var(--panel);
+    color: var(--accent-dark);
+    padding: 15px 20px;
+    text-align: center;
+    border-top: 2px solid var(--accent);
 }
 
 header img {
@@ -78,16 +132,16 @@ header img {
 }
 
 nav {
-    background-color: #006699;
-    padding: 2px;
+    background-color: var(--accent);
+    padding: 6px 10px;
     text-align: center;
 }
 
 nav a {
     color: #ffffff;
-    margin: 0 15px;
+    margin: 0 12px;
     text-decoration: none;
-    font-weight: bold;
+    font-weight: 600;
 }
 
 nav a:hover {
@@ -99,9 +153,9 @@ nav a:hover {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
-    background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: var(--panel);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
 }
 
 .form-section {
@@ -111,7 +165,7 @@ nav a:hover {
 label {
     display: block;
     margin-bottom: 5px;
-    color: #333;
+    color: var(--muted);
     font-weight: bold;
 }
 
@@ -119,9 +173,19 @@ select, input, textarea, button {
     width: 100%;
     padding: 10px;
     margin: 5px 0 15px 0;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     box-sizing: border-box;
+    font-family: inherit;
+    color: var(--ink);
+}
+
+select:focus,
+input:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(28, 107, 123, 0.15);
 }
 
 input[type="checkbox"] {
@@ -136,32 +200,33 @@ textarea {
 }
 
 .button {
-    background-color: #006699;
+    background-color: var(--accent);
     color: white;
-    padding: 10px 20px;
+    padding: 8px 16px;
     border: none;
-    border-radius: 4px;
+    border-radius: 999px;
     cursor: pointer;
+    transition: background-color 0.2s ease;
 }
 
 .button:hover {
-    background-color: #157a2f;
+    background-color: var(--accent-dark);
 }
 
 .button.delete {
-    background-color: #f44336;
+    background-color: var(--danger);
 }
 
 .button.delete:hover {
-    background-color: #e53935;
+    background-color: #9a3412;
 }
 
 .result-section {
     margin-top: 20px;
     padding: 1rem;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    border: 2px solid #333;
+    background-color: #f9fbfc;
+    border-radius: 14px;
+    border: 1px solid var(--border);
 }
 
 /* Category and Comment Styles */
@@ -173,14 +238,14 @@ textarea {
 }
 /* category on the edit page */
 .category {
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
     padding: 10px;
     width: calc(50% - 20px);
     box-sizing: border-box;
     position: relative;
-    background-color: #fff;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: var(--panel);
+    box-shadow: 0 8px 18px rgba(15, 34, 44, 0.08);
 }
 
 .category h3 {
@@ -188,7 +253,7 @@ textarea {
     margin-top: 0;
     margin-bottom: 10px;
     display: inline-block;
-    color: #002D72;
+    color: var(--accent-dark);
 }
 
 .category .button.delete {
@@ -196,11 +261,11 @@ textarea {
 }
 
 .comment {
-    border: 2px solid #aaa;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     padding: 8px;
     margin-bottom: 5px;
-    background-color: #f9f9f9;
+    background-color: var(--panel-alt);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -220,6 +285,8 @@ textarea {
     width: 120px;
     padding: 2px;
     margin-right: 5px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
 }
 
 .comment .button.delete {
@@ -257,7 +324,7 @@ nav ul li a:hover {
 }
 
 .footer-content a {
-    color: #ffcc00;
+    color: var(--highlight);
     text-decoration: none;
 }
 
@@ -267,7 +334,7 @@ nav ul li a:hover {
 
 .sample-prompt {
     font-style: italic;
-    color: #666;
+    color: var(--muted);
 }
 
 /* Modal Styles */
@@ -284,11 +351,12 @@ nav ul li a:hover {
 }
 
 .modal-content {
-    background: white;
+    background: var(--panel);
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 16px;
     width: 80%;
     max-width: 500px;
+    box-shadow: var(--shadow);
 }
 
 .hidden {
@@ -305,19 +373,17 @@ nav ul li a:hover {
 .comment-category {
     flex: 1 1 100%;
     box-sizing: border-box;
-    background-color: rgb(171, 230, 225);
-    border: 2px solid #002D72;
-    border-radius: 8px;
+    background-color: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     margin-top: 5px;
     margin-bottom: 5px;
     padding: 16px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 24px rgba(15, 34, 44, 0.08);
 }
 
 .report-page .comment-category {
-    background-color: var(--panel-alt);
     border-color: rgba(28, 107, 123, 0.35);
-    box-shadow: 0 12px 24px rgba(15, 34, 44, 0.08);
 }
 
 .comment-category.is-hidden {
@@ -797,11 +863,11 @@ nav ul li a:hover {
 .comment-category select {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
     text-align: center;
     font-size: large;
-    background-color: #e3f2fd;
+    background-color: var(--accent-soft);
 }
 
 
@@ -811,7 +877,7 @@ nav ul li a:hover {
     justify-content: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: #8092B2 1px solid;
+    border-bottom: 1px solid var(--border);
 }
 
 .subject-year .form-section {
@@ -824,12 +890,12 @@ nav ul li a:hover {
 .subject-year .form-section select {
     width: 15em;
     padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     text-align: center;
     font-size: larger;
-    background-color: #e3f2fd;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: var(--accent-soft);
+    box-shadow: 0 8px 16px rgba(15, 34, 44, 0.08);
 }
 
 #name-pronoun-section {
@@ -849,12 +915,12 @@ nav ul li a:hover {
 #name-pronoun-section input[type="text"] {
     width: 15em;
     padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     text-align: center;
     font-size: larger;
-    background-color: #e3f2fd;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: var(--accent-soft);
+    box-shadow: 0 8px 16px rgba(15, 34, 44, 0.08);
 }
 
 /* Styles for Inline Display of Pupil Details */
@@ -886,10 +952,10 @@ nav ul li a:hover {
 .main-title {
     text-align: center;
     font-size: 2em;
-    color: #002D72;
+    color: var(--accent-dark);
     margin-bottom: 20px;
-    border-top: #002D72 solid 4px;
-    border-bottom: #002D72 solid 4px;
+    border-top: 3px solid var(--accent);
+    border-bottom: 3px solid var(--accent);
     padding: 7px;
     margin-top: -10px;
 }
@@ -941,11 +1007,11 @@ nav ul li a:hover {
 }
 
 .savePromptDisabled {
-    background-color: #666;
+    background-color: #64748b;
 }
 
 .savePromptDisabled:hover {
-    background-color: #666;
+    background-color: #64748b;
 }
 
 .main-menu {
@@ -958,25 +1024,25 @@ nav ul li a:hover {
  }
 .main-menu ul li {
     display: inline-block;
-    border: #002D72 solid 0px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-top: none;
     border-bottom: none;
     /*border-top: #002D52 solid 1px;
     border-bottom: #002D52 solid 1px;*/
-    border-radius: 2px;
-    box-shadow: #002D72 0px 1px 1px 0px;
+    border-radius: 999px;
+    box-shadow: 0 6px 14px rgba(15, 34, 44, 0.15);
     margin-left: 3px;
     margin-right: 3px;
     margin-top: 4px;
     margin-bottom: 6px;
     padding-top: 10px;
     padding-bottom: 10px;
-    background-color: #006699 /*#337fad;*/
+    background-color: var(--accent);
     
 }
 
 .main-menu ul li:hover {
-    background-color: #002D72;
+    background-color: var(--accent-dark);
 }
 
 #copy-report-btn {
