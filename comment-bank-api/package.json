@@ -4,27 +4,35 @@
   "main": "server.mjs",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "node server.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.7.2",
-    "body-parser": "^1.20.2",
+    "axios": "^1.13.2",
     "cors": "^2.8.5",
-    "csv-parser": "^3.0.0",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "fs": "^0.0.1-security",
-    "https": "^1.0.0",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
+    "express-session": "^1.18.2",
     "json2csv": "^6.0.0-alpha.2",
-    "mariadb": "^3.3.0",
-    "multer": "^1.4.5-lts.1",
-    "mysql2": "^3.10.0",
-    "openai": "^4.47.1",
-    "sequelize": "^6.37.3"
+    "mariadb": "^3.4.5",
+    "multer": "^2.0.2",
+    "mysql2": "^3.16.0",
+    "openai": "^6.15.0",
+    "sequelize": "^6.37.7",
+    "bcrypt": "^6.0.0",
+    "connect-session-sequelize": "^8.0.4",
+    "umzug": "^3.8.2"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3",
+    "supertest": "^6.3.4",
+    "vitest": "^4.0.16"
   },
   "description": ""
 }

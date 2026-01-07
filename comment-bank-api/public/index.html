@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="manifest" href="/site.webmanifest">
 </head>
-<body class="bg-light-blue text-dark-gray">
+<body class="bg-light-blue text-dark-gray report-page">
 
     <div id="header-placeholder"></div>
     <div class="container bg-light-blue rounded-lg shadow-lg">
@@ -37,27 +37,92 @@
 
             <div id="name-pronoun-section" class="flex-center">
                 <div class="flex-col-center">
-                    <input type="text" id="pupil-name" required placeholder="Pupil's First Name" class="input-text">
+                    <input type="text" id="pupil-name" required maxlength="80" placeholder="Pupil's First Name" class="input-text">
                     <label for="pupil-name" class="block text-center">Pupil's First Name</label>
                 </div>
                 <div class="flex-col-center">
-                    <input type="text" id="pupil-pronouns" placeholder="Pupil's Pronouns" class="input-text">
+                    <input type="text" id="pupil-pronouns" maxlength="60" placeholder="Pupil's Pronouns" class="input-text">
                     <label for="pupil-pronouns" class="block text-center">Pronouns</label>
                 </div>
             </div>
 
-            <div id="categories-container" class="comment-categories-container">
-                <!-- Dynamic content will be added here -->
+            <div class="context-row">
+                <div class="form-section" id="subject-description-wrapper" style="display: none;">
+                    <label for="subject-description">Subject description (shown before the report, not repeated in the report):</label>
+                    <textarea id="subject-description" rows="4" readonly placeholder="No subject description set for this subject/year."></textarea>
+                </div>
+
+                <div class="form-section" id="word-limit-wrapper" style="display: none;">
+                    <label for="word-limit">Target word limit (optional):</label>
+                    <input type="number" id="word-limit" min="1" placeholder="e.g. 140">
+                </div>
             </div>
 
-            <div class="form-section" id="additional-comments-wrapper">
-                <label for="additional-comments">Additional Comments:</label>
-                <textarea id="additional-comments" rows="4" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
-            </div>
+            <div class="report-builder" id="report-builder" style="display: none;">
+                <section class="builder-main">
+                    <div class="builder-header">
+                        <div class="step-tabs" id="step-tabs"></div>
+                        <div class="builder-toolbar">
+                            <div class="filter-bar">
+                                <input type="text" id="comment-filter" class="filter-input" placeholder="Search comments in this paragraph...">
+                                <label class="toggle-pill">
+                                    <input type="checkbox" id="selected-only">
+                                    <span>Selected only</span>
+                                </label>
+                            </div>
+                            <div class="category-controls" id="category-controls" style="display: none;">
+                                <button type="button" class="button inline-button" id="toggle-categories" onclick="toggleAllCategories()">Collapse all</button>
+                            </div>
+                        </div>
+                    </div>
 
-            <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
+                    <div id="relevance-warning" class="warning-panel hidden">
+                        <div class="warning-header">
+                            <h3>Some selected comments may be out of scope</h3>
+                            <p>Review the highlighted comments or continue anyway.</p>
+                        </div>
+                        <div id="relevance-list" class="warning-list"></div>
+                        <div class="warning-actions">
+                            <button type="button" class="button inline-button" onclick="generateReport({ override: true })">Generate anyway</button>
+                            <button type="button" class="button inline-button" onclick="dismissRelevanceWarning()">Review selections</button>
+                        </div>
+                    </div>
+
+                    <div id="categories-container" class="comment-categories-container">
+                        <!-- Dynamic content will be added here -->
+                    </div>
+
+                    <div class="form-section strength-focus" id="strength-focus-wrapper" style="display: none;">
+                        <div class="strength-focus-header">
+                            <h3>Subject strengths focus (optional)</h3>
+                            <p>Pick a topic or aspect and how strong the pupil is. Paragraph 3 will include at least one.</p>
+                        </div>
+                        <div id="strength-focus-list" class="strength-focus-list"></div>
+                        <button type="button" class="button inline-button" onclick="addStrengthFocusRow()">Add strength focus</button>
+                    </div>
+
+                    <div class="form-section" id="additional-comments-wrapper">
+                        <label for="additional-comments">Additional Comments:</label>
+                        <textarea id="additional-comments" rows="4" maxlength="1000" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
+                    </div>
+
+                    <div id="result-container" class="result-section">
+                        <p class="preview-placeholder">Generated report will appear here after you click Generate.</p>
+                    </div>
+                </section>
+
+                <aside class="builder-summary">
+                    <div class="summary-card">
+                        <div class="summary-header">
+                            <h2>Selections</h2>
+                            <p>Quick view of chosen comments.</p>
+                        </div>
+                        <div id="selection-summary" class="selection-summary"></div>
+                    </div>
+                    <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
+                </aside>
+            </div>
         </div>
-        <div id="result-container" class="result-section"></div>
 
     </div>
 
@@ -66,7 +131,7 @@
     <div id="add-comment-modal" class="modal hidden">
         <div class="modal-content">
             <h2 class="modal-title">Add New Comment</h2>
-            <textarea id="new-comment-text" rows="4" class="textarea mb-4" placeholder="Enter new comment"></textarea>
+            <textarea id="new-comment-text" rows="4" maxlength="300" class="textarea mb-4" placeholder="Enter new comment"></textarea>
             <div class="modal-buttons">
                 <button class="button cancel" onclick="closeModal()">Cancel</button>
                 <button class="button save" onclick="saveNewComment()">Save Comment</button>
@@ -74,6 +139,7 @@
         </div>
     </div>
 
+    <script type="module" src="report-selection.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", async function () {
             if (!await isAuthenticated()) {
@@ -168,96 +234,589 @@
                 document.getElementById('name-pronoun-section').style.display = 'flex';
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
 
-                const [categoriesResponse, promptPartResponse] = await Promise.all([
+                const [categoriesResponse, promptPartResponse, subjectContextResponse] = await Promise.all([
                     fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
-                    fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
+                    fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
+                    fetch(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
                 ]);
 
                 const categories = await categoriesResponse.json();
                 promptPart = await promptPartResponse.text();
+                const subjectContext = subjectContextResponse.ok ? await subjectContextResponse.json() : {};
 
                 console.log('Fetched categories:', categories);
                 console.log('Fetched prompt part:', promptPart);
+                console.log('Fetched subject context:', subjectContext);
+
+                document.getElementById('subject-description').value = subjectContext.subjectDescription || '';
+                document.getElementById('word-limit').value = subjectContext.wordLimit || '';
+                document.getElementById('subject-description-wrapper').style.display = 'block';
+                document.getElementById('word-limit-wrapper').style.display = 'block';
+                document.getElementById('report-builder').style.display = 'grid';
+                document.getElementById('comment-filter').value = '';
+                document.getElementById('selected-only').checked = false;
+                clearRelevanceWarning();
 
                 const categoriesContainer = document.getElementById('categories-container');
                 categoriesContainer.innerHTML = ''; // Clear previous options
 
-                categories.forEach(category => {
+                const selectionHelper = window.ReportSelection;
+                if (!selectionHelper) {
+                    alert('Unable to load selection tools. Please refresh the page.');
+                    return;
+                }
+
+                const stepPresence = {
+                    topics: false,
+                    effort: false,
+                    strengths: false,
+                    development: false,
+                    other: false
+                };
+
+                categories.forEach((category) => {
                     const categoryDiv = document.createElement('div');
                     categoryDiv.classList.add('form-section', 'comment-category');
+                    categoryDiv.dataset.categoryId = category.id;
+                    categoryDiv.dataset.categoryName = category.name;
+                    const groupKey = selectionHelper.matchCategoryGroup(category.name) || 'other';
+                    categoryDiv.dataset.group = groupKey;
+                    stepPresence[groupKey] = true;
 
-                    const label = document.createElement('label');
-                    label.for = category.name.toLowerCase().replace(' ', '-');
-                    label.textContent = category.name + ':';
-                    categoryDiv.appendChild(label);
+                    const header = document.createElement('div');
+                    header.classList.add('comment-category-header');
 
-                    const select = document.createElement('select');
-                    select.id = category.name.toLowerCase().replace(' ', '-');
-                    select.innerHTML = '<option value="">-- Select Comment --</option>';
-                    select.classList.add('dropdown');
+                    const headerLeft = document.createElement('div');
+                    headerLeft.classList.add('comment-category-label');
 
-                    category.Comments.forEach(comment => {
-                        const option = document.createElement('option');
-                        option.value = comment.text;
-                        option.textContent = comment.text;
-                        select.appendChild(option);
+                    const title = document.createElement('h3');
+                    title.classList.add('comment-category-title');
+                    title.textContent = category.name;
+                    headerLeft.appendChild(title);
+
+                    const countBadge = document.createElement('span');
+                    countBadge.classList.add('category-selected-count');
+                    countBadge.textContent = '0 selected';
+                    headerLeft.appendChild(countBadge);
+
+                    header.appendChild(headerLeft);
+
+                    const toggleButton = document.createElement('button');
+                    toggleButton.type = 'button';
+                    toggleButton.classList.add('button', 'inline-button', 'toggle-button');
+                    toggleButton.textContent = 'Collapse';
+                    toggleButton.setAttribute('aria-expanded', 'true');
+                    toggleButton.addEventListener('click', () => {
+                        toggleCategory(categoryDiv, toggleButton);
+                    });
+                    header.appendChild(toggleButton);
+
+                    categoryDiv.appendChild(header);
+
+                    const optionsContainer = document.createElement('div');
+                    optionsContainer.classList.add('comment-options');
+
+                    category.Comments.forEach((comment) => {
+                        appendCommentCheckbox(optionsContainer, comment.text, category.id);
                     });
 
-                    // Add option to add new comment
-                    const addOption = document.createElement('option');
-                    addOption.value = "add-new";
-                    addOption.textContent = "Add new comment";
-                    select.appendChild(addOption);
+                    categoryDiv.appendChild(optionsContainer);
 
-                    select.addEventListener('change', () => {
-                        if (select.value === "add-new") {
-                            currentCategorySelect = select; // Keep track of the current select element
-                            openModal(category.id);
-                        }
+                    const addButton = document.createElement('button');
+                    addButton.type = 'button';
+                    addButton.classList.add('button', 'inline-button', 'addcomment');
+                    addButton.textContent = 'Add comment';
+                    addButton.addEventListener('click', () => {
+                        openModal(category.id);
                     });
-
-                    categoryDiv.appendChild(select);
+                    categoryDiv.appendChild(addButton);
                     categoriesContainer.appendChild(categoryDiv);
                 });
+                const firstStep = setupStepTabs(stepPresence);
+                setActiveStep(firstStep || 'topics');
+                updateSelectionSummary();
+                setupFilters();
+                setupAdditionalCommentPreview();
+                setupStrengthFocus();
+                setValidationState(false);
+                setAllCategoriesCollapsed(false);
+                document.getElementById('category-controls').style.display = categories.length ? 'flex' : 'none';
                 document.getElementById('additional-comments-wrapper').style.display = 'block';
                 document.getElementById('generate-report').style.display = 'block';
             }
         }
 
-        let currentCategorySelect = null;
+        let currentCategoryContainer = null;
+        let activeStep = 'topics';
+        let filterInitialized = false;
+        let additionalListenerBound = false;
+        let validationActive = false;
+        let categoriesCollapsed = false;
 
-        async function addNewComment(categoryId, selectElement) {
-            const commentText = prompt('Enter the new comment:');
-            if (commentText) {
-                try {
-                    const response = await fetch('/api/comments', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ text: commentText, categoryId })
-                    });
-                    if (!response.ok) {
-                        console.error('Error adding comment:', response.statusText);
-                        alert('Error adding comment.');
-                        return;
-                    }
-                    const newComment = await response.json();
-                    const option = document.createElement('option');
-                    option.value = newComment.text;
-                    option.textContent = newComment.text;
-                    selectElement.appendChild(option);
-                    selectElement.value = newComment.text; // Select the newly added comment
-                } catch (error) {
-                    console.error('Error adding comment:', error);
-                    alert('Error adding comment.');
+        const stepDefinitions = [
+            { key: 'topics', label: 'Paragraph 1', subtitle: 'Topics and skills' },
+            { key: 'effort', label: 'Paragraph 2', subtitle: 'Effort and attendance' },
+            { key: 'strengths', label: 'Paragraph 3', subtitle: 'Strengths and achievements' },
+            { key: 'development', label: 'Paragraph 4', subtitle: 'Development and targets' },
+            { key: 'other', label: 'Other', subtitle: 'Optional extras', optional: true }
+        ];
+        const strengthLevels = [
+            { value: '', label: 'Select level' },
+            { value: 'exceptional', label: 'Exceptional' },
+            { value: 'strong', label: 'Strong' },
+            { value: 'secure', label: 'Secure' },
+            { value: 'developing', label: 'Developing' },
+            { value: 'emerging', label: 'Emerging' }
+        ];
+        const STRENGTH_FOCUS_MAX = 5;
+
+        function appendCommentCheckbox(container, text, categoryId, checked = false) {
+            const label = document.createElement('label');
+            label.classList.add('checkbox-option');
+            label.dataset.comment = text;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = text;
+            checkbox.name = `category-${categoryId}`;
+            checkbox.checked = checked;
+            checkbox.addEventListener('change', () => {
+                updateSelectionSummary();
+                applyFilters();
+                clearRelevanceWarning();
+            });
+
+            const span = document.createElement('span');
+            span.textContent = text;
+
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            container.appendChild(label);
+        }
+
+        function toggleCategory(categoryDiv, toggleButton) {
+            const isCollapsed = categoryDiv.classList.toggle('is-collapsed');
+            toggleButton.textContent = isCollapsed ? 'Expand' : 'Collapse';
+            toggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+        }
+
+        function setAllCategoriesCollapsed(collapsed) {
+            categoriesCollapsed = collapsed;
+            const categorySections = document.querySelectorAll('.comment-category');
+            categorySections.forEach(section => {
+                section.classList.toggle('is-collapsed', collapsed);
+                const toggle = section.querySelector('.toggle-button');
+                if (toggle) {
+                    toggle.textContent = collapsed ? 'Expand' : 'Collapse';
+                    toggle.setAttribute('aria-expanded', String(!collapsed));
                 }
+            });
+            const toggleButton = document.getElementById('toggle-categories');
+            if (toggleButton) {
+                toggleButton.textContent = collapsed ? 'Expand all' : 'Collapse all';
             }
+        }
+
+        function expandAllCategories() {
+            setAllCategoriesCollapsed(false);
+        }
+
+        function collapseAllCategories() {
+            setAllCategoriesCollapsed(true);
+        }
+
+        function toggleAllCategories() {
+            setAllCategoriesCollapsed(!categoriesCollapsed);
+        }
+
+        function setupStepTabs(stepPresence) {
+            const tabsContainer = document.getElementById('step-tabs');
+            tabsContainer.innerHTML = '';
+            let firstKey = null;
+            stepDefinitions.forEach(step => {
+                if (step.optional && !stepPresence[step.key]) {
+                    return;
+                }
+                if (!firstKey) {
+                    firstKey = step.key;
+                }
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.classList.add('step-tab');
+                button.dataset.step = step.key;
+                button.innerHTML = `
+                    <span class="step-title">${step.label}</span>
+                    <span class="step-subtitle">${step.subtitle}</span>
+                    <span class="step-status"></span>
+                    <span class="step-count">0</span>
+                `;
+                button.addEventListener('click', () => setActiveStep(step.key));
+                tabsContainer.appendChild(button);
+            });
+            return firstKey;
+        }
+
+        function setActiveStep(stepKey) {
+            activeStep = stepKey;
+            document.querySelectorAll('.step-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.step === stepKey);
+            });
+            document.querySelectorAll('.comment-category').forEach(section => {
+                const matches = section.dataset.group === stepKey;
+                section.classList.toggle('is-hidden', !matches);
+            });
+            const strengthFocus = document.getElementById('strength-focus-wrapper');
+            if (strengthFocus) {
+                strengthFocus.style.display = stepKey === 'strengths' ? 'block' : 'none';
+            }
+            applyFilters();
+        }
+
+        function setupFilters() {
+            if (filterInitialized) {
+                return;
+            }
+            const filterInput = document.getElementById('comment-filter');
+            const selectedOnly = document.getElementById('selected-only');
+            filterInput.addEventListener('input', applyFilters);
+            selectedOnly.addEventListener('change', applyFilters);
+            filterInitialized = true;
+        }
+
+        function setupAdditionalCommentPreview() {
+            if (additionalListenerBound) {
+                return;
+            }
+            const additional = document.getElementById('additional-comments');
+            if (additional) {
+                additional.addEventListener('input', updateSelectionSummary);
+                additionalListenerBound = true;
+            }
+        }
+
+        function setValidationState(active) {
+            validationActive = active;
+            const builder = document.getElementById('report-builder');
+            if (builder) {
+                builder.classList.toggle('validation-active', active);
+            }
+        }
+
+        function setupStrengthFocus() {
+            const list = document.getElementById('strength-focus-list');
+            if (!list) {
+                return;
+            }
+            list.innerHTML = '';
+            addStrengthFocusRow(true);
+        }
+
+        function createStrengthFocusRow({ topic = '', level = '' } = {}) {
+            const row = document.createElement('div');
+            row.classList.add('strength-focus-row');
+
+            const topicInput = document.createElement('input');
+            topicInput.type = 'text';
+            topicInput.maxLength = 80;
+            topicInput.placeholder = 'Topic or aspect (e.g. fractions, map skills)';
+            topicInput.classList.add('strength-topic');
+            topicInput.value = topic;
+            topicInput.addEventListener('input', () => {
+                updateSelectionSummary();
+                clearRelevanceWarning();
+            });
+
+            const levelSelect = document.createElement('select');
+            levelSelect.classList.add('strength-level');
+            strengthLevels.forEach((levelOption) => {
+                const option = document.createElement('option');
+                option.value = levelOption.value;
+                option.textContent = levelOption.label;
+                if (levelOption.value === level) {
+                    option.selected = true;
+                }
+                levelSelect.appendChild(option);
+            });
+            levelSelect.addEventListener('change', () => {
+                updateSelectionSummary();
+                clearRelevanceWarning();
+            });
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.classList.add('button', 'inline-button', 'delete');
+            removeButton.textContent = 'Remove';
+            removeButton.addEventListener('click', () => {
+                removeStrengthFocusRow(removeButton);
+            });
+
+            row.appendChild(topicInput);
+            row.appendChild(levelSelect);
+            row.appendChild(removeButton);
+            return row;
+        }
+
+        function addStrengthFocusRow(skipLimitCheck = false) {
+            const list = document.getElementById('strength-focus-list');
+            if (!list) {
+                return;
+            }
+            if (!skipLimitCheck && list.children.length >= STRENGTH_FOCUS_MAX) {
+                alert(`You can add up to ${STRENGTH_FOCUS_MAX} strength focus items.`);
+                return;
+            }
+            list.appendChild(createStrengthFocusRow());
+            updateSelectionSummary();
+        }
+
+        function removeStrengthFocusRow(button) {
+            const row = button.closest('.strength-focus-row');
+            if (row) {
+                row.remove();
+                updateSelectionSummary();
+            }
+        }
+
+        function collectStrengthFocus() {
+            const rows = document.querySelectorAll('.strength-focus-row');
+            const items = [];
+            const incomplete = [];
+
+            rows.forEach((row, index) => {
+                const topic = row.querySelector('.strength-topic')?.value.trim() || '';
+                const level = row.querySelector('.strength-level')?.value.trim() || '';
+
+                if (!topic && !level) {
+                    return;
+                }
+                if (!topic || !level) {
+                    incomplete.push(index + 1);
+                    return;
+                }
+                items.push({ topic, level });
+            });
+
+            return { items, incomplete };
+        }
+
+        function applyFilters() {
+            const filterInput = document.getElementById('comment-filter');
+            const selectedOnly = document.getElementById('selected-only');
+            if (!filterInput || !selectedOnly) {
+                return;
+            }
+            const query = filterInput.value.trim().toLowerCase();
+            const onlySelected = selectedOnly.checked;
+
+            document.querySelectorAll('.comment-category').forEach(section => {
+                if (section.classList.contains('is-hidden')) {
+                    return;
+                }
+                let visibleCount = 0;
+                section.querySelectorAll('.checkbox-option').forEach(option => {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    const text = option.textContent.toLowerCase();
+                    const matchesQuery = !query || text.includes(query);
+                    const matchesSelected = !onlySelected || checkbox.checked;
+                    const show = matchesQuery && matchesSelected;
+                    option.style.display = show ? '' : 'none';
+                    if (show) {
+                        visibleCount += 1;
+                    }
+                });
+                section.classList.toggle('filtered-empty', visibleCount === 0);
+            });
+        }
+
+        function updateSelectionSummary() {
+            const summaryContainer = document.getElementById('selection-summary');
+            if (!summaryContainer) {
+                return;
+            }
+            const { items: strengthFocusItems } = collectStrengthFocus();
+            const counts = {
+                topics: 0,
+                effort: 0,
+                strengths: 0,
+                development: 0,
+                other: 0
+            };
+            const groupedSelections = {
+                topics: [],
+                effort: [],
+                strengths: [],
+                development: [],
+                other: []
+            };
+
+            document.querySelectorAll('.comment-category').forEach(section => {
+                const groupKey = section.dataset.group;
+                const categoryName = section.dataset.categoryName;
+                const checked = Array.from(section.querySelectorAll('input[type="checkbox"]:checked'));
+                const selectedCount = checked.length;
+                const countBadge = section.querySelector('.category-selected-count');
+                if (countBadge) {
+                    countBadge.textContent = selectedCount ? `${selectedCount} selected` : '0 selected';
+                    countBadge.classList.toggle('has-selection', selectedCount > 0);
+                }
+                counts[groupKey] += checked.length;
+                checked.forEach(input => {
+                    groupedSelections[groupKey].push({ category: categoryName, comment: input.value });
+                });
+            });
+            if (strengthFocusItems.length > 0) {
+                counts.strengths += strengthFocusItems.length;
+            }
+
+            summaryContainer.innerHTML = '';
+            stepDefinitions.forEach(step => {
+                if (step.optional && groupedSelections[step.key].length === 0) {
+                    return;
+                }
+                const section = document.createElement('div');
+                section.classList.add('summary-section');
+                const heading = document.createElement('h4');
+                heading.textContent = step.label;
+                section.appendChild(heading);
+
+                if (groupedSelections[step.key].length === 0) {
+                    const empty = document.createElement('p');
+                    empty.classList.add('summary-empty');
+                    empty.textContent = 'No comments selected yet.';
+                    section.appendChild(empty);
+                } else {
+                    const list = document.createElement('ul');
+                    groupedSelections[step.key].forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.comment}`;
+                        list.appendChild(li);
+                    });
+                    section.appendChild(list);
+                }
+                if (step.key === 'strengths' && strengthFocusItems.length > 0) {
+                    const focusHeading = document.createElement('p');
+                    focusHeading.classList.add('summary-focus-title');
+                    focusHeading.textContent = 'Subject strengths focus';
+                    section.appendChild(focusHeading);
+                    const focusList = document.createElement('ul');
+                    focusList.classList.add('summary-tag-list');
+                    strengthFocusItems.forEach(item => {
+                        const li = document.createElement('li');
+                        li.classList.add('summary-tag');
+                        li.textContent = `${item.topic} (${item.level})`;
+                        focusList.appendChild(li);
+                    });
+                    section.appendChild(focusList);
+                }
+                summaryContainer.appendChild(section);
+            });
+
+            const additional = document.getElementById('additional-comments')?.value.trim();
+            if (additional) {
+                const extraSection = document.createElement('div');
+                extraSection.classList.add('summary-section');
+                const heading = document.createElement('h4');
+                heading.textContent = 'Additional comments';
+                const text = document.createElement('p');
+                text.textContent = additional;
+                extraSection.appendChild(heading);
+                extraSection.appendChild(text);
+                summaryContainer.appendChild(extraSection);
+            }
+
+            const missingRequiredKeys = stepDefinitions
+                .filter(step => !step.optional && (counts[step.key] || 0) === 0)
+                .map(step => step.key);
+
+            if (validationActive && missingRequiredKeys.length === 0) {
+                setValidationState(false);
+            }
+
+            document.querySelectorAll('.step-tab').forEach(tab => {
+                const key = tab.dataset.step;
+                const count = counts[key] || 0;
+                const countNode = tab.querySelector('.step-count');
+                const statusNode = tab.querySelector('.step-status');
+                const stepMeta = stepDefinitions.find(step => step.key === key);
+                if (countNode) {
+                    countNode.textContent = count;
+                }
+                if (statusNode && stepMeta) {
+                    if (!stepMeta.optional) {
+                        statusNode.textContent = count > 0 ? 'Done' : 'Needs selection';
+                    } else {
+                        statusNode.textContent = count > 0 ? 'Selected' : 'Optional';
+                    }
+                }
+                tab.classList.toggle('has-selection', count > 0);
+                tab.classList.toggle('needs-selection', missingRequiredKeys.includes(key));
+            });
+        }
+
+        function showRelevanceWarning(flaggedItems) {
+            const warning = document.getElementById('relevance-warning');
+            const list = document.getElementById('relevance-list');
+            if (!warning || !list) {
+                return;
+            }
+            list.innerHTML = '';
+            flaggedItems.forEach(item => {
+                const row = document.createElement('div');
+                row.classList.add('warning-item');
+                row.innerHTML = `
+                    <strong>${item.category}</strong>
+                    <span>${item.comment}</span>
+                    <em>${item.reason}</em>
+                `;
+                list.appendChild(row);
+            });
+            highlightFlagged(flaggedItems);
+            warning.classList.remove('hidden');
+        }
+
+        function clearRelevanceWarning() {
+            const warning = document.getElementById('relevance-warning');
+            if (warning) {
+                warning.classList.add('hidden');
+            }
+            document.querySelectorAll('.checkbox-option.flagged').forEach(option => {
+                option.classList.remove('flagged');
+            });
+            document.querySelectorAll('.strength-focus-row.flagged').forEach(row => {
+                row.classList.remove('flagged');
+            });
+        }
+
+        function dismissRelevanceWarning() {
+            clearRelevanceWarning();
+        }
+
+        function highlightFlagged(flaggedItems) {
+            const normalizeKey = (value) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const buildKey = (category, comment) => `${normalizeKey(category)}||${normalizeKey(comment)}`;
+            const flaggedSet = new Set(flaggedItems.map(item => buildKey(item.category, item.comment)));
+            document.querySelectorAll('.comment-category').forEach(section => {
+                const categoryName = section.dataset.categoryName;
+                section.querySelectorAll('.checkbox-option').forEach(option => {
+                    const key = buildKey(categoryName, option.dataset.comment);
+                    option.classList.toggle('flagged', flaggedSet.has(key));
+                });
+            });
+            document.querySelectorAll('.strength-focus-row').forEach(row => {
+                const topic = row.querySelector('.strength-topic')?.value.trim() || '';
+                const level = row.querySelector('.strength-level')?.value.trim() || '';
+                const comment = topic && level ? `${topic} (${level})` : '';
+                const key = buildKey('Strength focus', comment);
+                row.classList.toggle('flagged', comment && flaggedSet.has(key));
+            });
         }
 
         function openModal(categoryId) {
             document.getElementById('add-comment-modal').classList.remove('hidden');
             document.getElementById('add-comment-modal').dataset.categoryId = categoryId;
+            currentCategoryContainer = document.querySelector(
+                `.comment-category[data-category-id="${categoryId}"] .comment-options`
+            );
         }
 
         function closeModal() {
@@ -267,7 +826,7 @@
 
         async function saveNewComment() {
             const categoryId = document.getElementById('add-comment-modal').dataset.categoryId;
-            const commentText = document.getElementById('new-comment-text').value;
+            const commentText = document.getElementById('new-comment-text').value.trim();
 
             if (commentText) {
                 try {
@@ -284,11 +843,11 @@
                         return;
                     }
                     const newComment = await response.json();
-                    const option = document.createElement('option');
-                    option.value = newComment.text;
-                    option.textContent = newComment.text;
-                    currentCategorySelect.appendChild(option);
-                    currentCategorySelect.value = newComment.text; // Select the newly added comment
+                    if (currentCategoryContainer) {
+                        appendCommentCheckbox(currentCategoryContainer, newComment.text, categoryId, true);
+                    }
+                    updateSelectionSummary();
+                    applyFilters();
                     closeModal();
                 } catch (error) {
                     console.error('Error adding comment:', error);
@@ -297,28 +856,64 @@
             }
         }
 
-        async function generateReport() {
-            const pupilName = document.getElementById('pupil-name').value;
-            const pupilPronouns = document.getElementById('pupil-pronouns').value;
+        async function generateReport(options = {}) {
+            const pupilName = document.getElementById('pupil-name').value.trim();
+            const pupilPronouns = document.getElementById('pupil-pronouns').value.trim();
             const additionalComments = document.getElementById('additional-comments').value;
+            const wordLimit = document.getElementById('word-limit').value;
 
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
 
-            const categoriesContainer = document.getElementById('categories-container');
-            const categorySelects = categoriesContainer.getElementsByTagName('select');
+            clearRelevanceWarning();
+
+            if (!pupilName) {
+                alert('Please enter the pupil name before generating a report.');
+                document.getElementById('pupil-name').focus();
+                return;
+            }
+
+            if (!pupilPronouns) {
+                alert('Please enter the pupil pronouns before generating a report.');
+                document.getElementById('pupil-pronouns').focus();
+                return;
+            }
+
+            const selectionHelper = window.ReportSelection;
+            if (!selectionHelper || typeof selectionHelper.collectSelections !== 'function') {
+                alert('Unable to validate category selections. Please refresh the page.');
+                return;
+            }
+
+            const { selections, missingGroups } = selectionHelper.collectSelections(
+                document.getElementById('categories-container')
+            );
+            if (missingGroups.length > 0) {
+                setValidationState(true);
+                alert(`Please select at least one comment for: ${missingGroups.join(', ')}.`);
+                return;
+            }
+            setValidationState(false);
+
+            const strengthFocus = collectStrengthFocus();
+            if (strengthFocus.incomplete.length > 0) {
+                alert('Please complete or remove all strength focus rows before generating the report.');
+                return;
+            }
 
             const pupil = {
                 name: pupilName,
                 pronouns: pupilPronouns,
                 subjectId: subjectId,
                 yearGroupId: yearGroupId,
-                additionalComments: additionalComments
+                additionalComments: additionalComments,
+                wordLimit: wordLimit,
+                overrideIrrelevant: options.override === true,
+                strengthFocus: strengthFocus.items
             };
 
-            Array.from(categorySelects).forEach(select => {
-                const categoryName = select.id.replace('-', ' ');
-                pupil[categoryName] = select.value;
+            Object.entries(selections).forEach(([categoryName, selectedComments]) => {
+                pupil[categoryName] = selectedComments;
             });
             document.getElementById('result-container').style.display = 'block';
             let resultContainer = document.getElementById('result-container');
@@ -333,24 +928,47 @@
                     },
                     body: JSON.stringify(pupil)
                 });
+                if (response.status === 422) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    showRelevanceWarning(errorPayload.flagged || []);
+                    resultContainer.innerHTML = '<p>Please review the highlighted comments before continuing.</p>';
+                    return;
+                }
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    throw new Error(errorPayload.message || 'There was an error generating the report.');
+                }
                 const data = await response.json();
-                let report = data.report;
+                const report = data.report;
                 resultContainer.innerHTML = `<button id="copy-report-btn" class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>`;
-                resultContainer.innerHTML += `<div id="the-report">${report}</div>`;
+                resultContainer.innerHTML += `<div id="the-report"></div>`;
+                const reportContainer = document.getElementById('the-report');
+                if (Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
+                    reportContainer.textContent = data.paragraphs.join('\n\n');
+                } else {
+                    reportContainer.textContent = report;
+                }
             } catch (error) {
                 console.error('Error:', error);
-                resultContainer.innerHTML += '<p>There was an error generating the report.</p>';
+                resultContainer.innerHTML += `<p>${error.message}</p>`;
             }
-            document.getElementById('copy-report-btn').style.display = 'block';
+            const copyButton = document.getElementById('copy-report-btn');
+            if (copyButton) {
+                copyButton.style.display = 'block';
+            }
             // Clear the form fields
             document.getElementById('pupil-name').value = '';
             document.getElementById('pupil-pronouns').value = '';
             document.getElementById('additional-comments').value = '';
+            setupStrengthFocus();
 
-            // Reset all comment selections to "-- Select Comment --"
-            Array.from(categorySelects).forEach(select => {
-                select.selectedIndex = 0;
+            // Reset all comment selections
+            const checkboxes = document.querySelectorAll('#categories-container input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
             });
+            updateSelectionSummary();
+            applyFilters();
         }
 
         function copyReportToClipboard() {

@@ -11,8 +11,9 @@
     <link rel="manifest" href="/site.webmanifest">
 </head>
 <body>
-    <div class="container">
-        <h1>Login</h1>
+    <div id="header-placeholder"></div>
+    <div class="container bg-light-blue rounded-lg shadow-lg">
+        <h1 class="main-title">Login</h1>
         <form id="login-form">
             <div class="form-section">
                 <label for="username">Username:</label>
@@ -26,7 +27,17 @@
         </form>
         <p>Don't have an account? <a href="register.html">Register</a></p>
     </div>
+    <div id="footer-placeholder"></div>
     <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            fetch("header.html").then(response => response.text()).then(data => {
+                document.getElementById("header-placeholder").innerHTML = data;
+            });
+            fetch("footer.html").then(response => response.text()).then(data => {
+                document.getElementById("footer-placeholder").innerHTML = data;
+            });
+        });
+
         document.getElementById('login-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const username = document.getElementById('username').value;
@@ -46,4 +57,3 @@
     </script>
 </body>
 </html>
-
