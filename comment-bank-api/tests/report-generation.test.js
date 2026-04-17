@@ -131,7 +131,7 @@ describe('generate-report', () => {
     expect(prompt).toContain('Target length: about 180 words total.');
   });
 
-  it('returns 500 when OpenAI produces no usable output', async () => {
+  it('returns 502 when OpenAI produces no usable output', async () => {
     models.Prompt.findOne.mockResolvedValue(null);
     models.SubjectContext.findOne.mockResolvedValue(null);
     openai.responses.parse.mockResolvedValue({});
@@ -145,7 +145,28 @@ describe('generate-report', () => {
         yearGroupId: 2
       });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(502);
+    expect(response.body.message).toMatch(/complete 4-paragraph report/i);
+  });
+
+  it('returns 502 when OpenAI returns an incomplete report', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    models.SubjectContext.findOne.mockResolvedValue(null);
+    openai.responses.parse.mockResolvedValue({
+      output_parsed: { paragraphs: ['p1', 'p2', 'p3'] }
+    });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2
+      });
+
+    expect(response.status).toBe(502);
+    expect(response.body.message).toMatch(/complete 4-paragraph report/i);
   });
 
   it('returns 422 when relevance flags a selected comment', async () => {

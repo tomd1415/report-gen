@@ -50,6 +50,8 @@ Use this checklist before pulling or deploying changes on the live server.
 - Confirm the Generate Report ready checklist updates as required fields and
   comments are selected.
 - Generate a small test report for a known subject/year group.
+- Confirm the Generate Report form clears only after a valid 4-paragraph report
+  is returned.
 - Confirm import pages highlight the first missing required field if submitted
   incomplete.
 - If deploying import changes, run one small import into a test or low-risk

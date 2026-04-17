@@ -167,5 +167,7 @@ node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(console.
 - Generate report creates 4 paragraphs.
 - Generate Report ready check shows completed and missing items.
 - Paragraph 3 includes a subject-specific strength.
+- If generation fails or returns an incomplete report, the entered details and
+  selected comments remain available to retry.
 - Placeholder names replaced correctly.
 - Relevance warning appears only for out-of-scope comments.

@@ -60,6 +60,13 @@ const fulfillText = (route, body, status = 200) => route.fulfill({
 
 const mockApis = async (page, {
   categories = reportCategories,
+  generateReportResponse = {
+    body: {
+      report: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.\n\nParagraph four.',
+      paragraphs: ['Paragraph one.', 'Paragraph two.', 'Paragraph three.', 'Paragraph four.']
+    },
+    status: 200
+  },
   isAdmin = false,
   username = 'teacher'
 } = {}) => {
@@ -117,10 +124,9 @@ const mockApis = async (page, {
     return fulfillJson(route, { message: `Unhandled test route: ${path}` }, 404);
   });
 
-  await page.route('**/generate-report', async (route) => fulfillJson(route, {
-    report: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.\n\nParagraph four.',
-    paragraphs: ['Paragraph one.', 'Paragraph two.', 'Paragraph three.', 'Paragraph four.']
-  }));
+  await page.route('**/generate-report', async (route) => {
+    return fulfillJson(route, generateReportResponse.body, generateReportResponse.status);
+  });
 };
 
 const chooseSubjectAndYear = async (page) => {
@@ -159,6 +165,40 @@ test('Generate Report ready check validates required fields and reaches a genera
   await page.getByRole('button', { name: 'Generate Report' }).click();
   await expect(page.locator('#generate-status')).toContainText('Report generated');
   await expect(page.locator('#the-report')).toContainText('Paragraph three.');
+  await expect(page.locator('#pupil-name')).toHaveValue('');
+  await expect(page.locator('#pupil-pronouns')).toHaveValue('');
+  await expect(page.locator('input[value="Understands fractions well."]')).not.toBeChecked();
+});
+
+test('Generate Report keeps entered data when the returned report is incomplete', async ({ page }) => {
+  await mockApis(page, {
+    generateReportResponse: {
+      body: {
+        report: 'Only one paragraph.',
+        paragraphs: ['Only one paragraph.']
+      },
+      status: 200
+    }
+  });
+
+  await page.goto('/index.html');
+  await chooseSubjectAndYear(page);
+
+  await page.fill('#pupil-name', 'Alex');
+  await page.fill('#pupil-pronouns', 'they/them');
+  await page.fill('#additional-comments', 'Keep this note.');
+  await selectCommentForStep(page, 'Paragraph 1', 'Understands fractions well.');
+  await selectCommentForStep(page, 'Paragraph 2', 'Works hard in lessons.');
+  await selectCommentForStep(page, 'Paragraph 3', 'Explains mathematical ideas clearly.');
+  await selectCommentForStep(page, 'Paragraph 4', 'Should practise checking calculations.');
+
+  await page.getByRole('button', { name: 'Generate Report' }).click();
+
+  await expect(page.locator('#generate-status')).toContainText('incomplete report');
+  await expect(page.locator('#pupil-name')).toHaveValue('Alex');
+  await expect(page.locator('#pupil-pronouns')).toHaveValue('they/them');
+  await expect(page.locator('#additional-comments')).toHaveValue('Keep this note.');
+  await expect(page.locator('input[value="Understands fractions well."]')).toBeChecked();
 });
 
 test('Generate Report shows an empty state when no comment bank exists', async ({ page }) => {

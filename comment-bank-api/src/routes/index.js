@@ -108,6 +108,29 @@ const reportSchema = {
   },
   required: ['paragraphs']
 };
+const EXPECTED_REPORT_PARAGRAPHS = 4;
+const INCOMPLETE_REPORT_MESSAGE = 'The AI did not return a complete 4-paragraph report. Your entries have been kept; please try again.';
+
+const extractGeneratedParagraphs = (response) => {
+  const parsed = response.output_parsed || {};
+  const parsedParagraphs = Array.isArray(parsed.paragraphs)
+    ? parsed.paragraphs.map((paragraph) => cleanText(paragraph)).filter(Boolean)
+    : [];
+
+  if (parsedParagraphs.length === EXPECTED_REPORT_PARAGRAPHS) {
+    return parsedParagraphs;
+  }
+
+  const fallbackText = response.output_text?.trim() || '';
+  if (!fallbackText) {
+    return parsedParagraphs;
+  }
+
+  return fallbackText
+    .split(/\n\s*\n/)
+    .map((paragraph) => cleanText(paragraph))
+    .filter(Boolean);
+};
 
 const relevanceSchema = {
   type: 'object',
@@ -1154,18 +1177,9 @@ export function registerRoutes(app, { models, openai }) {
       });
       logRequestId(response, 'generate-report');
 
-      const parsed = response.output_parsed || {};
-      let paragraphs = Array.isArray(parsed.paragraphs) ? parsed.paragraphs : [];
-
-      if (paragraphs.length !== 4) {
-        const fallbackText = response.output_text?.trim() || '';
-        if (fallbackText) {
-          paragraphs = fallbackText.split(/\n\s*\n/).map((text) => cleanText(text)).filter(Boolean);
-        }
-      }
-
-      if (paragraphs.length === 0) {
-        return res.status(500).send('Error generating report');
+      const paragraphs = extractGeneratedParagraphs(response);
+      if (paragraphs.length !== EXPECTED_REPORT_PARAGRAPHS) {
+        return res.status(502).json({ message: INCOMPLETE_REPORT_MESSAGE });
       }
 
       const finalParagraphs = paragraphs.map((paragraph) =>
@@ -1176,7 +1190,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ report, paragraphs: finalParagraphs });
     } catch (error) {
       console.error('Error generating report:', error);
-      res.status(500).send('Error generating report');
+      res.status(500).json({ message: 'Error generating report' });
     }
   });
 

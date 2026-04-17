@@ -154,7 +154,7 @@ instead of the currently logged-in admin user.
 ## Current Test Coverage
 
 - Report generation prompt building, placeholder replacement, relevance warning,
-  strength focus, and validation limits.
+  strength focus, incomplete AI output rejection, and validation limits.
 - Report import placeholder replacement, maximum import length, and relevance
   filtering.
 - CSV import caps and skipped-row reporting.
@@ -168,8 +168,9 @@ instead of the currently logged-in admin user.
 - Shared UI helper coverage for status panels, context chips, button loading,
   invalid-field styling, and comment-bank filtering.
 - Playwright browser smoke tests for the Generate Report ready checklist and
-  empty state, Manage Comments expand/collapse and delete confirmation, import
-  validation, and the admin staff-bank step layout.
+  empty state, valid-report form clearing, incomplete-report form retention,
+  Manage Comments expand/collapse and delete confirmation, import validation,
+  and the admin staff-bank step layout.
 
 ## Baseline Manual Test Checklist
 

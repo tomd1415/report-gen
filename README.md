@@ -155,6 +155,9 @@ You have three options:
 - Click Generate.
 
 If any comments are out of scope for the subject description, you will see a warning and can either revise or override.
+If generation fails or the AI returns an incomplete report, the entered pupil
+details and selected comments remain on the page so you can retry. Once a valid
+4-paragraph report is returned, the form clears ready for the next pupil.
 
 ---
 

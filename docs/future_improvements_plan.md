@@ -34,6 +34,8 @@ Completed on `2026-04-17`:
 - Generate Report now has page-level status messages, context chips, active
   paragraph tabs, selection summaries, loading states, a ready checklist, and a
   clear empty state when no comment bank exists for the selected subject/year.
+  It also keeps entered data after failed or incomplete generation and clears
+  only after a complete 4-paragraph report is returned.
 - Import pages and CSV import/export now use visible status messages, button
   loading states, and field-specific validation/focus for missing required
   inputs.

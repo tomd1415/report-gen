@@ -1028,6 +1028,48 @@
             }
         }
 
+        function getCompleteReportParagraphs(data) {
+            const normalizeParagraphs = (items) => items
+                .map((item) => String(item || '').replace(/\s+/g, ' ').trim())
+                .filter(Boolean);
+            const paragraphs = Array.isArray(data?.paragraphs) ? normalizeParagraphs(data.paragraphs) : [];
+            if (paragraphs.length === 4) {
+                return paragraphs;
+            }
+
+            const reportText = String(data?.report || '').trim();
+            if (!reportText) {
+                return [];
+            }
+
+            const splitParagraphs = normalizeParagraphs(reportText.split(/\n\s*\n/));
+            return splitParagraphs.length === 4 ? splitParagraphs : [];
+        }
+
+        function showResultMessage(resultContainer, message) {
+            resultContainer.innerHTML = '';
+            const paragraph = document.createElement('p');
+            paragraph.textContent = message;
+            resultContainer.appendChild(paragraph);
+        }
+
+        function clearGenerateFormAfterSuccessfulReport() {
+            document.getElementById('pupil-name').value = '';
+            document.getElementById('pupil-pronouns').value = '';
+            document.getElementById('additional-comments').value = '';
+            setupStrengthFocus();
+            setFieldInvalid('pupil-name', false);
+            setFieldInvalid('pupil-pronouns', false);
+
+            const checkboxes = document.querySelectorAll('#categories-container input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateSelectionSummary();
+            applyFilters();
+            updateReadyChecklist();
+        }
+
         async function generateReport(options = {}) {
             const pupilName = document.getElementById('pupil-name').value.trim();
             const pupilPronouns = document.getElementById('pupil-pronouns').value.trim();
@@ -1130,19 +1172,19 @@
                     throw new Error(errorPayload.message || 'There was an error generating the report.');
                 }
                 const data = await response.json();
-                const report = data.report;
+                const paragraphs = getCompleteReportParagraphs(data);
+                if (paragraphs.length !== 4) {
+                    throw new Error('The AI returned an incomplete report. Your entries have been kept so you can try again.');
+                }
                 resultContainer.innerHTML = `<button id="copy-report-btn" class="button" onclick="copyReportToClipboard()">Copy Report to Clipboard</button>`;
                 resultContainer.innerHTML += `<div id="the-report"></div>`;
                 const reportContainer = document.getElementById('the-report');
-                if (Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
-                    reportContainer.textContent = data.paragraphs.join('\n\n');
-                } else {
-                    reportContainer.textContent = report;
-                }
+                reportContainer.textContent = paragraphs.join('\n\n');
                 showGenerateStatus('Report generated.', 'success');
+                clearGenerateFormAfterSuccessfulReport();
             } catch (error) {
                 console.error('Error:', error);
-                resultContainer.innerHTML += `<p>${error.message}</p>`;
+                showResultMessage(resultContainer, error.message);
                 showGenerateStatus(error.message, 'error');
             } finally {
                 window.ReportGenUI?.setButtonLoading(generateButton, false);
@@ -1151,22 +1193,6 @@
             if (copyButton) {
                 copyButton.style.display = 'block';
             }
-            // Clear the form fields
-            document.getElementById('pupil-name').value = '';
-            document.getElementById('pupil-pronouns').value = '';
-            document.getElementById('additional-comments').value = '';
-            setupStrengthFocus();
-            setFieldInvalid('pupil-name', false);
-            setFieldInvalid('pupil-pronouns', false);
-
-            // Reset all comment selections
-            const checkboxes = document.querySelectorAll('#categories-container input[type="checkbox"]');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = false;
-            });
-            updateSelectionSummary();
-            applyFilters();
-            updateReadyChecklist();
         }
 
         function copyReportToClipboard() {
