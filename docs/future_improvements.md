@@ -4,6 +4,8 @@ This document is a living backlog for useful improvements that are outside the
 current task. When a future review uncovers something worth improving but not
 needed for the immediate feature, add a dated note here.
 
+For the prioritised roadmap, see `docs/future_improvements_plan.md`.
+
 ## How To Use This Document
 
 - Add concise notes under the relevant section.
