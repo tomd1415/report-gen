@@ -182,6 +182,11 @@
             return `${subject} / ${yearGroup}`;
         }
 
+        function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+            const fetcher = window.ReportGenUI?.fetchWithTimeout || fetch;
+            return fetcher(url, options, { timeoutMs });
+        }
+
         async function exportCategoriesAndComments() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
@@ -202,7 +207,7 @@
             window.ReportGenUI?.setButtonLoading(button, true, 'Exporting...');
             window.ReportGenUI?.showStatus('#csv-status', `Preparing export for ${getCsvContextText()}.`, { tone: 'info' });
             try {
-                const response = await fetch(`/api/export-categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
+                const response = await fetchWithTimeout(`/api/export-categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch data for export.');
                 }
@@ -262,10 +267,10 @@
             window.ReportGenUI?.setButtonLoading(button, true, 'Importing...');
             window.ReportGenUI?.showStatus('#csv-status', `Importing CSV for ${getCsvContextText()}. Existing comments for this selection will be replaced.`, { tone: 'warning' });
             try {
-                const response = await fetch('/api/import-categories-comments', {
+                const response = await fetchWithTimeout('/api/import-categories-comments', {
                     method: 'POST',
                     body: formData
-                });
+                }, 60000);
 
                 const text = await response.text();
                 let payload = {};

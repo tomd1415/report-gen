@@ -30,6 +30,9 @@ npm start
 ## Health Check
 
 - API check: `curl http://localhost:44344/api/health`
+- Version check: `curl http://localhost:44344/api/version`
+- Database check: visit `/api/health/db` from an authenticated admin browser
+  session.
 - Visit `http://localhost:44344`
 - Log in and generate a test report for a known subject/year group.
 
@@ -39,12 +42,18 @@ npm start
 cd /path/to/report-gen/comment-bank-api
 npm test
 npm run test:e2e
+npm run check:inline-scripts
 ```
 
 If Playwright has not been used on that machine before, install its Chromium
 browser once:
 ```
 npx playwright install chromium
+```
+
+Before a live pull or restart, the combined check is:
+```
+npm run check:deploy
 ```
 
 ---

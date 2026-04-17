@@ -269,6 +269,11 @@
             window.ReportGenUI?.showStatus('#generate-status', message, { tone });
         }
 
+        function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+            const fetcher = window.ReportGenUI?.fetchWithTimeout || fetch;
+            return fetcher(url, options, { timeoutMs });
+        }
+
         function setupReadyChecklistListeners() {
             ['pupil-name', 'pupil-pronouns'].forEach((id) => {
                 document.getElementById(id)?.addEventListener('input', updateReadyChecklist);
@@ -374,9 +379,9 @@
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
 
                 const [categoriesResponse, promptPartResponse, subjectContextResponse] = await Promise.all([
-                    fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
-                    fetch(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
-                    fetch(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
+                    fetchWithTimeout(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
+                    fetchWithTimeout(`/api/prompts?subjectId=${subjectId}&yearGroupId=${yearGroupId}`),
+                    fetchWithTimeout(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
                 ]);
 
                 const categories = await categoriesResponse.json();
@@ -1015,7 +1020,7 @@
 
             if (commentText) {
                 try {
-                    const response = await fetch('/api/comments', {
+                    const response = await fetchWithTimeout('/api/comments', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -1181,13 +1186,13 @@
 
             // Generate report for the pupil
             try {
-                const response = await fetch('/generate-report', {
+                const response = await fetchWithTimeout('/generate-report', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(pupil)
-                });
+                }, 120000);
                 if (response.status === 422) {
                     const errorPayload = await response.json().catch(() => ({}));
                     showRelevanceWarning(errorPayload.flagged || []);

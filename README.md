@@ -263,6 +263,11 @@ values locally.
 ### Health check
 - `GET /api/health`
 - Returns `{ "ok": true, "status": "ok" }` when Express is responding.
+- `GET /api/version`
+- Returns the app name, package version, environment, and deployed commit when
+  a supported commit environment variable is set.
+- `GET /api/health/db` (admin only)
+- Checks the Sequelize database connection and returns a JSON status.
 
 ---
 
@@ -356,6 +361,21 @@ cd comment-bank-api
 npx playwright install chromium
 npm run test:e2e
 ```
+
+Check inline browser scripts for syntax errors:
+```
+cd comment-bank-api
+npm run check:inline-scripts
+```
+
+Run the preferred pre-deploy check:
+```
+cd comment-bank-api
+npm run check:deploy
+```
+
+`check:deploy` runs the unit tests, Playwright smoke tests, inline script
+syntax check, and `git diff --check`.
 
 Watch mode:
 ```

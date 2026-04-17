@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let clearStatus;
+let fetchWithTimeout;
 let filterCommentBank;
 let getSelectedOptionText;
 let renderContextSummary;
@@ -12,6 +13,7 @@ let showStatus;
 beforeAll(async () => {
   ({
     clearStatus,
+    fetchWithTimeout,
     filterCommentBank,
     getSelectedOptionText,
     renderContextSummary,
@@ -23,6 +25,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   document.body.innerHTML = '';
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('shared UI helpers', () => {
@@ -83,6 +89,16 @@ describe('shared UI helpers', () => {
     expect(setFieldInvalid('#name', false, { documentRef: document })).toBe(true);
     expect(document.querySelector('#name').classList.contains('field-invalid')).toBe(false);
     expect(document.querySelector('#name').hasAttribute('aria-invalid')).toBe(false);
+  });
+
+  it('rejects slow fetches with a useful timeout message', async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn(() => new Promise(() => {}));
+    const request = fetchWithTimeout('/slow', {}, { fetchImpl, timeoutMs: 100 });
+
+    vi.advanceTimersByTime(100);
+
+    await expect(request).rejects.toThrow(/timed out/i);
   });
 
   it('filters comment bank categories and comments', () => {

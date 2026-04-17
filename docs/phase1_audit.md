@@ -53,6 +53,9 @@ instead of the currently logged-in admin user.
 
 ### Auth/session
 
+- `GET /api/health`
+- `GET /api/version`
+- `GET /api/health/db` (admin only)
 - `POST /api/register`
 - `POST /api/login`
 - `POST /api/admin/login`
@@ -137,6 +140,10 @@ instead of the currently logged-in admin user.
 - Main browser workflows use shared helpers for page-level status, context
   chips, button loading states, comment-bank filtering, and invalid-field
   styling.
+- Long-running browser workflows use a shared timeout wrapper so stalled
+  requests fail with a useful message instead of hanging indefinitely.
+- API route errors that previously returned plain text now use a consistent
+  JSON `{ "message": "..." }` shape.
 - Admin target-staff endpoints exist under `/api/admin/staff/:userId/*`.
 - The existing OpenAI import flow already supports subject/year scoped comments,
   name placeholder replacement, relevance filtering, and merge with existing
@@ -166,7 +173,10 @@ instead of the currently logged-in admin user.
 - Category/comment/prompt ownership checks.
 - Password-change field consistency.
 - Shared UI helper coverage for status panels, context chips, button loading,
-  invalid-field styling, and comment-bank filtering.
+  invalid-field styling, timeout handling, and comment-bank filtering.
+- Operational endpoint coverage for `/api/version` and the admin-only database
+  health check.
+- Inline script syntax checking through `npm run check:inline-scripts`.
 - Playwright browser smoke tests for the Generate Report ready checklist and
   empty state, valid-report form clearing, incomplete-report form retention,
   Manage Comments expand/collapse and delete confirmation, import validation,

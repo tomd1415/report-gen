@@ -162,6 +162,11 @@
             clearImportFieldState('year-group-select');
         }
 
+        function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+            const fetcher = window.ReportGenUI?.fetchWithTimeout || fetch;
+            return fetcher(url, options, { timeoutMs });
+        }
+
         function clearImportFieldState(id) {
             window.ReportGenUI?.setFieldInvalid(`#${id}`, false);
         }
@@ -223,7 +228,7 @@
             window.ReportGenUI?.showStatus('#result-container', 'Generating comments and categories. This may take a while.', { tone: 'info' });
 
             try {
-                const response = await fetch('/api/import-reports', {
+                const response = await fetchWithTimeout('/api/import-reports', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -234,7 +239,7 @@
                         pupilNames,
                         reports
                     })
-                });
+                }, 180000);
 
                 const result = await parseImportResponse(response);
                 if (!response.ok) {

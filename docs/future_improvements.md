@@ -23,6 +23,8 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Reliability and Data Safety
 
+- `2026-04-17`: Extend the shared request timeout helper across the remaining
+  lower-risk browser fetches when page scripts are moved into dedicated modules.
 - `2026-04-17`: Consider adding an optional `ImportJobs` table later for import
   metadata only: actor, owner, subject, year group, mode, status, counts, and
   error message. Do not store raw report text unless there is a separate policy
@@ -61,8 +63,9 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   admin user management would reduce route-handler complexity.
 - `2026-04-17`: Move shared limits and text-cleaning helpers out of
   `src/routes/index.js` once multiple services need them.
-- `2026-04-17`: Consider centralizing response error formatting so frontend code
-  can reliably parse JSON errors instead of sometimes receiving plain text.
+- `2026-04-17`: Route-local errors now use a shared JSON helper. Consider
+  moving this into formal Express error middleware when route handlers are split
+  into smaller modules.
 
 ## OpenAI and Prompting
 

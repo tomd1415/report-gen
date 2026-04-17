@@ -22,7 +22,8 @@ Use these rules for every future improvement:
    merge should be the default and replace should require explicit confirmation.
 4. Add tests before or alongside changes to admin, import, authentication,
    permissions, and report generation workflows.
-5. Run the release checklist in `docs/release_checklist.md` before live pulls.
+5. Run `npm run check:deploy` and the release checklist in
+   `docs/release_checklist.md` before live pulls when practical.
 6. Do not store raw pasted reports unless there is a clear policy decision.
 
 ## Recently Completed UX Improvements
@@ -47,6 +48,9 @@ Completed on `2026-04-17`:
   and invalid-field helpers with jsdom coverage.
 - Playwright smoke tests now cover the main UI regressions from this batch.
 - A first restore drill is documented in `docs/restore_drill.md`.
+- Reliability guardrails now include JSON API errors for route-local failures,
+  frontend request timeouts on higher-risk browser workflows, `/api/version`,
+  admin-only `/api/health/db`, and a combined `npm run check:deploy` command.
 
 ## Priority 1: Data Safety And Operations
 

@@ -83,6 +83,40 @@ export const setFieldInvalid = (target, invalid, { documentRef = globalThis.docu
   return true;
 };
 
+export const fetchWithTimeout = (
+  url,
+  options = {},
+  {
+    timeoutMs = 30_000,
+    fetchImpl = globalThis.fetch,
+    AbortControllerImpl = globalThis.AbortController
+  } = {}
+) => {
+  if (!fetchImpl) {
+    return Promise.reject(new Error('Fetch is not available.'));
+  }
+
+  const controller = AbortControllerImpl ? new AbortControllerImpl() : null;
+  const requestOptions = controller && !options.signal
+    ? { ...options, signal: controller.signal }
+    : options;
+
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = globalThis.setTimeout(() => {
+      controller?.abort();
+      reject(new Error('The request timed out. Please try again.'));
+    }, timeoutMs);
+  });
+
+  return Promise.race([
+    fetchImpl(url, requestOptions),
+    timeoutPromise
+  ]).finally(() => {
+    globalThis.clearTimeout(timeoutId);
+  });
+};
+
 export const renderContextSummary = (target, items, { documentRef = globalThis.document } = {}) => {
   const element = resolveElement(target, documentRef);
   if (!element) {
@@ -174,6 +208,7 @@ if (typeof window !== 'undefined') {
     getSelectedOptionText,
     setButtonLoading,
     setFieldInvalid,
+    fetchWithTimeout,
     renderContextSummary,
     filterCommentBank
   };

@@ -475,6 +475,11 @@
             window.ReportGenUI?.showStatus('#staff-bank-result', message, { tone });
         }
 
+        function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+            const fetcher = window.ReportGenUI?.fetchWithTimeout || fetch;
+            return fetcher(url, options, { timeoutMs });
+        }
+
         async function parseResponseMessage(response) {
             const text = await response.text();
             try {
@@ -495,9 +500,9 @@
             try {
                 setStaffBankResult('Loading staff comment bank context.');
                 const [contextResponse, promptResponse, bankResponse] = await Promise.all([
-                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`),
-                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/prompts/${encodeURIComponent(subjectId)}/${encodeURIComponent(yearGroupId)}`),
-                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/comment-bank?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`)
+                    fetchWithTimeout(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`),
+                    fetchWithTimeout(`/api/admin/staff/${encodeURIComponent(userId)}/prompts/${encodeURIComponent(subjectId)}/${encodeURIComponent(yearGroupId)}`),
+                    fetchWithTimeout(`/api/admin/staff/${encodeURIComponent(userId)}/comment-bank?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`)
                 ]);
 
                 if (contextResponse.ok) {
@@ -536,12 +541,12 @@
             try {
                 window.ReportGenUI?.setButtonLoading(button, true, 'Saving...');
                 const [contextResponse, promptResponse] = await Promise.all([
-                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context`, {
+                    fetchWithTimeout(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ subjectId, yearGroupId, subjectDescription, wordLimit })
                     }),
-                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/prompts`, {
+                    fetchWithTimeout(`/api/admin/staff/${encodeURIComponent(userId)}/prompts`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ subjectId, yearGroupId, promptPart })
@@ -614,7 +619,7 @@
             setStaffBankResult('Importing reports. This may take a while.');
 
             try {
-                const response = await fetch(`/api/admin/staff/${encodeURIComponent(userId)}/import-reports`, {
+                const response = await fetchWithTimeout(`/api/admin/staff/${encodeURIComponent(userId)}/import-reports`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -625,7 +630,7 @@
                         mode,
                         confirmReplace
                     })
-                });
+                }, 180000);
 
                 const text = await response.text();
                 let payload = {};

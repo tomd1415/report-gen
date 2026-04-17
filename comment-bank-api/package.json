@@ -6,6 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "check:inline-scripts": "node scripts/check-inline-scripts.mjs",
+    "check:deploy": "npm test && npm run test:e2e && npm run check:inline-scripts && git diff --check",
     "test:watch": "vitest",
     "start": "node server.mjs"
   },

@@ -29,6 +29,8 @@ Use this checklist before pulling or deploying changes on the live server.
 
 ## Verify Before Restart
 
+- Run the combined pre-deploy check when practical:
+  `npm run check:deploy`
 - Run the automated tests when practical:
   `npm test`
 - Run browser smoke tests when UI behaviour changed:
@@ -39,6 +41,10 @@ Use this checklist before pulling or deploying changes on the live server.
   `sudo systemctl status reportgen -l`
 - Check the health endpoint:
   `curl http://localhost:44344/api/health`
+- Check the deployed version:
+  `curl http://localhost:44344/api/version`
+- Check database connectivity from an authenticated admin browser session:
+  `/api/health/db`
 - Watch logs while doing the smoke test:
   `sudo journalctl -u reportgen -f`
 

@@ -41,6 +41,14 @@ const upload = multer({
   dest: 'uploads/',
   limits: { fileSize: UPLOAD_LIMIT_BYTES }
 });
+const packageVersion = (() => {
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+    return packageJson.version || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+})();
 
 const cleanText = (text) => (text ? text.replace(/\s+/g, ' ').trim() : '');
 const cleanAndLimit = (value, maxLength) => {
@@ -71,6 +79,14 @@ const logRequestId = (response, label) => {
     console.log(`${label} request id: ${response._request_id}`);
   }
 };
+const sendError = (res, status, message, extra = {}) =>
+  res.status(status).json({ message, ...extra });
+const getBuildCommit = () =>
+  process.env.GIT_COMMIT
+  || process.env.SOURCE_VERSION
+  || process.env.RENDER_GIT_COMMIT
+  || process.env.COMMIT_SHA
+  || null;
 
 const categorySchema = {
   type: 'object',
@@ -241,7 +257,7 @@ const buildOpenAIParams = (req) => ({
   safety_identifier: getSafetyIdentifier(req)
 });
 
-export function registerRoutes(app, { models, openai }) {
+export function registerRoutes(app, { models, openai, sequelizeClient = sequelize }) {
   const {
     User,
     Subject,
@@ -330,7 +346,7 @@ export function registerRoutes(app, { models, openai }) {
         return res.status(409).json({ message: 'A user with that username already exists.' });
       }
       console.error('Error creating user:', error);
-      res.status(500).send('Error creating user');
+      sendError(res, 500, 'Error creating user');
     }
   };
 
@@ -466,12 +482,35 @@ export function registerRoutes(app, { models, openai }) {
       }
     } catch (error) {
       console.error('Error fetching user info:', error);
-      res.status(500).send('Error fetching user info');
+      sendError(res, 500, 'Error fetching user info');
     }
   });
 
   app.get('/api/health', (req, res) => {
     res.json({ ok: true, status: 'ok' });
+  });
+
+  app.get('/api/health/db', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await sequelizeClient.authenticate();
+      res.json({ ok: true, status: 'ok', database: 'ok' });
+    } catch (error) {
+      console.error('Database health check failed:', error);
+      sendError(res, 503, 'Database connection failed.', {
+        ok: false,
+        status: 'error',
+        database: 'error'
+      });
+    }
+  });
+
+  app.get('/api/version', (req, res) => {
+    res.json({
+      name: 'comment-bank-api',
+      version: packageVersion,
+      environment: config.env,
+      commit: getBuildCommit()
+    });
   });
 
   app.post('/api/register', async (req, res) => {
@@ -485,7 +524,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ message: 'User registered successfully', user });
     } catch (error) {
       console.error('Error registering user:', error);
-      res.status(500).send('Error registering user');
+      sendError(res, 500, 'Error registering user');
     }
   });
 
@@ -501,7 +540,7 @@ export function registerRoutes(app, { models, openai }) {
       }
     } catch (error) {
       console.error('Error logging in:', error);
-      res.status(500).send('Error logging in');
+      sendError(res, 500, 'Error logging in');
     }
   });
 
@@ -527,7 +566,7 @@ export function registerRoutes(app, { models, openai }) {
       }
     } catch (error) {
       console.error('Error logging in:', error);
-      res.status(500).send('Error logging in');
+      sendError(res, 500, 'Error logging in');
     }
   });
 
@@ -545,7 +584,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(yearGroup);
     } catch (error) {
       console.error('Error creating year group:', error);
-      res.status(500).send('Error creating year group');
+      sendError(res, 500, 'Error creating year group');
     }
   });
 
@@ -557,11 +596,11 @@ export function registerRoutes(app, { models, openai }) {
         await yearGroup.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Year group not found');
+        sendError(res, 404, 'Year group not found');
       }
     } catch (error) {
       console.error('Error deleting year group:', error);
-      res.status(500).send('Error deleting year group');
+      sendError(res, 500, 'Error deleting year group');
     }
   });
 
@@ -579,7 +618,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(subject);
     } catch (error) {
       console.error('Error creating subject:', error);
-      res.status(500).send('Error creating subject');
+      sendError(res, 500, 'Error creating subject');
     }
   });
 
@@ -591,11 +630,11 @@ export function registerRoutes(app, { models, openai }) {
         await subject.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Subject not found');
+        sendError(res, 404, 'Subject not found');
       }
     } catch (error) {
       console.error('Error deleting subject:', error);
-      res.status(500).send('Error deleting subject');
+      sendError(res, 500, 'Error deleting subject');
     }
   });
 
@@ -611,24 +650,24 @@ export function registerRoutes(app, { models, openai }) {
         await user.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('User not found');
+        sendError(res, 404, 'User not found');
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      res.status(500).send('Error deleting user');
+      sendError(res, 500, 'Error deleting user');
     }
   });
 
   app.get('/api/admin/export', isAdmin, async (req, res) => {
     if (!config.backup.enabled) {
-      return res.status(403).send('Database export disabled');
+      return sendError(res, 403, 'Database export disabled');
     }
     try {
       const filePath = await exportDatabase();
       res.download(filePath);
     } catch (error) {
       console.error('Error exporting database:', error);
-      res.status(500).send('Error exporting database');
+      sendError(res, 500, 'Error exporting database');
     }
   });
 
@@ -641,7 +680,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ message: 'Backup successful', file: filePath });
     } catch (error) {
       console.error('Error backing up database:', error);
-      res.status(500).send('Error backing up database');
+      sendError(res, 500, 'Error backing up database');
     }
   });
 
@@ -659,7 +698,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(subject);
     } catch (error) {
       console.error('Error creating subject:', error);
-      res.status(500).send('Error creating subject');
+      sendError(res, 500, 'Error creating subject');
     }
   });
 
@@ -680,11 +719,11 @@ export function registerRoutes(app, { models, openai }) {
         await subject.save();
         res.json(subject);
       } else {
-        res.status(404).send('Subject not found');
+        sendError(res, 404, 'Subject not found');
       }
     } catch (error) {
       console.error('Error updating subject:', error);
-      res.status(500).send('Error updating subject');
+      sendError(res, 500, 'Error updating subject');
     }
   });
 
@@ -696,11 +735,11 @@ export function registerRoutes(app, { models, openai }) {
         await subject.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Subject not found');
+        sendError(res, 404, 'Subject not found');
       }
     } catch (error) {
       console.error('Error deleting subject:', error);
-      res.status(500).send('Error deleting subject');
+      sendError(res, 500, 'Error deleting subject');
     }
   });
 
@@ -710,7 +749,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(subjects);
     } catch (error) {
       console.error('Error fetching subjects:', error);
-      res.status(500).send('Error fetching subjects');
+      sendError(res, 500, 'Error fetching subjects');
     }
   });
 
@@ -728,7 +767,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(yearGroup);
     } catch (error) {
       console.error('Error creating year group:', error);
-      res.status(500).send('Error creating year group');
+      sendError(res, 500, 'Error creating year group');
     }
   });
 
@@ -749,11 +788,11 @@ export function registerRoutes(app, { models, openai }) {
         await yearGroup.save();
         res.json(yearGroup);
       } else {
-        res.status(404).send('Year group not found');
+        sendError(res, 404, 'Year group not found');
       }
     } catch (error) {
       console.error('Error updating year group:', error);
-      res.status(500).send('Error updating year group');
+      sendError(res, 500, 'Error updating year group');
     }
   });
 
@@ -765,11 +804,11 @@ export function registerRoutes(app, { models, openai }) {
         await yearGroup.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Year group not found');
+        sendError(res, 404, 'Year group not found');
       }
     } catch (error) {
       console.error('Error deleting year group:', error);
-      res.status(500).send('Error deleting year group');
+      sendError(res, 500, 'Error deleting year group');
     }
   });
 
@@ -779,7 +818,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(yearGroups);
     } catch (error) {
       console.error('Error fetching year groups:', error);
-      res.status(500).send('Error fetching year groups');
+      sendError(res, 500, 'Error fetching year groups');
     }
   });
 
@@ -798,7 +837,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(category);
     } catch (error) {
       console.error('Error creating category:', error);
-      res.status(500).send('Error creating category');
+      sendError(res, 500, 'Error creating category');
     }
   });
 
@@ -820,11 +859,11 @@ export function registerRoutes(app, { models, openai }) {
         await category.save();
         res.json(category);
       } else {
-        res.status(404).send('Category not found');
+        sendError(res, 404, 'Category not found');
       }
     } catch (error) {
       console.error('Error updating category:', error);
-      res.status(500).send('Error updating category');
+      sendError(res, 500, 'Error updating category');
     }
   });
 
@@ -837,11 +876,11 @@ export function registerRoutes(app, { models, openai }) {
         await category.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Category not found');
+        sendError(res, 404, 'Category not found');
       }
     } catch (error) {
       console.error('Error deleting category:', error);
-      res.status(500).send('Error deleting category');
+      sendError(res, 500, 'Error deleting category');
     }
   });
 
@@ -856,7 +895,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(categories);
     } catch (error) {
       console.error('Error fetching categories and comments:', error);
-      res.status(500).send('Error fetching categories and comments');
+      sendError(res, 500, 'Error fetching categories and comments');
     }
   });
 
@@ -868,11 +907,11 @@ export function registerRoutes(app, { models, openai }) {
       if (category) {
         res.json(category);
       } else {
-        res.status(404).send('Category not found');
+        sendError(res, 404, 'Category not found');
       }
     } catch (error) {
       console.error('Error fetching category:', error);
-      res.status(500).send('Error fetching category');
+      sendError(res, 500, 'Error fetching category');
     }
   });
 
@@ -889,13 +928,13 @@ export function registerRoutes(app, { models, openai }) {
       }
       const category = await findOwnedCategory(categoryId, userId);
       if (!category) {
-        return res.status(404).send('Category not found');
+        return sendError(res, 404, 'Category not found');
       }
       const comment = await Comment.create({ text: cleanedText, categoryId });
       res.json(comment);
     } catch (error) {
       console.error('Error creating comment:', error);
-      res.status(500).send('Error creating comment');
+      sendError(res, 500, 'Error creating comment');
     }
   });
 
@@ -917,11 +956,11 @@ export function registerRoutes(app, { models, openai }) {
         await comment.save();
         res.json(comment);
       } else {
-        res.status(404).send('Comment not found');
+        sendError(res, 404, 'Comment not found');
       }
     } catch (error) {
       console.error('Error updating comment:', error);
-      res.status(500).send('Error updating comment');
+      sendError(res, 500, 'Error updating comment');
     }
   });
 
@@ -934,11 +973,11 @@ export function registerRoutes(app, { models, openai }) {
         await comment.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Comment not found');
+        sendError(res, 404, 'Comment not found');
       }
     } catch (error) {
       console.error('Error deleting comment:', error);
-      res.status(500).send('Error deleting comment');
+      sendError(res, 500, 'Error deleting comment');
     }
   });
 
@@ -948,7 +987,7 @@ export function registerRoutes(app, { models, openai }) {
     try {
       const category = await findOwnedCategory(categoryId, userId);
       if (!category) {
-        return res.status(404).send('Category not found');
+        return sendError(res, 404, 'Category not found');
       }
       const comments = await Comment.findAll({
         where: { categoryId }
@@ -956,7 +995,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(comments);
     } catch (error) {
       console.error('Error fetching comments:', error);
-      res.status(500).send('Error fetching comments');
+      sendError(res, 500, 'Error fetching comments');
     }
   });
 
@@ -968,11 +1007,11 @@ export function registerRoutes(app, { models, openai }) {
       if (comment) {
         res.json(comment);
       } else {
-        res.status(404).send('Comment not found');
+        sendError(res, 404, 'Comment not found');
       }
     } catch (error) {
       console.error('Error fetching comment:', error);
-      res.status(500).send('Error fetching comment');
+      sendError(res, 500, 'Error fetching comment');
     }
   });
 
@@ -985,7 +1024,7 @@ export function registerRoutes(app, { models, openai }) {
         findOwnedCategory(newCategoryId, userId)
       ]);
       if (!comment || !newCategory) {
-        res.status(404).send('Comment not found');
+        sendError(res, 404, 'Comment not found');
         return;
       }
       comment.categoryId = newCategoryId;
@@ -993,7 +1032,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(comment);
     } catch (error) {
       console.error('Error moving comment:', error);
-      res.status(500).send('Error moving comment');
+      sendError(res, 500, 'Error moving comment');
     }
   });
 
@@ -1228,7 +1267,7 @@ export function registerRoutes(app, { models, openai }) {
         return res.status(error.statusCode).json({ message: error.message });
       }
       console.error('Error importing reports:', error);
-      res.status(500).send('Error importing reports');
+      sendError(res, 500, 'Error importing reports');
     }
   });
 
@@ -1250,7 +1289,7 @@ export function registerRoutes(app, { models, openai }) {
       });
     } catch (error) {
       console.error('Error fetching subject context:', error);
-      res.status(500).send('Error fetching subject context');
+      sendError(res, 500, 'Error fetching subject context');
     }
   });
 
@@ -1286,7 +1325,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(context);
     } catch (error) {
       console.error('Error saving subject context:', error);
-      res.status(500).send('Error saving subject context');
+      sendError(res, 500, 'Error saving subject context');
     }
   });
 
@@ -1311,7 +1350,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(categories);
     } catch (error) {
       console.error('Error fetching target comment bank:', error);
-      res.status(500).send('Error fetching target comment bank');
+      sendError(res, 500, 'Error fetching target comment bank');
     }
   });
 
@@ -1378,7 +1417,7 @@ export function registerRoutes(app, { models, openai }) {
         return res.status(error.statusCode).json({ message: error.message });
       }
       console.error('Error importing reports for target user:', error);
-      res.status(500).send('Error importing reports for target user');
+      sendError(res, 500, 'Error importing reports for target user');
     }
   });
 
@@ -1416,7 +1455,7 @@ export function registerRoutes(app, { models, openai }) {
       res.send(csvText);
     } catch (error) {
       console.error('Error exporting target categories and comments:', error);
-      res.status(500).send('Error exporting target categories and comments');
+      sendError(res, 500, 'Error exporting target categories and comments');
     }
   });
 
@@ -1426,7 +1465,7 @@ export function registerRoutes(app, { models, openai }) {
     const filePath = req.file?.path;
 
     if (!subjectId || !yearGroupId) {
-      return res.status(400).send('Missing subjectId or yearGroupId');
+      return sendError(res, 400, 'Missing subjectId or yearGroupId');
     }
 
     if (!isTruthy(confirmReplace)) {
@@ -1434,7 +1473,7 @@ export function registerRoutes(app, { models, openai }) {
     }
 
     if (!req.file) {
-      return res.status(400).send('No file uploaded');
+      return sendError(res, 400, 'No file uploaded');
     }
 
     try {
@@ -1468,7 +1507,7 @@ export function registerRoutes(app, { models, openai }) {
       });
     } catch (error) {
       console.error('Error importing target categories and comments:', error);
-      res.status(500).send('Error importing target categories and comments');
+      sendError(res, 500, 'Error importing target categories and comments');
     } finally {
       if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
@@ -1499,7 +1538,7 @@ export function registerRoutes(app, { models, openai }) {
       });
     } catch (error) {
       console.error('Error fetching target subject context:', error);
-      res.status(500).send('Error fetching target subject context');
+      sendError(res, 500, 'Error fetching target subject context');
     }
   });
 
@@ -1546,7 +1585,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ context, visibility });
     } catch (error) {
       console.error('Error saving target subject context:', error);
-      res.status(500).send('Error saving target subject context');
+      sendError(res, 500, 'Error saving target subject context');
     }
   });
 
@@ -1565,7 +1604,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ promptPart: prompt?.promptPart || '' });
     } catch (error) {
       console.error('Error fetching target prompt:', error);
-      res.status(500).send('Error fetching target prompt');
+      sendError(res, 500, 'Error fetching target prompt');
     }
   });
 
@@ -1607,7 +1646,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ prompt, visibility });
     } catch (error) {
       console.error('Error saving target prompt:', error);
-      res.status(500).send('Error saving target prompt');
+      sendError(res, 500, 'Error saving target prompt');
     }
   });
 
@@ -1638,7 +1677,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(prompt);
     } catch (error) {
       console.error('Error creating or updating prompt:', error);
-      res.status(500).send('Error creating or updating prompt');
+      sendError(res, 500, 'Error creating or updating prompt');
     }
   });
 
@@ -1663,11 +1702,11 @@ export function registerRoutes(app, { models, openai }) {
         await prompt.save();
         res.json(prompt);
       } else {
-        res.status(404).send('Prompt not found');
+        sendError(res, 404, 'Prompt not found');
       }
     } catch (error) {
       console.error('Error updating prompt:', error);
-      res.status(500).send('Error updating prompt');
+      sendError(res, 500, 'Error updating prompt');
     }
   });
 
@@ -1686,11 +1725,11 @@ export function registerRoutes(app, { models, openai }) {
         await prompt.save();
         res.json(prompt);
       } else {
-        res.status(404).send('Prompt not found');
+        sendError(res, 404, 'Prompt not found');
       }
     } catch (error) {
       console.error('Error updating prompt:', error);
-      res.status(500).send('Error updating prompt');
+      sendError(res, 500, 'Error updating prompt');
     }
   });
 
@@ -1703,11 +1742,11 @@ export function registerRoutes(app, { models, openai }) {
         await prompt.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Prompt not found');
+        sendError(res, 404, 'Prompt not found');
       }
     } catch (error) {
       console.error('Error deleting prompt:', error);
-      res.status(500).send('Error deleting prompt');
+      sendError(res, 500, 'Error deleting prompt');
     }
   });
 
@@ -1726,11 +1765,11 @@ export function registerRoutes(app, { models, openai }) {
         await prompt.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('Prompt not found');
+        sendError(res, 404, 'Prompt not found');
       }
     } catch (error) {
       console.error('Error deleting prompt:', error);
-      res.status(500).send('Error deleting prompt');
+      sendError(res, 500, 'Error deleting prompt');
     }
   });
 
@@ -1755,7 +1794,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(prompts);
     } catch (error) {
       console.error('Error fetching prompts:', error);
-      res.status(500).send('Error fetching prompts');
+      sendError(res, 500, 'Error fetching prompts');
     }
   });
 
@@ -1773,7 +1812,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(prompt ? prompt.promptPart : '');
     } catch (error) {
       console.error('Error fetching prompt:', error);
-      res.status(500).send('Error fetching prompt');
+      sendError(res, 500, 'Error fetching prompt');
     }
   });
 
@@ -1805,7 +1844,7 @@ export function registerRoutes(app, { models, openai }) {
       res.send(csvText);
     } catch (error) {
       console.error('Error exporting categories and comments:', error);
-      res.status(500).send('Error exporting categories and comments');
+      sendError(res, 500, 'Error exporting categories and comments');
     }
   });
 
@@ -1817,7 +1856,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json(users);
     } catch (error) {
       console.error('Error fetching users:', error);
-      res.status(500).send('Error fetching users');
+      sendError(res, 500, 'Error fetching users');
     }
   });
 
@@ -1833,24 +1872,24 @@ export function registerRoutes(app, { models, openai }) {
         await user.destroy();
         res.sendStatus(204);
       } else {
-        res.status(404).send('User not found');
+        sendError(res, 404, 'User not found');
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      res.status(500).send('Error deleting user');
+      sendError(res, 500, 'Error deleting user');
     }
   });
 
   app.get('/api/export-database', isAdmin, async (req, res) => {
     if (!config.backup.enabled) {
-      return res.status(403).send('Database export disabled');
+      return sendError(res, 403, 'Database export disabled');
     }
     try {
       const filePath = await exportDatabase();
       res.download(filePath, 'database-backup.sql');
     } catch (error) {
       console.error('Error exporting database:', error);
-      res.status(500).send('Error exporting database');
+      sendError(res, 500, 'Error exporting database');
     }
   });
 
@@ -1863,7 +1902,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ message: 'Database backup created successfully' });
     } catch (error) {
       console.error('Error creating database backup:', error);
-      res.status(500).send('Error creating database backup');
+      sendError(res, 500, 'Error creating database backup');
     }
   });
 
@@ -1882,11 +1921,11 @@ export function registerRoutes(app, { models, openai }) {
         await user.save();
         res.json({ message: 'Password updated successfully' });
       } else {
-        res.status(404).send('User not found');
+        sendError(res, 404, 'User not found');
       }
     } catch (error) {
       console.error('Error updating password:', error);
-      res.status(500).send('Error updating password');
+      sendError(res, 500, 'Error updating password');
     }
   });
 
@@ -1896,11 +1935,11 @@ export function registerRoutes(app, { models, openai }) {
     const filePath = req.file?.path;
 
     if (!subjectId || !yearGroupId) {
-      return res.status(400).send('Missing subjectId or yearGroupId');
+      return sendError(res, 400, 'Missing subjectId or yearGroupId');
     }
 
     if (!req.file) {
-      return res.status(400).send('No file uploaded');
+      return sendError(res, 400, 'No file uploaded');
     }
 
     try {
@@ -1919,7 +1958,7 @@ export function registerRoutes(app, { models, openai }) {
       });
     } catch (error) {
       console.error('Error importing categories and comments:', error);
-      res.status(500).send('Error importing categories and comments');
+      sendError(res, 500, 'Error importing categories and comments');
     } finally {
       if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
@@ -1939,7 +1978,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ message: 'User subject updated successfully' });
     } catch (error) {
       console.error('Error updating user subject:', error);
-      res.status(500).send('Error updating user subject');
+      sendError(res, 500, 'Error updating user subject');
     }
   });
 
@@ -1955,7 +1994,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ message: 'User year group updated successfully' });
     } catch (error) {
       console.error('Error updating user year group:', error);
-      res.status(500).send('Error updating user year group');
+      sendError(res, 500, 'Error updating user year group');
     }
   });
 
@@ -1967,7 +2006,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ userSubjects, userYearGroups });
     } catch (error) {
       console.error('Error fetching user settings:', error);
-      res.status(500).send('Error fetching user settings');
+      sendError(res, 500, 'Error fetching user settings');
     }
   });
 
@@ -1987,7 +2026,7 @@ export function registerRoutes(app, { models, openai }) {
       res.json({ userSubjects, userYearGroups });
     } catch (error) {
       console.error('Error fetching user settings:', error);
-      res.status(500).send('Error fetching user settings');
+      sendError(res, 500, 'Error fetching user settings');
     }
   });
 
@@ -2007,7 +2046,7 @@ export function registerRoutes(app, { models, openai }) {
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      res.status(500).send('Error changing password');
+      sendError(res, 500, 'Error changing password');
     }
   });
 }

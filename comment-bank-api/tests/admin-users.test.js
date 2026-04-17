@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import bcrypt from 'bcrypt';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { registerRoutes } from '../src/routes/index.js';
 
 const createModels = (userOverrides = {}) => ({
@@ -21,7 +21,11 @@ const createModels = (userOverrides = {}) => ({
   Comment: {}
 });
 
-const createTestApp = ({ models = createModels(), sessionUser = { id: 1, username: 'admin', isAdmin: true } } = {}) => {
+const createTestApp = ({
+  models = createModels(),
+  sessionUser = { id: 1, username: 'admin', isAdmin: true },
+  sequelizeClient = { authenticate: vi.fn().mockResolvedValue() }
+} = {}) => {
   const app = express();
   app.use(express.json());
   app.use((req, res, next) => {
@@ -31,9 +35,13 @@ const createTestApp = ({ models = createModels(), sessionUser = { id: 1, usernam
     next();
   });
   const openai = { responses: { parse: vi.fn() } };
-  registerRoutes(app, { models, openai });
+  registerRoutes(app, { models, openai, sequelizeClient });
   return app;
 };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('health endpoint', () => {
   it('responds without requiring a session', async () => {
@@ -43,6 +51,77 @@ describe('health endpoint', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ ok: true, status: 'ok' });
+  });
+});
+
+describe('version endpoint', () => {
+  it('responds without requiring a session', async () => {
+    const app = createTestApp({ sessionUser: null });
+
+    const response = await request(app).get('/api/version');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      name: 'comment-bank-api',
+      version: expect.any(String),
+      environment: expect.any(String)
+    });
+    expect(response.body).toHaveProperty('commit');
+    expect(response.body.commit === null || typeof response.body.commit === 'string').toBe(true);
+  });
+});
+
+describe('database health endpoint', () => {
+  it('checks the database for admin users', async () => {
+    const sequelizeClient = { authenticate: vi.fn().mockResolvedValue() };
+    const app = createTestApp({ sequelizeClient });
+
+    const response = await request(app).get('/api/health/db');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true, status: 'ok', database: 'ok' });
+    expect(sequelizeClient.authenticate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not check the database for unauthenticated users', async () => {
+    const sequelizeClient = { authenticate: vi.fn().mockResolvedValue() };
+    const app = createTestApp({ sessionUser: null, sequelizeClient });
+
+    const response = await request(app).get('/api/health/db');
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toMatch(/unauthorized/i);
+    expect(sequelizeClient.authenticate).not.toHaveBeenCalled();
+  });
+
+  it('does not check the database for non-admin users', async () => {
+    const sequelizeClient = { authenticate: vi.fn().mockResolvedValue() };
+    const app = createTestApp({
+      sessionUser: { id: 2, username: 'teacher', isAdmin: false },
+      sequelizeClient
+    });
+
+    const response = await request(app).get('/api/health/db');
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toMatch(/forbidden/i);
+    expect(sequelizeClient.authenticate).not.toHaveBeenCalled();
+  });
+
+  it('returns a clear error when the database check fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const sequelizeClient = { authenticate: vi.fn().mockRejectedValue(new Error('connection refused')) };
+    const app = createTestApp({ sequelizeClient });
+
+    const response = await request(app).get('/api/health/db');
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      message: 'Database connection failed.',
+      ok: false,
+      status: 'error',
+      database: 'error'
+    });
   });
 });
 
