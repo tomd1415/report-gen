@@ -23,6 +23,34 @@ export const applyMenuState = (menu, userInfo) => {
   return state;
 };
 
+export const getCurrentPage = (locationRef = globalThis.location) => {
+  const pathname = locationRef?.pathname || '';
+  const current = pathname.split('/').pop();
+  return current || 'index.html';
+};
+
+export const applyActiveMenuState = (menu, locationRef = globalThis.location) => {
+  const currentPage = getCurrentPage(locationRef);
+  let matched = false;
+
+  menu.querySelectorAll('a').forEach((link) => {
+    const item = link.closest('li');
+    const href = link.getAttribute('href')?.split(/[?#]/)[0] || '';
+    const isActive = !link.hasAttribute('data-menu-logout') && href === currentPage;
+
+    link.classList.toggle('is-active', isActive);
+    if (isActive) {
+      link.setAttribute('aria-current', 'page');
+    } else {
+      link.removeAttribute('aria-current');
+    }
+    item?.classList.toggle('has-active-link', isActive);
+    matched = matched || isActive;
+  });
+
+  return matched;
+};
+
 export const bindLogout = (menu, { fetchImpl = globalThis.fetch, locationRef = globalThis.location } = {}) => {
   const logoutLink = menu.querySelector('[data-menu-logout]');
   if (!logoutLink || logoutLink.dataset.logoutBound === 'true') {
@@ -65,8 +93,12 @@ export const initializeMenu = async ({
   }
 
   const menu = documentRef.querySelector('[data-reportgen-menu]');
-  if (!menu || menu.dataset.menuInitialized === 'true') {
-    return Boolean(menu);
+  if (!menu) {
+    return false;
+  }
+  if (menu.dataset.menuInitialized === 'true') {
+    applyActiveMenuState(menu, locationRef);
+    return true;
   }
 
   menu.dataset.menuInitialized = 'true';
@@ -82,6 +114,7 @@ export const initializeMenu = async ({
   }
 
   applyMenuState(menu, userInfo);
+  applyActiveMenuState(menu, locationRef);
   bindLogout(menu, { fetchImpl, locationRef });
   return true;
 };

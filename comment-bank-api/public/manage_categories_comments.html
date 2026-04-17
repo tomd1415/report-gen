@@ -11,6 +11,7 @@
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
 </head>
 <body class="bg-gray-100 text-gray-900">
 
@@ -26,7 +27,7 @@
                     <!--
                     <label for="subject-select" class="block text-center">Subject:</label>
                     -->
-                    <select id="subject-select" onchange="loadCategoriesAndComments()"
+                    <select id="subject-select" onchange="loadCategoriesAndComments(); updateManageCommentsContext();"
                             class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
                         <option value="">Select Subject</option>
                     </select>
@@ -36,20 +37,26 @@
                     <!--
                     <label for="year-group-select" class="block text-center">Year Group:</label>
                     -->
-                    <select id="year-group-select" onchange="loadCategoriesAndComments()"
+                    <select id="year-group-select" onchange="loadCategoriesAndComments(); updateManageCommentsContext();"
                             class="border border-gray-300 rounded-md shadow-sm text-2xl text-center bg-green-200">
                         <option value="">Select Year Group</option>
                     </select>
                 </div>
             </div>
 
+            <div id="manage-comments-context" class="context-summary" hidden></div>
+            <div id="manage-comments-status" class="status-panel" hidden></div>
+
             <div id="new-category">
                 <div class="form-section">
                     <label for="new-category-name" class="block text-center">New Category Name:</label>
                     <input type="text" id="new-category-name" placeholder="Enter new category name"
                            class="border border-gray-300 rounded-md shadow-sm mb-0 p-1 text-center">
-                    <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="addCategory()">Add Category</button>
+                    <button class="button bg-blue-600 text-white px-4 py-2 rounded-md" onclick="addCategory(this)">Add Category</button>
                 </div>
+            </div>
+            <div class="filter-bar">
+                <input type="text" id="comment-bank-filter" class="filter-input" placeholder="Search categories and comments..." oninput="applyCommentBankFilter()">
             </div>
             <div id="categories-container" class="comment-categories-container">
                 <!-- Categories and comments will be populated here -->
@@ -117,6 +124,32 @@
             };
         }
 
+        function updateManageCommentsContext() {
+            window.ReportGenUI?.renderContextSummary('#manage-comments-context', [
+                { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
+                { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
+            ]);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function parseResponseMessage(response) {
+            const text = await response.text();
+            try {
+                const payload = JSON.parse(text);
+                return payload.message || text;
+            } catch {
+                return text;
+            }
+        }
+
         async function loadSubjects() {
             const response = await fetch('/api/subjects');
             const subjects = await response.json();
@@ -172,62 +205,86 @@
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             if (subjectId && yearGroupId) {
+                window.ReportGenUI?.showStatus('#manage-comments-status', 'Loading categories and comments.', { tone: 'info' });
                 try {
                     const response = await fetch(`/api/categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
                     if (!response.ok) {
                         console.error('Failed to fetch categories and comments:', response.statusText);
+                        window.ReportGenUI?.showStatus('#manage-comments-status', 'Unable to load categories and comments.', { tone: 'error' });
                         return;
                     }
 
                     const categories = await response.json();
                     const categoriesContainer = document.getElementById('categories-container');
                     categoriesContainer.innerHTML = '';
+                    document.getElementById('new-category').style.display = 'block';
+                    if (categories.length === 0) {
+                        window.ReportGenUI?.showStatus('#manage-comments-status', 'No categories yet for this subject and year group. Add one to start building this comment bank.', { tone: 'info' });
+                        return;
+                    }
                     categories.forEach(category => {
-                        document.getElementById('new-category').style.display = 'block';
                         const categoryDiv = document.createElement('div');
                         categoryDiv.classList.add('category', 'm-1', 'p-1', 'bg-blue-300', 'rounded-md', 'shadow-sm');
                         categoryDiv.innerHTML = `
                             <h3 class="category-title" onclick="toggleCategory(this.parentElement)" data-category-id="${category.id}">
-                                ${category.name} <span class="expand">+</span>
+                                ${escapeHtml(category.name)} <span class="expand">+</span>
                             </h3>
-                            <button class="button delete" onclick="deleteCategory(${category.id})">Delete Category</button>
+                            <button class="button delete" onclick="deleteCategory(${category.id}, this)">Delete Category</button>
                             <div class="comments-container" style="display: none;">
                                 ${category.Comments.map(comment => `
                                     <div class="comment" data-comment-id="${comment.id}">
                                         <div class="comment-content" contenteditable="true" onblur="editComment(${comment.id}, this.textContent)">
-                                            ${comment.text}
+                                            ${escapeHtml(comment.text)}
                                         </div>
                                         <div class="comment-actions">
                                             <select onchange="moveComment(${comment.id}, this.value)">
                                                 <option value="">Move to...</option>
                                                 ${categories.map(cat => `
-                                                    <option value="${cat.id}" ${cat.id === category.id ? 'disabled' : ''}>${cat.name}</option>
+                                                    <option value="${cat.id}" ${cat.id === category.id ? 'disabled' : ''}>${escapeHtml(cat.name)}</option>
                                                 `).join('')}
                                             </select>
-                                            <button class="button delete" onclick="deleteComment(${comment.id})">Delete</button>
+                                            <button class="button delete" onclick="deleteComment(${comment.id}, this)">Delete</button>
                                         </div>
                                     </div>
                                 `).join('')}
                                 <div>
                                     <textarea rows="2" placeholder="Add new comment"></textarea>
-                                    <button class="button addcomment" onclick="addComment(${category.id}, this.previousElementSibling.value)">Add Comment</button>
+                                    <button class="button addcomment" onclick="addComment(${category.id}, this.previousElementSibling.value, this)">Add Comment</button>
                                 </div>
                             </div>
                         `;
                         categoriesContainer.appendChild(categoryDiv);
                     });
+                    window.ReportGenUI?.showStatus('#manage-comments-status', `Loaded ${categories.length} categories.`, { tone: 'success' });
+                    applyCommentBankFilter();
                 } catch (error) {
                     console.error('Error loading categories and comments:', error);
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error loading categories and comments.', { tone: 'error' });
                 }
+            } else {
+                document.getElementById('new-category').style.display = 'none';
+                document.getElementById('categories-container').innerHTML = '';
+                window.ReportGenUI?.clearStatus('#manage-comments-status');
+            }
+        }
+
+        function applyCommentBankFilter() {
+            const query = document.getElementById('comment-bank-filter').value;
+            const result = window.ReportGenUI?.filterCommentBank('#categories-container', query);
+            if (query && result) {
+                window.ReportGenUI?.showStatus('#manage-comments-status', `Showing ${result.visible} of ${result.total} categories for "${query}".`, {
+                    tone: result.visible ? 'info' : 'warning'
+                });
             }
         }
 
         // Add new category
-        async function addCategory() {
+        async function addCategory(button) {
             const name = document.getElementById('new-category-name').value;
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             if (name && subjectId && yearGroupId) {
+                window.ReportGenUI?.setButtonLoading(button, true, 'Adding...');
                 try {
                     const response = await fetch('/api/categories', {
                         method: 'POST',
@@ -238,17 +295,20 @@
                     });
                     if (!response.ok) {
                         console.error('Error adding category:', response.statusText);
-                        alert('Error adding category.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error adding category.', { tone: 'error' });
                         return;
                     }
                     document.getElementById('new-category-name').value = '';
-                    loadCategoriesAndComments();
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Category added.', { tone: 'success' });
+                    await loadCategoriesAndComments();
                 } catch (error) {
                     console.error('Error adding category:', error);
-                    alert('Error adding category.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error adding category.', { tone: 'error' });
+                } finally {
+                    window.ReportGenUI?.setButtonLoading(button, false);
                 }
             } else {
-                alert('Please enter a name and select a subject and year group.');
+                window.ReportGenUI?.showStatus('#manage-comments-status', 'Please enter a category name and select a subject and year group.', { tone: 'warning' });
             }
         }
 
@@ -265,38 +325,45 @@
                     });
                     if (!response.ok) {
                         console.error('Error editing category:', response.statusText);
-                        alert('Error editing category.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error editing category.', { tone: 'error' });
+                    } else {
+                        window.ReportGenUI?.showStatus('#manage-comments-status', 'Category updated.', { tone: 'success' });
                     }
                 } catch (error) {
                     console.error('Error editing category:', error);
-                    alert('Error editing category.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error editing category.', { tone: 'error' });
                 }
             }
         }
 
         // Delete category
-        async function deleteCategory(id) {
+        async function deleteCategory(id, button) {
             if (confirm('Are you sure you want to delete this category? All comments in this category will also be deleted.')) {
+                window.ReportGenUI?.setButtonLoading(button, true, 'Deleting...');
                 try {
                     const response = await fetch(`/api/categories/${id}`, {
                         method: 'DELETE'
                     });
                     if (!response.ok) {
                         console.error('Error deleting category:', response.statusText);
-                        alert('Error deleting category.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error deleting category.', { tone: 'error' });
                         return;
                     }
-                    loadCategoriesAndComments();
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Category deleted.', { tone: 'success' });
+                    await loadCategoriesAndComments();
                 } catch (error) {
                     console.error('Error deleting category:', error);
-                    alert('Error deleting category.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error deleting category.', { tone: 'error' });
+                } finally {
+                    window.ReportGenUI?.setButtonLoading(button, false);
                 }
             }
         }
 
         // Add new comment
-        async function addComment(categoryId, text) {
+        async function addComment(categoryId, text, button) {
             if (text) {
+                window.ReportGenUI?.setButtonLoading(button, true, 'Adding...');
                 try {
                     const response = await fetch('/api/comments', {
                         method: 'POST',
@@ -307,16 +374,19 @@
                     });
                     if (!response.ok) {
                         console.error('Error adding comment:', response.statusText);
-                        alert('Error adding comment.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error adding comment.', { tone: 'error' });
                         return;
                     }
-                    loadCategoriesAndComments();
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Comment added.', { tone: 'success' });
+                    await loadCategoriesAndComments();
                 } catch (error) {
                     console.error('Error adding comment:', error);
-                    alert('Error adding comment.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error adding comment.', { tone: 'error' });
+                } finally {
+                    window.ReportGenUI?.setButtonLoading(button, false);
                 }
             } else {
-                alert('Please enter a comment.');
+                window.ReportGenUI?.showStatus('#manage-comments-status', 'Please enter a comment before adding it.', { tone: 'warning' });
             }
         }
 
@@ -333,31 +403,37 @@
                     });
                     if (!response.ok) {
                         console.error('Error editing comment:', response.statusText);
-                        alert('Error editing comment.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error editing comment.', { tone: 'error' });
+                    } else {
+                        window.ReportGenUI?.showStatus('#manage-comments-status', 'Comment updated.', { tone: 'success' });
                     }
                 } catch (error) {
                     console.error('Error editing comment:', error);
-                    alert('Error editing comment.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error editing comment.', { tone: 'error' });
                 }
             }
         }
 
         // Delete comment
-        async function deleteComment(id) {
+        async function deleteComment(id, button) {
             if (confirm('Are you sure you want to delete this comment?')) {
+                window.ReportGenUI?.setButtonLoading(button, true, 'Deleting...');
                 try {
                     const response = await fetch(`/api/comments/${id}`, {
                         method: 'DELETE'
                     });
                     if (!response.ok) {
                         console.error('Error deleting comment:', response.statusText);
-                        alert('Error deleting comment.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error deleting comment.', { tone: 'error' });
                         return;
                     }
-                    loadCategoriesAndComments();
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Comment deleted.', { tone: 'success' });
+                    await loadCategoriesAndComments();
                 } catch (error) {
                     console.error('Error deleting comment:', error);
-                    alert('Error deleting comment.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error deleting comment.', { tone: 'error' });
+                } finally {
+                    window.ReportGenUI?.setButtonLoading(button, false);
                 }
             }
         }
@@ -375,13 +451,14 @@
                     });
                     if (!response.ok) {
                         console.error('Error moving comment:', response.statusText);
-                        alert('Error moving comment.');
+                        window.ReportGenUI?.showStatus('#manage-comments-status', await parseResponseMessage(response) || 'Error moving comment.', { tone: 'error' });
                         return;
                     }
-                    loadCategoriesAndComments();
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Comment moved.', { tone: 'success' });
+                    await loadCategoriesAndComments();
                 } catch (error) {
                     console.error('Error moving comment:', error);
-                    alert('Error moving comment.');
+                    window.ReportGenUI?.showStatus('#manage-comments-status', 'Error moving comment.', { tone: 'error' });
                 }
             }
         }
@@ -392,7 +469,6 @@
         }
 
         // Load subjects and year groups on page load
-        document.addEventListener('DOMContentLoaded', loadSettings);
     </script>
 
 </body>

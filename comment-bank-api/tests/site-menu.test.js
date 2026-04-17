@@ -2,7 +2,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let applyMenuState;
+let applyActiveMenuState;
 let bindLogout;
+let getCurrentPage;
 let getMenuState;
 let initializeMenu;
 let watchForMenu;
@@ -22,7 +24,9 @@ beforeAll(async () => {
   globalThis.__REPORTGEN_MENU_DISABLE_AUTO_INIT__ = true;
   ({
     applyMenuState,
+    applyActiveMenuState,
     bindLogout,
+    getCurrentPage,
     getMenuState,
     initializeMenu,
     watchForMenu
@@ -132,6 +136,29 @@ describe('site menu helpers', () => {
       credentials: 'include'
     });
     expect(locationRef.href).toBe('login.html');
+  });
+
+  it('marks the current page as active without marking logout', () => {
+    document.body.innerHTML = `
+      <ul data-reportgen-menu>
+        <li><a href="index.html">Generate</a></li>
+        <li><a href="adminpage.html">Admin</a></li>
+        <li><a href="login.html" data-menu-logout>Logout</a></li>
+      </ul>
+    `;
+    const menu = document.querySelector('[data-reportgen-menu]');
+
+    const matched = applyActiveMenuState(menu, { pathname: '/adminpage.html' });
+
+    expect(matched).toBe(true);
+    expect(menu.querySelector('a[href="adminpage.html"]').classList.contains('is-active')).toBe(true);
+    expect(menu.querySelector('a[href="adminpage.html"]').getAttribute('aria-current')).toBe('page');
+    expect(menu.querySelector('a[data-menu-logout]').classList.contains('is-active')).toBe(false);
+  });
+
+  it('uses index.html as the default current page', () => {
+    expect(getCurrentPage({ pathname: '/' })).toBe('index.html');
+    expect(getCurrentPage({ pathname: '/settings.html' })).toBe('settings.html');
   });
 
   it('maps admin state consistently', () => {

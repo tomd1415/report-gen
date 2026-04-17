@@ -11,6 +11,7 @@
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
 </head>
 <body>
     <!-- Include header -->
@@ -21,18 +22,21 @@
         <div id="form-container">
             <div class="subject-year">
                 <div class="form-section">
-                    <select id="subject-select" onchange="loadYearGroups()">
+                    <select id="subject-select" onchange="loadYearGroups(); updatePromptContext();">
                         <option value="">Select Subject</option>
                         <!-- Options will be populated dynamically -->
                     </select>
                 </div>
                 <div class="form-section">
-                    <select id="year-group-select" onchange="loadPrompt()">
+                    <select id="year-group-select" onchange="loadPrompt(); updatePromptContext();">
                         <option value="">Select Year Group</option>
                         <!-- Options will be populated dynamically -->
                     </select>
                 </div>
             </div>
+
+            <div id="prompt-context" class="context-summary" hidden></div>
+            <div id="prompt-status" class="status-panel" hidden></div>
 
             <div class="form-section">
                 <label for="subject-description">Subject description (shown before the report, not repeated in the report):</label>
@@ -111,6 +115,23 @@
             };
         }
 
+        function updatePromptContext() {
+            window.ReportGenUI?.renderContextSummary('#prompt-context', [
+                { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
+                { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
+            ]);
+        }
+
+        async function parseResponseMessage(response) {
+            const text = await response.text();
+            try {
+                const payload = JSON.parse(text);
+                return payload.message || text;
+            } catch {
+                return text;
+            }
+        }
+
         async function loadSubjects(userSubjects) {
             const response = await fetch('/api/subjects');
             const subjects = await response.json();
@@ -147,6 +168,7 @@
                 option.textContent = name;
                 yearGroupSelect.appendChild(option);
             });
+            updatePromptContext();
         }
 
         async function loadPrompt() {
@@ -157,28 +179,35 @@
             const yearGroupTextIndex = document.getElementById('year-group-select').selectedIndex;
             const yearGroupText = document.getElementById('year-group-select').options[yearGroupTextIndex].text;
             if (subjectId && yearGroupId) {
+                window.ReportGenUI?.showStatus('#prompt-status', 'Loading prompt and subject context.', { tone: 'info' });
                 document.getElementById('savePrompt').disabled = false;
                 document.getElementById('savePrompt').className = document.getElementById('savePrompt').className.replace('savePromptDisabled', 'savePrompt')
-                const [promptResponse, contextResponse] = await Promise.all([
-                    fetch(`/api/prompts/${subjectId}/${yearGroupId}`),
-                    fetch(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
-                ]);
-                const promptPart = await promptResponse.json();
-                const subjectContext = contextResponse.ok ? await contextResponse.json() : {};
+                try {
+                    const [promptResponse, contextResponse] = await Promise.all([
+                        fetch(`/api/prompts/${subjectId}/${yearGroupId}`),
+                        fetch(`/api/subject-context?subjectId=${subjectId}&yearGroupId=${yearGroupId}`)
+                    ]);
+                    const promptPart = await promptResponse.json();
+                    const subjectContext = contextResponse.ok ? await contextResponse.json() : {};
 
-                const defaultPrompt = `Write a friendly yet formal school report for the pupil in ${yearGroupText} ${subjectText} lessons. The subject description (provided separately) is context only and should not be repeated in the report. Use exactly four paragraphs: (1) topics/areas studied so far and key knowledge/skills acquired, (2) effort/motivation/attendance, (3) strengths and particular achievements, (4) areas for development to bolster progress and achieve the end of year Teacher Target. Use the selected comments as evidence, do not use headings or bullet points, and keep within the target word limit if set.`;
+                    const defaultPrompt = `Write a friendly yet formal school report for the pupil in ${yearGroupText} ${subjectText} lessons. The subject description (provided separately) is context only and should not be repeated in the report. Use exactly four paragraphs: (1) topics/areas studied so far and key knowledge/skills acquired, (2) effort/motivation/attendance, (3) strengths and particular achievements, (4) areas for development to bolster progress and achieve the end of year Teacher Target. Use the selected comments as evidence, do not use headings or bullet points, and keep within the target word limit if set.`;
 
-                document.getElementById('sample-prompt').innerHTML = `<b>Sample Prompt:</b><br />Write a friendly yet formal school report for the pupil in ${yearGroupText} ${subjectText} lessons. The subject description (provided separately) is context only and should not be repeated in the report.<br /><br />
+                    document.getElementById('sample-prompt').innerHTML = `<b>Sample Prompt:</b><br />Write a friendly yet formal school report for the pupil in ${yearGroupText} ${subjectText} lessons. The subject description (provided separately) is context only and should not be repeated in the report.<br /><br />
 Use exactly four paragraphs: (1) topics/areas studied so far and key knowledge/skills acquired, (2) effort/motivation/attendance, (3) strengths and particular achievements, (4) areas for development to bolster progress and achieve the end of year Teacher Target.<br /><br />
 Use the selected comments as evidence, do not use headings or bullet points, and keep within the target word limit if set.`;
 
-                document.getElementById('subject-description').value = subjectContext.subjectDescription || '';
-                document.getElementById('word-limit').value = subjectContext.wordLimit || '';
+                    document.getElementById('subject-description').value = subjectContext.subjectDescription || '';
+                    document.getElementById('word-limit').value = subjectContext.wordLimit || '';
 
-                if (!promptPart || promptPart === '') {
-                    document.getElementById('prompt-text').value = defaultPrompt;
-                } else {
-                    document.getElementById('prompt-text').value = promptPart;
+                    if (!promptPart || promptPart === '') {
+                        document.getElementById('prompt-text').value = defaultPrompt;
+                    } else {
+                        document.getElementById('prompt-text').value = promptPart;
+                    }
+                    window.ReportGenUI?.showStatus('#prompt-status', 'Prompt and subject context loaded.', { tone: 'success' });
+                } catch (error) {
+                    console.error('Error loading prompt:', error);
+                    window.ReportGenUI?.showStatus('#prompt-status', 'Error loading prompt and subject context.', { tone: 'error' });
                 }
             }
         }
@@ -189,51 +218,69 @@ Use the selected comments as evidence, do not use headings or bullet points, and
             const promptPart = document.getElementById('prompt-text').value;
             const subjectDescription = document.getElementById('subject-description').value;
             const wordLimit = document.getElementById('word-limit').value;
+            const button = document.getElementById('savePrompt');
 
-            // Check if the prompt exists
-            const checkResponse = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
-            const existingPrompt = await checkResponse.json();
-
-            let method;
-            let url;
-
-            if (existingPrompt && existingPrompt !== '') {
-                method = 'PUT';
-                url = `/api/prompts/${subjectId}/${yearGroupId}`;
-            } else {
-                method = 'POST';
-                url = '/api/prompts';
+            if (!subjectId || !yearGroupId) {
+                window.ReportGenUI?.showStatus('#prompt-status', 'Please select a subject and year group before saving.', { tone: 'warning' });
+                return;
             }
 
-            const responseSave = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    subjectId,
-                    yearGroupId,
-                    promptPart
-                })
-            });
+            window.ReportGenUI?.setButtonLoading(button, true, 'Saving...');
 
-            const contextSave = await fetch('/api/subject-context', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    subjectId,
-                    yearGroupId,
-                    subjectDescription,
-                    wordLimit
-                })
-            });
+            try {
+                // Check if the prompt exists
+                const checkResponse = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
+                const existingPrompt = await checkResponse.json();
 
-            if (responseSave.ok && contextSave.ok) {
-                alert('Prompt and subject context saved successfully!');
-            } else {
-                alert('Error saving prompt.');
+                let method;
+                let url;
+
+                if (existingPrompt && existingPrompt !== '') {
+                    method = 'PUT';
+                    url = `/api/prompts/${subjectId}/${yearGroupId}`;
+                } else {
+                    method = 'POST';
+                    url = '/api/prompts';
+                }
+
+                const responseSave = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        subjectId,
+                        yearGroupId,
+                        promptPart
+                    })
+                });
+
+                const contextSave = await fetch('/api/subject-context', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        subjectId,
+                        yearGroupId,
+                        subjectDescription,
+                        wordLimit
+                    })
+                });
+
+                if (responseSave.ok && contextSave.ok) {
+                    window.ReportGenUI?.showStatus('#prompt-status', 'Prompt and subject context saved.', { tone: 'success' });
+                } else {
+                    const message = !responseSave.ok
+                        ? await parseResponseMessage(responseSave)
+                        : await parseResponseMessage(contextSave);
+                    window.ReportGenUI?.showStatus('#prompt-status', message || 'Error saving prompt.', { tone: 'error' });
+                }
+            } catch (error) {
+                console.error('Error saving prompt:', error);
+                window.ReportGenUI?.showStatus('#prompt-status', 'Error saving prompt.', { tone: 'error' });
+            } finally {
+                window.ReportGenUI?.setButtonLoading(button, false);
             }
         }
     </script>

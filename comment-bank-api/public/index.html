@@ -11,6 +11,7 @@
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
 </head>
 <body class="bg-light-blue text-dark-gray report-page">
 
@@ -23,17 +24,20 @@
         <div id="form-container">
             <div class="subject-year">
                 <div class="form-section">
-                    <select id="subject-select" onchange="loadCategoriesAndComments()" class="form-control">
+                    <select id="subject-select" onchange="loadCategoriesAndComments(); updateGenerateContext();" class="form-control">
                         <option value="">Select Subject</option>
                     </select>
                 </div>
                 
                 <div class="form-section">
-                    <select id="year-group-select" onchange="loadCategoriesAndComments()" class="form-control">
+                    <select id="year-group-select" onchange="loadCategoriesAndComments(); updateGenerateContext();" class="form-control">
                         <option value="">Select Year Group</option>
                     </select>
                 </div>
             </div>
+
+            <div id="generate-context" class="context-summary" hidden></div>
+            <div id="generate-status" class="status-panel" hidden></div>
 
             <div id="name-pronoun-section" class="flex-center">
                 <div class="flex-col-center">
@@ -245,11 +249,23 @@
             });
         }
 
+        function updateGenerateContext() {
+            window.ReportGenUI?.renderContextSummary('#generate-context', [
+                { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
+                { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
+            ]);
+        }
+
+        function showGenerateStatus(message, tone = 'info') {
+            window.ReportGenUI?.showStatus('#generate-status', message, { tone });
+        }
+
         async function loadCategoriesAndComments() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             if (subjectId && yearGroupId) {
                 document.getElementById('name-pronoun-section').style.display = 'flex';
+                showGenerateStatus('Loading comment bank and prompt settings.');
                 console.log(`Fetching categories and comments for subjectId: ${subjectId}, yearGroupId: ${yearGroupId}`);
 
                 const [categoriesResponse, promptPartResponse, subjectContextResponse] = await Promise.all([
@@ -280,7 +296,7 @@
 
                 const selectionHelper = window.ReportSelection;
                 if (!selectionHelper) {
-                    alert('Unable to load selection tools. Please refresh the page.');
+                    showGenerateStatus('Unable to load selection tools. Please refresh the page.', 'error');
                     return;
                 }
 
@@ -361,6 +377,7 @@
                 document.getElementById('category-controls').style.display = categories.length ? 'flex' : 'none';
                 document.getElementById('additional-comments-wrapper').style.display = 'block';
                 document.getElementById('generate-report').style.display = 'block';
+                showGenerateStatus(`Loaded ${categories.length} categories for this report.`, categories.length ? 'success' : 'warning');
             }
         }
 
@@ -580,7 +597,7 @@
                 return;
             }
             if (!skipLimitCheck && list.children.length >= STRENGTH_FOCUS_MAX) {
-                alert(`You can add up to ${STRENGTH_FOCUS_MAX} strength focus items.`);
+                showGenerateStatus(`You can add up to ${STRENGTH_FOCUS_MAX} strength focus items.`, 'warning');
                 return;
             }
             list.appendChild(createStrengthFocusRow());
@@ -857,7 +874,7 @@
                     });
                     if (!response.ok) {
                         console.error('Error adding comment:', response.statusText);
-                        alert('Error adding comment.');
+                        showGenerateStatus('Error adding comment.', 'error');
                         return;
                     }
                     const newComment = await response.json();
@@ -867,10 +884,13 @@
                     updateSelectionSummary();
                     applyFilters();
                     closeModal();
+                    showGenerateStatus('Comment added to this report.', 'success');
                 } catch (error) {
                     console.error('Error adding comment:', error);
-                    alert('Error adding comment.');
+                    showGenerateStatus('Error adding comment.', 'error');
                 }
+            } else {
+                showGenerateStatus('Please enter a comment before saving it.', 'warning');
             }
         }
 
@@ -886,20 +906,20 @@
             clearRelevanceWarning();
 
             if (!pupilName) {
-                alert('Please enter the pupil name before generating a report.');
+                showGenerateStatus('Please enter the pupil name before generating a report.', 'warning');
                 document.getElementById('pupil-name').focus();
                 return;
             }
 
             if (!pupilPronouns) {
-                alert('Please enter the pupil pronouns before generating a report.');
+                showGenerateStatus('Please enter the pupil pronouns before generating a report.', 'warning');
                 document.getElementById('pupil-pronouns').focus();
                 return;
             }
 
             const selectionHelper = window.ReportSelection;
             if (!selectionHelper || typeof selectionHelper.collectSelections !== 'function') {
-                alert('Unable to validate category selections. Please refresh the page.');
+                showGenerateStatus('Unable to validate category selections. Please refresh the page.', 'error');
                 return;
             }
 
@@ -908,14 +928,14 @@
             );
             if (missingGroups.length > 0) {
                 setValidationState(true);
-                alert(`Please select at least one comment for: ${missingGroups.join(', ')}.`);
+                showGenerateStatus(`Please select at least one comment for: ${missingGroups.join(', ')}.`, 'warning');
                 return;
             }
             setValidationState(false);
 
             const strengthFocus = collectStrengthFocus();
             if (strengthFocus.incomplete.length > 0) {
-                alert('Please complete or remove all strength focus rows before generating the report.');
+                showGenerateStatus('Please complete or remove all strength focus rows before generating the report.', 'warning');
                 return;
             }
 
@@ -936,6 +956,9 @@
             document.getElementById('result-container').style.display = 'block';
             let resultContainer = document.getElementById('result-container');
             resultContainer.innerHTML = '<h1>Generating Report</h1>'; // Clear previous results
+            const generateButton = document.getElementById('generate-report');
+            window.ReportGenUI?.setButtonLoading(generateButton, true, 'Generating...');
+            showGenerateStatus('Generating report. This may take a moment.');
 
             // Generate report for the pupil
             try {
@@ -950,6 +973,7 @@
                     const errorPayload = await response.json().catch(() => ({}));
                     showRelevanceWarning(errorPayload.flagged || []);
                     resultContainer.innerHTML = '<p>Please review the highlighted comments before continuing.</p>';
+                    showGenerateStatus('Review the highlighted comments, then either adjust selections or generate anyway.', 'warning');
                     return;
                 }
                 if (!response.ok) {
@@ -966,9 +990,13 @@
                 } else {
                     reportContainer.textContent = report;
                 }
+                showGenerateStatus('Report generated.', 'success');
             } catch (error) {
                 console.error('Error:', error);
                 resultContainer.innerHTML += `<p>${error.message}</p>`;
+                showGenerateStatus(error.message, 'error');
+            } finally {
+                window.ReportGenUI?.setButtonLoading(generateButton, false);
             }
             const copyButton = document.getElementById('copy-report-btn');
             if (copyButton) {
@@ -994,9 +1022,10 @@
             const reportText = reportContainer.innerText || reportContainer.textContent;
 
             navigator.clipboard.writeText(reportText).then(() => {
-                alert('Report copied to clipboard!');
+                showGenerateStatus('Report copied to clipboard.', 'success');
             }).catch(err => {
                 console.error('Failed to copy report: ', err);
+                showGenerateStatus('Failed to copy report to clipboard.', 'error');
             });
         }
 

@@ -156,6 +156,16 @@ nav a:hover {
     text-decoration: underline;
 }
 
+nav a.is-active {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+nav li.has-active-link {
+    background-color: var(--accent-dark);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35), 0 6px 14px rgba(15, 34, 44, 0.15);
+}
+
 /* Container and Form Sections */
 .container {
     max-width: 1200px;
@@ -245,6 +255,13 @@ textarea {
     background-color: var(--accent-dark);
 }
 
+.button:disabled,
+.button[aria-busy="true"],
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.68;
+}
+
 .button.delete {
     background-color: var(--danger);
 }
@@ -259,6 +276,74 @@ textarea {
     background-color: #f9fbfc;
     border-radius: 14px;
     border: 1px solid var(--border);
+}
+
+.status-panel {
+    display: block;
+    margin: 14px 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #f9fbfc;
+    color: var(--ink);
+    font-size: 0.95rem;
+}
+
+.status-panel[hidden] {
+    display: none;
+}
+
+.status-panel--info {
+    border-color: rgba(28, 107, 123, 0.3);
+    background: #eef8fb;
+    color: var(--accent-dark);
+}
+
+.status-panel--success {
+    border-color: rgba(22, 101, 52, 0.3);
+    background: #ecfdf3;
+    color: #166534;
+}
+
+.status-panel--warning {
+    border-color: rgba(180, 83, 9, 0.35);
+    background: #fff7ed;
+    color: #7c4a10;
+}
+
+.status-panel--error {
+    border-color: rgba(194, 65, 12, 0.35);
+    background: #fff1ed;
+    color: #9a3412;
+}
+
+.context-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: -4px 0 18px;
+    justify-content: center;
+}
+
+.context-summary[hidden] {
+    display: none;
+}
+
+.context-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(28, 107, 123, 0.2);
+    background: #f8fafc;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.replace-summary {
+    border-color: rgba(194, 65, 12, 0.35);
+    background: #fff7ed;
 }
 
 /* Category and Comment Styles */
@@ -1001,6 +1086,14 @@ nav ul li a:hover {
 #result-container {
     font-size: 1.2em;
     padding: 20px;
+    display: none;
+}
+
+#result-container.status-panel {
+    display: block;
+}
+
+#result-container.status-panel[hidden] {
     display: none;
 }
 

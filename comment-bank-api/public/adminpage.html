@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
     <script type="module" src="import-summary.js"></script>
 </head>
 <body class="bg-light-blue text-dark-gray">
@@ -14,6 +15,7 @@
     <div class="container bg-light-blue rounded-lg shadow-lg">
         <h1 class="main-title">Admin Panel</h1>
         <div id="user-info">Logged in as: <span id="username"></span></div>
+        <div id="admin-status" class="status-panel" hidden></div>
 
         <!-- Manage Year Groups and Subjects Section -->
         <section class="section">
@@ -90,10 +92,12 @@
 
                 <label for="staff-bank-prompt">Prompt text:</label>
                 <textarea id="staff-bank-prompt" rows="4" maxlength="5000"></textarea>
-                <button type="button" class="button" onclick="saveStaffBankContextAndPrompt()">Save Staff Context</button>
+                <button type="button" class="button" id="staff-bank-save-context-button" onclick="saveStaffBankContextAndPrompt(this)">Save Staff Context</button>
             </div>
 
             <div class="form-section">
+                <div id="staff-bank-context-summary" class="context-summary" hidden></div>
+
                 <label for="staff-bank-pupil-names">Pupil names to redact (comma separated):</label>
                 <input type="text" id="staff-bank-pupil-names" maxlength="2000" placeholder="Enter pupil names separated by commas">
 
@@ -113,6 +117,7 @@
                     <input type="checkbox" id="staff-bank-confirm-replace">
                     I understand this will replace only this staff user's selected subject/year group comments.
                 </label>
+                <div id="staff-bank-replace-summary" class="status-panel replace-summary" hidden></div>
 
                 <button type="button" class="button" id="staff-bank-import-button" onclick="importStaffReports()">Import Reports For Staff</button>
                 <div id="staff-bank-result" class="result-section"></div>
@@ -122,8 +127,8 @@
         <!-- Database Management Section -->
         <section class="section">
             <h2>Database Management</h2>
-            <button type="button" class="button" onclick="exportDatabase()">Export Database</button>
-            <button type="button" class="button" onclick="backupDatabase()">Backup Database</button>
+            <button type="button" class="button" onclick="exportDatabase(this)">Export Database</button>
+            <button type="button" class="button" onclick="backupDatabase(this)">Backup Database</button>
             <p class="warning">Warning: These actions can significantly affect the database. Proceed with caution.</p>
         </section>
     </div>
@@ -139,26 +144,25 @@
                         window.location.href = 'admin-login.html';
                     }
                 });
-	    
-                checkAdminStatus();
+            checkAdminStatus();
 
-    	    function checkAdminStatus() {
-        	fetch('/api/user-info', {
-             	credentials: 'include'  // Make sure cookies are included with the request
-        	})
-        	.then(response => response.json())
-        	.then(data => {
-            	if (!data.isAdmin) {
-                	alert('Access Denied: You do not have admin privileges.');
-                	window.location.href = 'index.html'; // Redirect non-admins to a different page
-            	}
-        	})
-        	.catch(error => {
-            		console.error('Failed to check admin status:', error);
-            		window.location.href = 'admin-login.html'; // Redirect to login if there's an error
-        	});
-    		}
- 
+            function checkAdminStatus() {
+                fetch('/api/user-info', {
+                    credentials: 'include'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.isAdmin) {
+                            window.ReportGenUI?.showStatus('#admin-status', 'Access denied: you do not have admin privileges.', { tone: 'error' });
+                            window.location.href = 'index.html';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Failed to check admin status:', error);
+                        window.location.href = 'admin-login.html';
+                    });
+            }
+
 		
             loadYearGroups();
             loadSubjects();
@@ -220,11 +224,12 @@
                 if (response.ok) {
                     document.getElementById('year-group-name').value = '';
                     loadYearGroups();
+                    window.ReportGenUI?.showStatus('#admin-status', 'Year group added.', { tone: 'success' });
                 } else {
-                    alert('Error adding year group.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error adding year group.', { tone: 'error' });
                 }
             } else {
-                alert('Please enter a name for the year group.');
+                window.ReportGenUI?.showStatus('#admin-status', 'Please enter a name for the year group.', { tone: 'warning' });
             }
         }
 
@@ -233,8 +238,9 @@
                 const response = await fetch(`/api/year-groups/${id}`, { method: 'DELETE' });
                 if (response.ok) {
                     loadYearGroups();
+                    window.ReportGenUI?.showStatus('#admin-status', 'Year group deleted.', { tone: 'success' });
                 } else {
-                    alert('Error deleting year group.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error deleting year group.', { tone: 'error' });
                 }
             }
         }
@@ -279,11 +285,12 @@
                 if (response.ok) {
                     document.getElementById('subject-name').value = '';
                     loadSubjects();
+                    window.ReportGenUI?.showStatus('#admin-status', 'Subject added.', { tone: 'success' });
                 } else {
-                    alert('Error adding subject.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error adding subject.', { tone: 'error' });
                 }
             } else {
-                alert('Please enter a name for the subject.');
+                window.ReportGenUI?.showStatus('#admin-status', 'Please enter a name for the subject.', { tone: 'warning' });
             }
         }
 
@@ -292,8 +299,9 @@
                 const response = await fetch(`/api/subjects/${id}`, { method: 'DELETE' });
                 if (response.ok) {
                     loadSubjects();
+                    window.ReportGenUI?.showStatus('#admin-status', 'Subject deleted.', { tone: 'success' });
                 } else {
-                    alert('Error deleting subject.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error deleting subject.', { tone: 'error' });
                 }
             }
         }
@@ -313,12 +321,14 @@
                     document.getElementById('username-input').value = '';
                     document.getElementById('password').value = '';
                     document.getElementById('isAdmin').checked = false;
-                    alert('User added successfully.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'User added successfully.', { tone: 'success' });
+                    loadStaffCommentUsers();
                 } else {
-                    alert('Error adding user.');
+                    const message = await parseResponseMessage(response);
+                    window.ReportGenUI?.showStatus('#admin-status', message || 'Error adding user.', { tone: 'error' });
                 }
             } else {
-                alert('Please enter a username and password.');
+                window.ReportGenUI?.showStatus('#admin-status', 'Please enter a username and password.', { tone: 'warning' });
             }
         }
 
@@ -330,12 +340,13 @@
                     document.getElementById('username-input').value = '';
                     document.getElementById('password').value = '';
                     document.getElementById('isAdmin').checked = false;
-                    alert('User deleted successfully.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'User deleted successfully.', { tone: 'success' });
+                    loadStaffCommentUsers();
                 } else {
-                    alert('Error deleting user.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error deleting user.', { tone: 'error' });
                 }
             } else {
-                alert('Please enter a username.');
+                window.ReportGenUI?.showStatus('#admin-status', 'Please enter a username.', { tone: 'warning' });
             }
         }
         async function changePassword() {
@@ -357,16 +368,18 @@
       if (!response.ok) {
         const errorMessage = await response.text();
         console.error('Failed to change password:', response.statusText, errorMessage);
-        alert('Failed to change password: ' + errorMessage);
+        window.ReportGenUI?.showStatus('#admin-status', 'Failed to change password: ' + errorMessage, { tone: 'error' });
       } else {
-        alert('Password changed successfully.');
+        document.getElementById('change-password-username').value = '';
+        document.getElementById('new-password').value = '';
+        window.ReportGenUI?.showStatus('#admin-status', 'Password changed successfully.', { tone: 'success' });
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      alert('Error changing password: ' + error.message);
+      window.ReportGenUI?.showStatus('#admin-status', 'Error changing password: ' + error.message, { tone: 'error' });
     }
   } else {
-    alert('Please fill in both fields.');
+    window.ReportGenUI?.showStatus('#admin-status', 'Please fill in both fields.', { tone: 'warning' });
   }
 }
 
@@ -399,8 +412,41 @@
             };
         }
 
-        function setStaffBankResult(message) {
-            document.getElementById('staff-bank-result').textContent = message;
+        function getSelectedText(id) {
+            return window.ReportGenUI?.getSelectedOptionText(`#${id}`) || '';
+        }
+
+        function updateStaffBankSummary() {
+            const staff = getSelectedText('staff-bank-user');
+            const subject = getSelectedText('staff-bank-subject');
+            const yearGroup = getSelectedText('staff-bank-year-group');
+            window.ReportGenUI?.renderContextSummary('#staff-bank-context-summary', [
+                { label: 'Staff', value: staff },
+                { label: 'Subject', value: subject },
+                { label: 'Year group', value: yearGroup }
+            ]);
+            updateStaffReplaceSummary();
+        }
+
+        function updateStaffReplaceSummary() {
+            const mode = document.getElementById('staff-bank-import-mode').value;
+            if (mode !== 'replace') {
+                window.ReportGenUI?.clearStatus('#staff-bank-replace-summary');
+                return;
+            }
+
+            const staff = getSelectedText('staff-bank-user') || 'the selected staff user';
+            const subject = getSelectedText('staff-bank-subject') || 'the selected subject';
+            const yearGroup = getSelectedText('staff-bank-year-group') || 'the selected year group';
+            window.ReportGenUI?.showStatus(
+                '#staff-bank-replace-summary',
+                `Replace mode will delete and replace only ${staff}'s comments for ${subject} / ${yearGroup}. Other staff, subjects, and year groups are not changed.`,
+                { tone: 'warning' }
+            );
+        }
+
+        function setStaffBankResult(message, tone = 'info') {
+            window.ReportGenUI?.showStatus('#staff-bank-result', message, { tone });
         }
 
         async function parseResponseMessage(response) {
@@ -415,11 +461,13 @@
 
         async function loadStaffBankContext() {
             const { userId, subjectId, yearGroupId } = getStaffBankSelection();
+            updateStaffBankSummary();
             if (!userId || !subjectId || !yearGroupId) {
                 return;
             }
 
             try {
+                setStaffBankResult('Loading staff comment bank context.');
                 const [contextResponse, promptResponse, bankResponse] = await Promise.all([
                     fetch(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`),
                     fetch(`/api/admin/staff/${encodeURIComponent(userId)}/prompts/${encodeURIComponent(subjectId)}/${encodeURIComponent(yearGroupId)}`),
@@ -440,18 +488,18 @@
                 if (bankResponse.ok) {
                     const categories = await bankResponse.json();
                     const commentCount = categories.reduce((sum, category) => sum + ((category.Comments || []).length), 0);
-                    setStaffBankResult(`Current bank: ${categories.length} categories, ${commentCount} comments.`);
+                    setStaffBankResult(`Current bank: ${categories.length} categories, ${commentCount} comments.`, 'success');
                 }
             } catch (error) {
                 console.error('Error loading staff comment bank context:', error);
-                setStaffBankResult('Error loading staff comment bank context.');
+                setStaffBankResult('Error loading staff comment bank context.', 'error');
             }
         }
 
-        async function saveStaffBankContextAndPrompt() {
+        async function saveStaffBankContextAndPrompt(button = document.getElementById('staff-bank-save-context-button')) {
             const { userId, subjectId, yearGroupId } = getStaffBankSelection();
             if (!userId || !subjectId || !yearGroupId) {
-                alert('Please select a staff user, subject, and year group.');
+                setStaffBankResult('Please select a staff user, subject, and year group.', 'warning');
                 return false;
             }
 
@@ -460,6 +508,7 @@
             const promptPart = document.getElementById('staff-bank-prompt').value;
 
             try {
+                window.ReportGenUI?.setButtonLoading(button, true, 'Saving...');
                 const [contextResponse, promptResponse] = await Promise.all([
                     fetch(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context`, {
                         method: 'POST',
@@ -477,16 +526,18 @@
                     const message = !contextResponse.ok
                         ? await parseResponseMessage(contextResponse)
                         : await parseResponseMessage(promptResponse);
-                    alert(`Error saving staff context: ${message}`);
+                    setStaffBankResult(`Error saving staff context: ${message}`, 'error');
                     return false;
                 }
 
-                setStaffBankResult('Staff context saved.');
+                setStaffBankResult('Staff context saved.', 'success');
                 return true;
             } catch (error) {
                 console.error('Error saving staff context:', error);
-                alert('Error saving staff context.');
+                setStaffBankResult('Error saving staff context.', 'error');
                 return false;
+            } finally {
+                window.ReportGenUI?.setButtonLoading(button, false);
             }
         }
 
@@ -507,6 +558,7 @@
             if (mode !== 'replace') {
                 document.getElementById('staff-bank-confirm-replace').checked = false;
             }
+            updateStaffReplaceSummary();
         }
 
         async function importStaffReports() {
@@ -517,12 +569,12 @@
             const confirmReplace = document.getElementById('staff-bank-confirm-replace').checked;
 
             if (!userId || !subjectId || !yearGroupId || !pupilNames || !reports) {
-                alert('Please select staff, subject, year group, pupil names, and reports.');
+                setStaffBankResult('Please select staff, subject, year group, pupil names, and reports.', 'warning');
                 return;
             }
 
             if (mode === 'replace' && !confirmReplace) {
-                alert('Please confirm replace mode before importing.');
+                setStaffBankResult('Please confirm replace mode before importing.', 'warning');
                 return;
             }
 
@@ -532,7 +584,7 @@
             }
 
             const importButton = document.getElementById('staff-bank-import-button');
-            importButton.disabled = true;
+            window.ReportGenUI?.setButtonLoading(importButton, true, 'Importing...');
             setStaffBankResult('Importing reports. This may take a while.');
 
             try {
@@ -563,20 +615,21 @@
                 const summary = window.ReportGenImportSummary?.formatImportSummary(payload, {
                     targetLabel: 'staff comment bank'
                 }) || payload.message || 'Import completed.';
-                setStaffBankResult(summary);
+                setStaffBankResult(summary, 'success');
                 document.getElementById('staff-bank-reports').value = '';
                 document.getElementById('staff-bank-report-file').value = '';
             } catch (error) {
                 console.error('Error importing reports for staff:', error);
-                setStaffBankResult(error.message);
+                setStaffBankResult(error.message, 'error');
             } finally {
-                importButton.disabled = false;
+                window.ReportGenUI?.setButtonLoading(importButton, false);
             }
         }
 
 
 
-        async function exportDatabase() {
+        async function exportDatabase(button) {
+            window.ReportGenUI?.setButtonLoading(button, true, 'Exporting...');
             try {
                 const response = await fetch('/api/export-database');
                 if (response.ok) {
@@ -589,27 +642,32 @@
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
-                    alert('Database exported successfully.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Database exported successfully.', { tone: 'success' });
                 } else {
-                    alert('Error exporting database.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error exporting database.', { tone: 'error' });
                 }
             } catch (error) {
                 console.error('Error exporting database:', error);
-                alert('Error exporting database.');
+                window.ReportGenUI?.showStatus('#admin-status', 'Error exporting database.', { tone: 'error' });
+            } finally {
+                window.ReportGenUI?.setButtonLoading(button, false);
             }
         }
 
-        async function backupDatabase() {
+        async function backupDatabase(button) {
+            window.ReportGenUI?.setButtonLoading(button, true, 'Backing up...');
             try {
                 const response = await fetch('/api/backup-database', { method: 'POST' });
                 if (response.ok) {
-                    alert('Database backup created successfully.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Database backup created successfully.', { tone: 'success' });
                 } else {
-                    alert('Error creating database backup.');
+                    window.ReportGenUI?.showStatus('#admin-status', 'Error creating database backup.', { tone: 'error' });
                 }
             } catch (error) {
                 console.error('Error creating database backup:', error);
-                alert('Error creating database backup.');
+                window.ReportGenUI?.showStatus('#admin-status', 'Error creating database backup.', { tone: 'error' });
+            } finally {
+                window.ReportGenUI?.setButtonLoading(button, false);
             }
         }
     </script>

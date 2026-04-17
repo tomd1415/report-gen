@@ -11,6 +11,7 @@
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
     <script type="module" src="import-summary.js"></script>
 </head>
 <body>
@@ -23,7 +24,7 @@
             <div class="subject-year">
                 <div class="form-section">
                     <!-- <label for="subject-select">Subject:</label> -->
-                    <select id="subject-select">
+                    <select id="subject-select" onchange="updateImportContext()">
                         <option value="">Select Subject</option>
                         <!-- Options will be populated dynamically -->
                     </select>
@@ -31,12 +32,14 @@
 
                 <div class="form-section">
                     <!-- <label for="year-group-select">Year Group:</label> -->
-                    <select id="year-group-select">
+                    <select id="year-group-select" onchange="updateImportContext()">
                         <option value="">Select Year Group</option>
                         <!-- Options will be populated dynamically -->
                     </select>
                 </div>
             </div>
+
+            <div id="import-context" class="context-summary" hidden></div>
 
             <div class="form-section">
                 <label for="pupil-names">Pupil Names (comma separated):</label>
@@ -149,44 +152,66 @@
             });
         }
 
+        function updateImportContext() {
+            window.ReportGenUI?.renderContextSummary('#import-context', [
+                { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
+                { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
+            ]);
+        }
+
+        async function parseImportResponse(response) {
+            const text = await response.text();
+            try {
+                return text ? JSON.parse(text) : {};
+            } catch {
+                return { message: text };
+            }
+        }
+
         async function importReports() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             const pupilNames = document.getElementById('pupil-names').value;
             const reports = document.getElementById('reports').value;
+            const genReportButton = document.getElementById('genReportButton');
 
             if (!subjectId || !yearGroupId || !pupilNames || !reports) {
-                alert('Please fill in all fields.');
+                window.ReportGenUI?.showStatus('#result-container', 'Please choose a subject and year group, then add pupil names and reports.', { tone: 'warning' });
                 return;
             }
 
-            alert('Generating comments and categories.\nThis may take a while.')
+            window.ReportGenUI?.setButtonLoading(genReportButton, true, 'Importing...');
+            window.ReportGenUI?.showStatus('#result-container', 'Generating comments and categories. This may take a while.', { tone: 'info' });
 
-            const genReportButton = document.getElementById('genReportButton');
-            genReportButton.className = document.getElementById('genReportButton').className.replace('savePrompt', 'savePromptDisabled');
+            try {
+                const response = await fetch('/api/import-reports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        subjectId,
+                        yearGroupId,
+                        pupilNames,
+                        reports
+                    })
+                });
 
-            const response = await fetch('/api/import-reports', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    subjectId,
-                    yearGroupId,
-                    pupilNames,
-                    reports
-                })
-            });
+                const result = await parseImportResponse(response);
+                if (!response.ok) {
+                    throw new Error(result.message || 'Import failed.');
+                }
 
-            const result = await response.json();
-            const summary = window.ReportGenImportSummary?.formatImportSummary(result, {
-                targetLabel: 'your comment bank'
-            }) || result.message || 'Import completed.';
-            alert(summary);
-
-            genReportButton.className = document.getElementById('genReportButton').className.replace('savePromptDisabled', 'savePrompt');
-            const resultContainer = document.getElementById('result-container');
-            resultContainer.textContent = summary;
+                const summary = window.ReportGenImportSummary?.formatImportSummary(result, {
+                    targetLabel: 'your comment bank'
+                }) || result.message || 'Import completed.';
+                window.ReportGenUI?.showStatus('#result-container', summary, { tone: 'success' });
+            } catch (error) {
+                console.error('Error importing reports:', error);
+                window.ReportGenUI?.showStatus('#result-container', error.message, { tone: 'error' });
+            } finally {
+                window.ReportGenUI?.setButtonLoading(genReportButton, false);
+            }
         }
     </script>
 </body>

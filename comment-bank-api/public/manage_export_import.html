@@ -11,6 +11,7 @@
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
     <script type="module" src="import-summary.js"></script>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -24,25 +25,28 @@
         <div id="form-container">
             <div class="subject-year">
                 <div class="form-section">
-                    <select id="subject-select" class="form-control">
+                    <select id="subject-select" class="form-control" onchange="updateCsvContext()">
                         <option value="">Select Subject</option>
                     </select>
                 </div>
                 <div class="form-section">
-                    <select id="year-group-select" class="form-control">
+                    <select id="year-group-select" class="form-control" onchange="updateCsvContext()">
                         <option value="">Select Year Group</option>
                     </select>
                 </div>
             </div>
 
+            <div id="csv-context" class="context-summary" hidden></div>
+            <div id="csv-status" class="status-panel" hidden></div>
+
             <div class="form-section">
-                <button class="button" onclick="exportCategoriesAndComments()">Export Categories and Comments</button>
+                <button class="button" id="export-csv-button" onclick="exportCategoriesAndComments()">Export Categories and Comments</button>
             </div>
 
             <div class="form-section">
                 <label for="upload-csv" class="block text-center">Import Categories and Comments:</label>
                 <input type="file" id="upload-csv" class="border border-gray-300 rounded-md shadow-sm p-2">
-                <button class="button bg-red-600 text-white px-4 py-2 rounded-md" onclick="importCategoriesAndComments()">Import</button>
+                <button class="button bg-red-600 text-white px-4 py-2 rounded-md" id="import-csv-button" onclick="importCategoriesAndComments()">Import</button>
             </div>
         </div>
     </div>
@@ -145,15 +149,31 @@
             });
         }
 
+        function updateCsvContext() {
+            window.ReportGenUI?.renderContextSummary('#csv-context', [
+                { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
+                { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
+            ]);
+        }
+
+        function getCsvContextText() {
+            const subject = window.ReportGenUI?.getSelectedOptionText('#subject-select') || 'the selected subject';
+            const yearGroup = window.ReportGenUI?.getSelectedOptionText('#year-group-select') || 'the selected year group';
+            return `${subject} / ${yearGroup}`;
+        }
+
         async function exportCategoriesAndComments() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
+            const button = document.getElementById('export-csv-button');
 
             if (!subjectId || !yearGroupId) {
-                alert('Please select both subject and year group.');
+                window.ReportGenUI?.showStatus('#csv-status', 'Please select both subject and year group before exporting.', { tone: 'warning' });
                 return;
             }
 
+            window.ReportGenUI?.setButtonLoading(button, true, 'Exporting...');
+            window.ReportGenUI?.showStatus('#csv-status', `Preparing export for ${getCsvContextText()}.`, { tone: 'info' });
             try {
                 const response = await fetch(`/api/export-categories-comments?subjectId=${subjectId}&yearGroupId=${yearGroupId}`);
                 if (!response.ok) {
@@ -169,8 +189,11 @@
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
+                window.ReportGenUI?.showStatus('#csv-status', `Export ready for ${getCsvContextText()}.`, { tone: 'success' });
             } catch (error) {
-                alert('Error exporting categories and comments: ' + error.message);
+                window.ReportGenUI?.showStatus('#csv-status', 'Error exporting categories and comments: ' + error.message, { tone: 'error' });
+            } finally {
+                window.ReportGenUI?.setButtonLoading(button, false);
             }
         }
 
@@ -178,18 +201,21 @@
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
             const fileInput = document.getElementById('upload-csv');
+            const button = document.getElementById('import-csv-button');
 
             if (!subjectId || !yearGroupId) {
-                alert('Please select both subject and year group.');
+                window.ReportGenUI?.showStatus('#csv-status', 'Please select both subject and year group before importing.', { tone: 'warning' });
                 return;
             }
 
             if (!fileInput.files.length) {
-                alert('Please select a file to upload.');
+                window.ReportGenUI?.showStatus('#csv-status', 'Please select a CSV file to upload.', { tone: 'warning' });
                 return;
             }
 
-            if (!confirm('Are you sure you want to replace the existing categories and comments for the selected subject and year group? This action cannot be undone.')) {
+            const confirmed = confirm(`Replace the existing categories and comments for ${getCsvContextText()}? This action cannot be undone.`);
+            if (!confirmed) {
+                window.ReportGenUI?.showStatus('#csv-status', 'Import cancelled. Existing comments were not changed.', { tone: 'info' });
                 return;
             }
 
@@ -198,6 +224,8 @@
             formData.append('subjectId', subjectId);
             formData.append('yearGroupId', yearGroupId);
 
+            window.ReportGenUI?.setButtonLoading(button, true, 'Importing...');
+            window.ReportGenUI?.showStatus('#csv-status', `Importing CSV for ${getCsvContextText()}. Existing comments for this selection will be replaced.`, { tone: 'warning' });
             try {
                 const response = await fetch('/api/import-categories-comments', {
                     method: 'POST',
@@ -215,16 +243,17 @@
                     throw new Error(payload.message || 'Failed to import categories and comments.');
                 }
 
-                alert(window.ReportGenImportSummary?.formatImportSummary(payload, {
+                const summary = window.ReportGenImportSummary?.formatImportSummary(payload, {
                     targetLabel: 'your comment bank'
-                }) || payload.message || 'Categories and comments imported successfully.');
+                }) || payload.message || 'Categories and comments imported successfully.';
+                window.ReportGenUI?.showStatus('#csv-status', summary, { tone: 'success' });
                 fileInput.value = ''; // Clear the file input
             } catch (error) {
-                alert('Error importing categories and comments: ' + error.message);
+                window.ReportGenUI?.showStatus('#csv-status', 'Error importing categories and comments: ' + error.message, { tone: 'error' });
+            } finally {
+                window.ReportGenUI?.setButtonLoading(button, false);
             }
         }
-
-        document.addEventListener('DOMContentLoaded', loadSettings);
     </script>
 </body>
 </html>
