@@ -1,6 +1,13 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../src/db/sequelize.js', () => ({
+  sequelize: {
+    transaction: async (callback) => callback({})
+  }
+}));
+
 import { registerRoutes } from '../src/routes/index.js';
 
 const createTestApp = ({ models, openai }) => {
@@ -39,6 +46,7 @@ describe('import-reports', () => {
         create: vi.fn()
       },
       Comment: {
+        destroy: vi.fn(),
         create: vi.fn()
       }
     };

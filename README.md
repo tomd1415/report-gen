@@ -231,6 +231,13 @@ All variables live in `comment-bank-api/.env`.
 - Reset a user password (admin only API):
   - `PUT /api/admin/user/:username/password`
 
+### Admin uploads for staff comment banks
+- Admins can import previous reports for a selected staff user, subject, and year group from the Admin Panel.
+- Imports default to merge mode and write categories/comments to the selected staff user's comment bank.
+- Replace mode requires explicit confirmation and is scoped to the selected staff user + subject + year group.
+- Successful admin imports make the selected subject/year group visible to the target staff user.
+- See `docs/admin_staff_report_upload_plan.md` for the implementation and deployment-safety details.
+
 ### Manage subjects, year groups, prompts
 - Use the admin pages to create/edit subjects and year groups.
 - Prompts are per user + subject + year group.

@@ -1,90 +1,170 @@
-# Phase 1 Audit (Update1)
+# Phase 1 Audit (Current State)
+
+This audit reflects the current refactored codebase, not the older monolithic
+server implementation.
 
 ## Inventory
-- Entrypoint: `comment-bank-api/server.mjs` (Express, ESM).
-- Static UI: `comment-bank-api/public/` (inline JS in HTML).
-  - Pages: `index.html`, `login.html`, `register.html`, `admin-login.html`, `adminpage.html`,
-    `manage_categories_comments.html`, `manage_subjects_years.html`, `manage_years_subjects.html`,
-    `manage_export_import.html`, `import_reports.html`, `settings.html`, `header.html`, `footer.html`.
-- DB: Sequelize models defined inline in `comment-bank-api/server.mjs`; uses `sequelize.sync` (no migrations).
-- OpenAI: `openai.chat.completions` with `gpt-4` and `gpt-4o`.
-- Sessions: `express-session` default memory store, cookie `secure: false`.
-- Uploads: `multer` temp files to `uploads/`.
-- Backup/Export: `exec` with `mysqldump` plus hardcoded path `/home/duguid/apps/report-gen/dbbackup_web`.
 
-## API Surface (Grouped)
-- Auth/session: `/api/register`, `/api/login`, `/api/logout`, `/api/authenticated`, `/api/user-info`,
-  `/api/admin/login`, `/api/change-password`.
-- Admin/user management: `/api/users`, `/api/users/:username`, `/api/admin/user`,
-  `/api/admin/user/:username`, `/api/admin/user/:username/password`.
-- Subjects/year groups: `/api/subjects`, `/api/subjects/:id`, `/api/year-groups`, `/api/year-groups/:id`,
-  plus admin-only `/api/admin/subject`, `/api/admin/subject/:name`, `/api/admin/year-group`,
-  `/api/admin/year-group/:name`.
-- Categories/comments: `/api/categories`, `/api/categories/:id`, `/api/comments`, `/api/comments/:id`,
-  `/api/move-comment`, `/api/categories-comments`.
-- Prompts: `/api/prompts`, `/api/prompts/:subjectId/:yearGroupId`, `/api/prompts/:id`.
-- Reports: `/generate-report`, `/api/import-reports`.
-- Import/export: `/api/export-categories-comments`, `/api/import-categories-comments`,
-  `/api/export-database`, `/api/backup-database`, `/api/admin/export`, `/api/admin/backup`.
-- User settings: `/api/user-subjects`, `/api/user-year-groups`, `/api/user-settings`,
-  `/api/user-selected-settings`.
+- Entrypoint: `comment-bank-api/server.mjs`.
+- App setup: `comment-bank-api/src/app.js`.
+- Routes: `comment-bank-api/src/routes/index.js`.
+- Models: `comment-bank-api/src/models/index.js`.
+- DB: MariaDB/MySQL through Sequelize.
+- Migrations: Umzug migrations in `comment-bank-api/migrations/`.
+- OpenAI: Responses API via `openai.responses.parse`.
+- Sessions: `express-session` with `connect-session-sequelize` persisted in the
+  `Sessions` table.
+- Static UI: `comment-bank-api/public/`.
 
-## Frontend to API Usage (Observed)
-- `index.html`: `/api/authenticated`, `/api/user-info`, `/api/user-selected-settings`,
-  `/api/subjects`, `/api/year-groups`, `/api/categories-comments`, `/api/prompts` (query params),
-  `/api/comments`, `/generate-report`, `/api/logout`.
-- `import_reports.html`: `/api/authenticated`, `/api/user-selected-settings`, `/api/subjects`,
-  `/api/year-groups`, `/api/import-reports`.
-- `manage_categories_comments.html`: `/api/authenticated`, `/api/user-selected-settings`,
-  `/api/subjects`, `/api/year-groups`, `/api/categories-comments`, `/api/categories`, `/api/comments`,
-  `/api/move-comment`.
-- `manage_subjects_years.html`: `/api/authenticated`, `/api/user-selected-settings`,
-  `/api/subjects`, `/api/year-groups`, `/api/prompts/:subjectId/:yearGroupId`.
-- `manage_years_subjects.html`: `/api/authenticated`, `/api/subjects`, `/api/year-groups`.
-- `manage_export_import.html`: `/api/authenticated`, `/api/user-selected-settings`,
-  `/api/subjects`, `/api/year-groups`, `/api/export-categories-comments`,
-  `/api/import-categories-comments`.
-- `settings.html`: `/api/user-info`, `/api/user-settings`, `/api/subjects`, `/api/year-groups`,
-  `/api/user-year-groups`, `/api/user-subjects`, `/api/change-password`.
-- `adminpage.html`: `/api/authenticated`, `/api/user-info`, `/api/subjects`, `/api/year-groups`,
-  `/api/users`, `/api/admin/user/:username/password`, `/api/export-database`, `/api/backup-database`.
-- `login.html`, `register.html`, `admin-login.html`: `/api/login`, `/api/register`, `/api/admin/login`.
+## Static Pages
 
-## Notable Mismatches or Issues
-- Duplicate admin endpoints exist (`/api/admin/*`) but the UI uses the non-admin versions.
-- Absolute path for backup/export is tied to a different filesystem location than this repo.
+- `index.html`: generate reports from selected comments.
+- `import_reports.html`: paste old reports to generate a comment bank.
+- `manage_categories_comments.html`: manually manage categories/comments.
+- `manage_subjects_years.html`: manage per-user prompt text, subject
+  description, and default word limit.
+- `manage_export_import.html`: export/import CSV comment banks.
+- `settings.html`: choose visible subjects/year groups and change password.
+- `adminpage.html`: manage global subjects, year groups, users, password resets,
+  and database backup/export.
+- `login.html`, `register.html`, `admin-login.html`: auth pages.
+- `header.html`, `footer.html`: shared static fragments.
 
-## Cleanup Candidates (Confirmed Deleted)
-- Legacy server copies: `comment-bank-api/server.mjs2`, `comment-bank-api/server.mjs4`,
-  `comment-bank-api/server.mjs.bak`, `comment-bank-api/server.mjs.bak2`,
-  `comment-bank-api/server.mjs.bak5`.
-- Unused route/model artifacts: `comment-bank-api/routes/comments.js`,
-  `comment-bank-api/models/index.js.bak`.
-- Orphan/unused static: `comment-bank-api/public/settings.js`.
-- Misc: `comment-bank-api/cookies.txt`.
-## Dependency Consolidation
-- Root `package.json` and `package-lock.json` removed.
-- `express-session` moved into `comment-bank-api/package.json`.
-- Root `node_modules` is now orphaned; safe to delete after reinstalling in `comment-bank-api`.
+## Data Ownership
 
-## Baseline Manual Test Checklist (Current Behavior)
-- Auth: register, login, logout; admin login; password change.
-- Settings: select subjects/year groups per user and see them reflected in dropdowns.
-- Comment bank: load categories/comments, add comment, move comment, delete category/comment.
-- Prompt management: save prompt part per subject/year group; reload prompt.
-- Report generation: generate report with placeholders; verify pupil name substitution.
-- Imports: import raw reports to generate categories/comments; import/export CSV.
-- Admin: add/delete subjects/year groups/users; backup/export database.
-## Sample Data Notes
-- Sample seed function exists in `comment-bank-api/server.mjs` as `addSampleData()` (currently commented out).
-  It can be used to populate a baseline subject/year group and sample categories/comments.
+- `Category` rows are scoped by `userId`, `subjectId`, and `yearGroupId`.
+- `Prompt` rows are scoped by `userId`, `subjectId`, and `yearGroupId`.
+- `SubjectContext` rows are scoped by `userId`, `subjectId`, and `yearGroupId`.
+- `Comment` rows inherit ownership through their category.
+- `Subject` and `YearGroup` rows are global.
+- Staff-visible subject/year options are stored in `UserSubject` and
+  `UserYearGroup`.
 
-## Target Stack Decision (Chosen)
-- Chosen: Option A (Express + Sequelize).
-  - Reason: lowest risk and fastest path to modernize while preserving current workflows; easier Debian/Gentoo compatibility.
-  - Revisit later if a UI rewrite becomes a priority.
+This means the schema supports separate comment banks for different staff. The
+admin staff import workflow now writes imports to a selected target staff user
+instead of the currently logged-in admin user.
 
-## Phase 1 Actions Completed
-- Added admin-only guards to subject/year group/user/backup endpoints.
-- Fixed `/api/prompts` query compatibility and restored the missing `PUT /api/prompts/:id`.
-- Added `GET /api/users` for admin UI.
+## API Surface
+
+### Auth/session
+
+- `POST /api/register`
+- `POST /api/login`
+- `POST /api/admin/login`
+- `POST /api/logout`
+- `GET /api/authenticated`
+- `GET /api/user-info`
+- `POST /api/change-password`
+
+### Admin/user management
+
+- `GET /api/users`
+- `POST /api/users`
+- `DELETE /api/users/:username`
+- `PUT /api/admin/user/:username/password`
+- `GET /api/export-database`
+- `POST /api/backup-database`
+- Duplicate legacy admin routes also exist under `/api/admin/*`.
+
+### Subjects/year groups
+
+- `GET /api/subjects`
+- `POST /api/subjects` (admin only)
+- `PUT /api/subjects/:id` (admin only)
+- `DELETE /api/subjects/:id` (admin only)
+- `GET /api/year-groups`
+- `POST /api/year-groups` (admin only)
+- `PUT /api/year-groups/:id` (admin only)
+- `DELETE /api/year-groups/:id` (admin only)
+
+### Categories/comments
+
+- `GET /api/categories-comments`
+- `GET /api/categories/:id`
+- `POST /api/categories`
+- `PUT /api/categories/:id`
+- `DELETE /api/categories/:id`
+- `GET /api/comments`
+- `GET /api/comments/:id`
+- `POST /api/comments`
+- `PUT /api/comments/:id`
+- `DELETE /api/comments/:id`
+- `POST /api/move-comment`
+
+### Prompts and subject context
+
+- `GET /api/prompts`
+- `GET /api/prompts/:subjectId/:yearGroupId`
+- `POST /api/prompts`
+- `PUT /api/prompts/:subjectId/:yearGroupId`
+- `PUT /api/prompts/:id`
+- `DELETE /api/prompts/:id`
+- `DELETE /api/prompts/:subjectId/:yearGroupId`
+- `GET /api/subject-context`
+- `POST /api/subject-context`
+
+### Report generation and import/export
+
+- `POST /generate-report`
+- `POST /api/import-reports`
+- `GET /api/export-categories-comments`
+- `POST /api/import-categories-comments`
+
+### User settings
+
+- `POST /api/user-subjects`
+- `POST /api/user-year-groups`
+- `GET /api/user-settings`
+- `GET /api/user-selected-settings`
+
+## Feature-Relevant Current Behavior
+
+- `import_reports.html` and `/api/import-reports` import pasted reports for the
+  current session user.
+- `manage_export_import.html` and `/api/import-categories-comments` replace CSV
+  categories/comments for the current session user.
+- `index.html` and `/generate-report` generate reports from the current session
+  user's comment bank only.
+- `adminpage.html` now includes a Staff Comment Banks section that lets admins
+  import pasted reports for a selected staff user, subject, and year group.
+- Admin target-staff endpoints exist under `/api/admin/staff/:userId/*`.
+- The existing OpenAI import flow already supports subject/year scoped comments,
+  name placeholder replacement, relevance filtering, and merge with existing
+  categories.
+
+## Notable Gaps and Risks
+
+- Admin-on-behalf-of-staff report import is implemented. Bulk multi-staff import
+  and Word/PDF parsing remain future work.
+- Duplicate admin routes increase maintenance cost and should either be kept as
+  compatibility aliases or consolidated.
+- Manual single-category deletion should be reviewed later for comment cleanup
+  behavior.
+
+## Current Test Coverage
+
+- Report generation prompt building, placeholder replacement, relevance warning,
+  strength focus, and validation limits.
+- Report import placeholder replacement, maximum import length, and relevance
+  filtering.
+- CSV import caps and skipped-row reporting.
+- Subject context validation.
+- UI selection helper grouping.
+- Rate limiting for OpenAI-backed generation.
+- Admin target-staff import, non-admin rejection, replace confirmation, and
+  target ownership.
+- Category/comment/prompt ownership checks.
+- Password-change field consistency.
+
+## Baseline Manual Test Checklist
+
+- Login, logout, and admin login.
+- Admin creates/deletes global subjects, year groups, and users.
+- User selects visible subjects/year groups in settings.
+- Subject description and word limit save and reload for a subject/year group.
+- Report import creates paragraph-aligned categories and comments.
+- CSV export/import works for one subject/year group.
+- Report generation returns exactly four paragraphs.
+- Pupil names are replaced with `PUPIL_NAME` before OpenAI calls and restored in
+  the final report.
+- Relevance warning appears for out-of-scope selected comments.
