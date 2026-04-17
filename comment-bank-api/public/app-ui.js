@@ -68,6 +68,21 @@ export const setButtonLoading = (target, isLoading, loadingText = 'Working...', 
   return true;
 };
 
+export const setFieldInvalid = (target, invalid, { documentRef = globalThis.document } = {}) => {
+  const field = resolveElement(target, documentRef);
+  if (!field) {
+    return false;
+  }
+
+  field.classList.toggle('field-invalid', Boolean(invalid));
+  if (invalid) {
+    field.setAttribute('aria-invalid', 'true');
+  } else {
+    field.removeAttribute('aria-invalid');
+  }
+  return true;
+};
+
 export const renderContextSummary = (target, items, { documentRef = globalThis.document } = {}) => {
   const element = resolveElement(target, documentRef);
   if (!element) {
@@ -158,6 +173,7 @@ if (typeof window !== 'undefined') {
     clearStatus,
     getSelectedOptionText,
     setButtonLoading,
+    setFieldInvalid,
     renderContextSummary,
     filterCommentBank
   };

@@ -39,12 +39,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 - `2026-04-17`: Split large inline scripts out of HTML pages into dedicated JS
   modules. `adminpage.html`, `index.html`, and management pages would be easier
   to test and maintain.
-- `2026-04-17`: Improve loading and error states on import pages. Current import
-  pages use alerts and basic button class swaps.
+- `2026-04-17`: Consider replacing browser `confirm()` prompts with an in-page
+  confirmation component for destructive actions. Current delete/import prompts
+  are clearer, but native dialogs cannot show richer context or styling.
+- `2026-04-17`: Consider making the Generate Report ready checklist reusable
+  once page scripts are moved into dedicated modules.
 
 ## Testing
 
-- `2026-04-17`: Add tests for ownership checks on category/comment/prompt routes.
 - `2026-04-17`: Add a small integration-style test around staff settings:
   selecting subjects/year groups, then confirming dropdown options use those
   settings.

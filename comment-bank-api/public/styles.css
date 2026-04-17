@@ -230,6 +230,12 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(28, 107, 123, 0.15);
 }
 
+.field-invalid {
+    border-color: #b91c1c !important;
+    background-color: #fff7ed !important;
+    box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.15) !important;
+}
+
 input[type="checkbox"] {
     width: auto;
     margin: 0 8px 0 0;
@@ -344,6 +350,24 @@ button:disabled {
 .replace-summary {
     border-color: rgba(194, 65, 12, 0.35);
     background: #fff7ed;
+}
+
+.empty-state {
+    border: 1px dashed rgba(28, 107, 123, 0.35);
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    color: #51606e;
+}
+
+.empty-state h3 {
+    margin: 0 0 6px;
+    color: var(--accent-dark);
+}
+
+.empty-state p {
+    margin: 0;
 }
 
 /* Category and Comment Styles */
@@ -570,6 +594,17 @@ nav ul li a:hover {
     margin-bottom: 0;
 }
 
+.manage-comment-controls {
+    justify-content: center;
+    align-items: center;
+    margin: 0 0 14px;
+    flex-wrap: wrap;
+}
+
+.manage-comment-controls[hidden] {
+    display: none;
+}
+
 .inline-button {
     width: auto;
     margin: 0;
@@ -656,6 +691,42 @@ nav ul li a:hover {
     margin: 4px 0 0;
     color: #5b6472;
     font-size: 0.85rem;
+}
+
+.ready-checklist {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ready-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.ready-marker {
+    flex: 0 0 auto;
+    min-width: 58px;
+    text-align: center;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.ready-item--complete .ready-marker {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.ready-item--missing .ready-marker {
+    background: #ffedd5;
+    color: #9a3412;
 }
 
 .step-tabs {
@@ -959,6 +1030,13 @@ nav ul li a:hover {
     border-radius: 10px;
 }
 
+.strength-focus-row.field-invalid-row {
+    border: 1px solid rgba(185, 28, 28, 0.45);
+    background: #fff7ed;
+    padding: 6px;
+    border-radius: 10px;
+}
+
 .context-row {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
@@ -1104,8 +1182,57 @@ nav ul li a:hover {
     width: 100%;
 }
 
+.category-count {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef2f7;
+    color: #51606e;
+    font-size: 0.75rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
 .expand {
     float: right;
+}
+
+.staff-bank-workflow {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-step {
+    border-left: 4px solid var(--accent);
+    background: #f9fbfc;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.admin-step-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.admin-step-heading h3 {
+    margin: 0;
+    color: var(--accent-dark);
+}
+
+.admin-step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #ffffff;
+    font-weight: 700;
 }
 
 .category.collapsed .comments-container {

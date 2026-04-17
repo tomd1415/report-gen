@@ -148,7 +148,10 @@ node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(console.
 
 - Login works.
 - Subject/year group lists load.
+- Missing required fields show visible page messages and focus the relevant
+  field.
 - Generate report creates 4 paragraphs.
+- Generate Report ready check shows completed and missing items.
 - Paragraph 3 includes a subject-specific strength.
 - Placeholder names replaced correctly.
 - Relevance warning appears only for out-of-scope comments.

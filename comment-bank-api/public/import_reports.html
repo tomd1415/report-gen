@@ -68,6 +68,7 @@
             }
 
             loadSettings();
+            setupImportValidationListeners();
         });
 
         async function isAuthenticated() {
@@ -157,6 +158,27 @@
                 { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
                 { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
             ]);
+            clearImportFieldState('subject-select');
+            clearImportFieldState('year-group-select');
+        }
+
+        function clearImportFieldState(id) {
+            window.ReportGenUI?.setFieldInvalid(`#${id}`, false);
+        }
+
+        function markImportFieldInvalid(id) {
+            window.ReportGenUI?.setFieldInvalid(`#${id}`, true);
+            document.getElementById(id)?.focus();
+        }
+
+        function clearImportValidation() {
+            ['subject-select', 'year-group-select', 'pupil-names', 'reports'].forEach(clearImportFieldState);
+        }
+
+        function setupImportValidationListeners() {
+            ['pupil-names', 'reports'].forEach((id) => {
+                document.getElementById(id)?.addEventListener('input', () => clearImportFieldState(id));
+            });
         }
 
         async function parseImportResponse(response) {
@@ -175,8 +197,25 @@
             const reports = document.getElementById('reports').value;
             const genReportButton = document.getElementById('genReportButton');
 
-            if (!subjectId || !yearGroupId || !pupilNames || !reports) {
-                window.ReportGenUI?.showStatus('#result-container', 'Please choose a subject and year group, then add pupil names and reports.', { tone: 'warning' });
+            clearImportValidation();
+            if (!subjectId) {
+                markImportFieldInvalid('subject-select');
+                window.ReportGenUI?.showStatus('#result-container', 'Please choose a subject before importing reports.', { tone: 'warning' });
+                return;
+            }
+            if (!yearGroupId) {
+                markImportFieldInvalid('year-group-select');
+                window.ReportGenUI?.showStatus('#result-container', 'Please choose a year group before importing reports.', { tone: 'warning' });
+                return;
+            }
+            if (!pupilNames.trim()) {
+                markImportFieldInvalid('pupil-names');
+                window.ReportGenUI?.showStatus('#result-container', 'Please add the pupil names to redact before importing reports.', { tone: 'warning' });
+                return;
+            }
+            if (!reports.trim()) {
+                markImportFieldInvalid('reports');
+                window.ReportGenUI?.showStatus('#result-container', 'Please paste the reports before starting the import.', { tone: 'warning' });
                 return;
             }
 

@@ -67,6 +67,8 @@ selected staff user's bank.
 Implemented in the first pass:
 
 - Admin "Staff Comment Banks" section in `adminpage.html`.
+- Staff Comment Banks UI is presented as a three-step workflow: choose staff
+  and class, set staff context, import previous reports.
 - Target staff report imports via `POST /api/admin/staff/:userId/import-reports`.
 - Target staff context and prompt management.
 - Target staff CSV import/export endpoints.

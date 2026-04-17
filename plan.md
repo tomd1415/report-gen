@@ -69,6 +69,11 @@
 - Improve error handling and loading states for report generation and imports.
 - Treat UI/UX refresh as a final, optional step once the backend and prompts are stable.
 
+Current status: the report-generation UI now includes paragraph tabs, selection
+summary, ready checklist, empty states, page-level status messages, button
+loading states, and field-specific validation. Import/CSV pages and Manage
+Comments now use the same status/validation helpers where practical.
+
 ## Phase 7: Security + Privacy
 - Validate and sanitize all user input (CSV import, prompts, comments).
 - Add rate limiting on OpenAI-backed endpoints.

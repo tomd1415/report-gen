@@ -6,6 +6,7 @@ let filterCommentBank;
 let getSelectedOptionText;
 let renderContextSummary;
 let setButtonLoading;
+let setFieldInvalid;
 let showStatus;
 
 beforeAll(async () => {
@@ -15,6 +16,7 @@ beforeAll(async () => {
     getSelectedOptionText,
     renderContextSummary,
     setButtonLoading,
+    setFieldInvalid,
     showStatus
   } = await import('../public/app-ui.js'));
 });
@@ -69,6 +71,18 @@ describe('shared UI helpers', () => {
     setButtonLoading('#save', false, undefined, { documentRef: document });
     expect(document.querySelector('#save').disabled).toBe(false);
     expect(document.querySelector('#save').textContent).toBe('Save');
+  });
+
+  it('marks and clears invalid fields consistently', () => {
+    document.body.innerHTML = '<input id="name">';
+
+    expect(setFieldInvalid('#name', true, { documentRef: document })).toBe(true);
+    expect(document.querySelector('#name').classList.contains('field-invalid')).toBe(true);
+    expect(document.querySelector('#name').getAttribute('aria-invalid')).toBe('true');
+
+    expect(setFieldInvalid('#name', false, { documentRef: document })).toBe(true);
+    expect(document.querySelector('#name').classList.contains('field-invalid')).toBe(false);
+    expect(document.querySelector('#name').hasAttribute('aria-invalid')).toBe(false);
   });
 
   it('filters comment bank categories and comments', () => {

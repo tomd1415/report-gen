@@ -25,6 +25,25 @@ Use these rules for every future improvement:
 5. Run the release checklist in `docs/release_checklist.md` before live pulls.
 6. Do not store raw pasted reports unless there is a clear policy decision.
 
+## Recently Completed UX Improvements
+
+Completed on `2026-04-17`:
+
+- Shared menu now includes Settings and Logout on every page, with Admin shown
+  only to admin users.
+- Generate Report now has page-level status messages, context chips, active
+  paragraph tabs, selection summaries, loading states, a ready checklist, and a
+  clear empty state when no comment bank exists for the selected subject/year.
+- Import pages and CSV import/export now use visible status messages, button
+  loading states, and field-specific validation/focus for missing required
+  inputs.
+- Manage Comments now has search, category/comment counts, expand/collapse all
+  controls, empty-state messaging, and more specific delete confirmations.
+- Admin Staff Comment Banks now presents the staff import workflow as three
+  visual steps.
+- Shared frontend UI helpers now include status, context, loading, filtering,
+  and invalid-field helpers with jsdom coverage.
+
 ## Priority 1: Data Safety And Operations
 
 These should come before larger feature work because they reduce deployment and
@@ -104,20 +123,25 @@ Acceptance criteria:
 - Admin can reject poor comments before they reach a staff comment bank.
 - Replace mode still requires explicit confirmation before saving.
 
-### Better Import Error States
+### Continue Workflow Feedback Polish
 
-Replace basic alerts with clearer page-level status messages.
+The main browser workflows now use page-level status messages and field-specific
+validation. Continue this work where the page logic is still inline or where
+errors can be made more actionable.
 
 Tasks:
 
-- Add loading, success, warning, and error states to import pages.
-- Preserve button disabled states while requests are running.
-- Show count summaries consistently for report imports and CSV imports.
+- Replace any remaining browser alerts with page-level status or a deliberate
+  confirmation component.
+- Keep button disabled/loading states consistent as page scripts are moved into
+  modules.
+- Add focused tests for reusable UI logic as it is extracted from inline page
+  scripts.
 
 Acceptance criteria:
 
-- Import pages show progress without relying only on browser alerts.
-- Failure messages stay visible after the request completes.
+- Users can recover from common mistakes without losing form context.
+- Validation and loading behaviour stays covered by tests where practical.
 
 ### Staff Settings Integration Test
 
@@ -253,7 +277,7 @@ Acceptance criteria:
 1. Restore drill documentation.
 2. Safer delete behaviour.
 3. Staff settings integration tests.
-4. Better import error states.
+4. Continue workflow feedback polish.
 5. Import history metadata.
 6. Import preview and edit.
 7. Admin route consolidation.

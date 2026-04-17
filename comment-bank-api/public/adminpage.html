@@ -64,9 +64,13 @@
         </section>
 
         <!-- Staff Comment Bank Management Section -->
-        <section class="section">
+        <section class="section staff-bank-workflow">
             <h2>Staff Comment Banks</h2>
-            <div class="form-section">
+            <div class="form-section admin-step">
+                <div class="admin-step-heading">
+                    <span class="admin-step-number">1</span>
+                    <h3>Choose Staff And Class</h3>
+                </div>
                 <label for="staff-bank-user">Staff user:</label>
                 <select id="staff-bank-user" onchange="loadStaffBankContext()">
                     <option value="">Select Staff User</option>
@@ -83,7 +87,11 @@
                 </select>
             </div>
 
-            <div class="form-section">
+            <div class="form-section admin-step">
+                <div class="admin-step-heading">
+                    <span class="admin-step-number">2</span>
+                    <h3>Set Staff Context</h3>
+                </div>
                 <label for="staff-bank-subject-description">Subject description:</label>
                 <textarea id="staff-bank-subject-description" rows="4" maxlength="2000"></textarea>
 
@@ -95,7 +103,11 @@
                 <button type="button" class="button" id="staff-bank-save-context-button" onclick="saveStaffBankContextAndPrompt(this)">Save Staff Context</button>
             </div>
 
-            <div class="form-section">
+            <div class="form-section admin-step">
+                <div class="admin-step-heading">
+                    <span class="admin-step-number">3</span>
+                    <h3>Import Previous Reports</h3>
+                </div>
                 <div id="staff-bank-context-summary" class="context-summary" hidden></div>
 
                 <label for="staff-bank-pupil-names">Pupil names to redact (comma separated):</label>

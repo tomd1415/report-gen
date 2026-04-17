@@ -123,6 +123,13 @@
                         </div>
                         <div id="selection-summary" class="selection-summary"></div>
                     </div>
+                    <div class="summary-card readiness-card">
+                        <div class="summary-header">
+                            <h2>Ready Check</h2>
+                            <p>Items needed before generating.</p>
+                        </div>
+                        <ul id="ready-checklist" class="ready-checklist"></ul>
+                    </div>
                     <button class="generate-report" id="generate-report" onclick="generateReport()">Generate Report</button>
                 </aside>
             </div>
@@ -153,6 +160,7 @@
 
             fetchUsername();
             loadSettings();
+            setupReadyChecklistListeners();
         });
 
         async function isAuthenticated() {
@@ -254,10 +262,107 @@
                 { label: 'Subject', value: window.ReportGenUI?.getSelectedOptionText('#subject-select') },
                 { label: 'Year group', value: window.ReportGenUI?.getSelectedOptionText('#year-group-select') }
             ]);
+            updateReadyChecklist();
         }
 
         function showGenerateStatus(message, tone = 'info') {
             window.ReportGenUI?.showStatus('#generate-status', message, { tone });
+        }
+
+        function setupReadyChecklistListeners() {
+            ['pupil-name', 'pupil-pronouns'].forEach((id) => {
+                document.getElementById(id)?.addEventListener('input', updateReadyChecklist);
+            });
+        }
+
+        function setFieldInvalid(id, invalid) {
+            const field = document.getElementById(id);
+            setControlInvalid(field, invalid);
+        }
+
+        function setControlInvalid(field, invalid) {
+            if (field) {
+                window.ReportGenUI?.setFieldInvalid(field, invalid);
+            }
+        }
+
+        function setStrengthFocusValidation(incompleteRows = []) {
+            const incompleteSet = new Set(incompleteRows);
+            document.querySelectorAll('.strength-focus-row').forEach((row, index) => {
+                const rowNumber = index + 1;
+                const topicInput = row.querySelector('.strength-topic');
+                const levelSelect = row.querySelector('.strength-level');
+                const rowInvalid = incompleteSet.has(rowNumber);
+
+                row.classList.toggle('field-invalid-row', rowInvalid);
+                setControlInvalid(topicInput, rowInvalid && !topicInput?.value.trim());
+                setControlInvalid(levelSelect, rowInvalid && !levelSelect?.value.trim());
+            });
+        }
+
+        function focusFirstIncompleteStrengthRow() {
+            const firstInvalid = document.querySelector('.strength-focus-row.field-invalid-row .field-invalid');
+            if (firstInvalid) {
+                firstInvalid.focus();
+            }
+        }
+
+        function renderChecklistItem(label, complete, detail = '') {
+            const item = document.createElement('li');
+            item.className = complete ? 'ready-item ready-item--complete' : 'ready-item ready-item--missing';
+
+            const marker = document.createElement('span');
+            marker.className = 'ready-marker';
+            marker.textContent = complete ? 'Ready' : 'Needed';
+
+            const text = document.createElement('span');
+            text.textContent = detail ? `${label}: ${detail}` : label;
+
+            item.append(marker, text);
+            return item;
+        }
+
+        function updateReadyChecklist() {
+            const checklist = document.getElementById('ready-checklist');
+            if (!checklist) {
+                return;
+            }
+
+            const helper = window.ReportSelection;
+            const container = document.getElementById('categories-container');
+            const hasName = Boolean(document.getElementById('pupil-name')?.value.trim());
+            const hasPronouns = Boolean(document.getElementById('pupil-pronouns')?.value.trim());
+            const hasSubject = Boolean(document.getElementById('subject-select')?.value);
+            const hasYearGroup = Boolean(document.getElementById('year-group-select')?.value);
+            const categoriesLoaded = container?.querySelectorAll('.comment-category').length > 0;
+            const selectionState = helper?.collectSelections && categoriesLoaded
+                ? helper.collectSelections(container)
+                : { missingGroups: [], selections: {} };
+            const missingGroups = selectionState.missingGroups || [];
+            const selectedCount = Object.values(selectionState.selections || {})
+                .reduce((sum, comments) => sum + comments.length, 0);
+            const strengthFocus = collectStrengthFocus();
+            const incompleteStrength = strengthFocus.incomplete.length > 0;
+
+            checklist.innerHTML = '';
+            checklist.appendChild(renderChecklistItem('Subject and year group', hasSubject && hasYearGroup));
+            checklist.appendChild(renderChecklistItem('Pupil name', hasName));
+            checklist.appendChild(renderChecklistItem('Pronouns', hasPronouns));
+            checklist.appendChild(renderChecklistItem(
+                'Paragraph comments',
+                categoriesLoaded && missingGroups.length === 0,
+                categoriesLoaded
+                    ? `${selectedCount} selected${missingGroups.length ? `, missing ${missingGroups.join(', ')}` : ''}`
+                    : 'no comment bank loaded'
+            ));
+            checklist.appendChild(renderChecklistItem(
+                'Strength focus',
+                !incompleteStrength,
+                strengthFocus.items.length ? `${strengthFocus.items.length} added` : 'optional'
+            ));
+
+            setFieldInvalid('pupil-name', !hasName && validationActive);
+            setFieldInvalid('pupil-pronouns', !hasPronouns && validationActive);
         }
 
         async function loadCategoriesAndComments() {
@@ -297,6 +402,24 @@
                 const selectionHelper = window.ReportSelection;
                 if (!selectionHelper) {
                     showGenerateStatus('Unable to load selection tools. Please refresh the page.', 'error');
+                    return;
+                }
+
+                if (categories.length === 0) {
+                    document.getElementById('step-tabs').innerHTML = '';
+                    document.getElementById('category-controls').style.display = 'none';
+                    document.getElementById('strength-focus-wrapper').style.display = 'none';
+                    document.getElementById('additional-comments-wrapper').style.display = 'none';
+                    document.getElementById('generate-report').style.display = 'none';
+                    categoriesContainer.innerHTML = `
+                        <div class="empty-state">
+                            <h3>No comments found for this selection</h3>
+                            <p>This subject and year group has no saved comment bank yet.</p>
+                        </div>
+                    `;
+                    updateSelectionSummary();
+                    updateReadyChecklist();
+                    showGenerateStatus('No comment bank exists yet for this subject and year group.', 'warning');
                     return;
                 }
 
@@ -377,6 +500,7 @@
                 document.getElementById('category-controls').style.display = categories.length ? 'flex' : 'none';
                 document.getElementById('additional-comments-wrapper').style.display = 'block';
                 document.getElementById('generate-report').style.display = 'block';
+                updateReadyChecklist();
                 showGenerateStatus(`Loaded ${categories.length} categories for this report.`, categories.length ? 'success' : 'warning');
             }
         }
@@ -544,6 +668,7 @@
             }
             list.innerHTML = '';
             addStrengthFocusRow(true);
+            updateReadyChecklist();
         }
 
         function createStrengthFocusRow({ topic = '', level = '' } = {}) {
@@ -557,6 +682,9 @@
             topicInput.classList.add('strength-topic');
             topicInput.value = topic;
             topicInput.addEventListener('input', () => {
+                if (validationActive || document.querySelector('.strength-focus-row.field-invalid-row')) {
+                    setStrengthFocusValidation(collectStrengthFocus().incomplete);
+                }
                 updateSelectionSummary();
                 clearRelevanceWarning();
             });
@@ -573,6 +701,9 @@
                 levelSelect.appendChild(option);
             });
             levelSelect.addEventListener('change', () => {
+                if (validationActive || document.querySelector('.strength-focus-row.field-invalid-row')) {
+                    setStrengthFocusValidation(collectStrengthFocus().incomplete);
+                }
                 updateSelectionSummary();
                 clearRelevanceWarning();
             });
@@ -602,6 +733,7 @@
             }
             list.appendChild(createStrengthFocusRow());
             updateSelectionSummary();
+            updateReadyChecklist();
         }
 
         function removeStrengthFocusRow(button) {
@@ -609,6 +741,7 @@
             if (row) {
                 row.remove();
                 updateSelectionSummary();
+                updateReadyChecklist();
             }
         }
 
@@ -786,6 +919,7 @@
                 tab.classList.toggle('has-selection', count > 0);
                 tab.classList.toggle('needs-selection', missingRequiredKeys.includes(key));
             });
+            updateReadyChecklist();
         }
 
         function showRelevanceWarning(flaggedItems) {
@@ -904,14 +1038,23 @@
             const yearGroupId = document.getElementById('year-group-select').value;
 
             clearRelevanceWarning();
+            setFieldInvalid('pupil-name', false);
+            setFieldInvalid('pupil-pronouns', false);
+            setStrengthFocusValidation([]);
 
             if (!pupilName) {
+                setValidationState(true);
+                setFieldInvalid('pupil-name', true);
+                updateReadyChecklist();
                 showGenerateStatus('Please enter the pupil name before generating a report.', 'warning');
                 document.getElementById('pupil-name').focus();
                 return;
             }
 
             if (!pupilPronouns) {
+                setValidationState(true);
+                setFieldInvalid('pupil-pronouns', true);
+                updateReadyChecklist();
                 showGenerateStatus('Please enter the pupil pronouns before generating a report.', 'warning');
                 document.getElementById('pupil-pronouns').focus();
                 return;
@@ -928,14 +1071,20 @@
             );
             if (missingGroups.length > 0) {
                 setValidationState(true);
+                updateReadyChecklist();
                 showGenerateStatus(`Please select at least one comment for: ${missingGroups.join(', ')}.`, 'warning');
                 return;
             }
             setValidationState(false);
+            updateReadyChecklist();
 
             const strengthFocus = collectStrengthFocus();
             if (strengthFocus.incomplete.length > 0) {
+                setValidationState(true);
+                setStrengthFocusValidation(strengthFocus.incomplete);
+                updateReadyChecklist();
                 showGenerateStatus('Please complete or remove all strength focus rows before generating the report.', 'warning');
+                focusFirstIncompleteStrengthRow();
                 return;
             }
 
@@ -1007,6 +1156,8 @@
             document.getElementById('pupil-pronouns').value = '';
             document.getElementById('additional-comments').value = '';
             setupStrengthFocus();
+            setFieldInvalid('pupil-name', false);
+            setFieldInvalid('pupil-pronouns', false);
 
             // Reset all comment selections
             const checkboxes = document.querySelectorAll('#categories-container input[type="checkbox"]');
@@ -1015,6 +1166,7 @@
             });
             updateSelectionSummary();
             applyFilters();
+            updateReadyChecklist();
         }
 
         function copyReportToClipboard() {

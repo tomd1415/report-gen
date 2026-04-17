@@ -18,15 +18,20 @@ server implementation.
 
 ## Static Pages
 
-- `index.html`: generate reports from selected comments.
-- `import_reports.html`: paste old reports to generate a comment bank.
-- `manage_categories_comments.html`: manually manage categories/comments.
+- `index.html`: generate reports from selected comments, with paragraph tabs,
+  a selection summary, a ready checklist, and empty-state handling.
+- `import_reports.html`: paste old reports to generate a comment bank, with
+  field-specific validation and page-level import status.
+- `manage_categories_comments.html`: manually manage categories/comments, with
+  search, counts, expand/collapse controls, empty-state handling, and clearer
+  delete confirmations.
 - `manage_subjects_years.html`: manage per-user prompt text, subject
   description, and default word limit.
-- `manage_export_import.html`: export/import CSV comment banks.
+- `manage_export_import.html`: export/import CSV comment banks, with
+  field-specific validation and page-level import/export status.
 - `settings.html`: choose visible subjects/year groups and change password.
 - `adminpage.html`: manage global subjects, year groups, users, password resets,
-  and database backup/export.
+  staff comment-bank imports, and database backup/export.
 - `login.html`, `register.html`, `admin-login.html`: auth pages.
 - `header.html`, `footer.html`: shared static fragments.
 
@@ -127,6 +132,11 @@ instead of the currently logged-in admin user.
   user's comment bank only.
 - `adminpage.html` now includes a Staff Comment Banks section that lets admins
   import pasted reports for a selected staff user, subject, and year group.
+- The Staff Comment Banks section is shown as a three-step admin workflow:
+  choose staff/class, set context, then import previous reports.
+- Main browser workflows use shared helpers for page-level status, context
+  chips, button loading states, comment-bank filtering, and invalid-field
+  styling.
 - Admin target-staff endpoints exist under `/api/admin/staff/:userId/*`.
 - The existing OpenAI import flow already supports subject/year scoped comments,
   name placeholder replacement, relevance filtering, and merge with existing
@@ -155,6 +165,8 @@ instead of the currently logged-in admin user.
   target ownership.
 - Category/comment/prompt ownership checks.
 - Password-change field consistency.
+- Shared UI helper coverage for status panels, context chips, button loading,
+  invalid-field styling, and comment-bank filtering.
 
 ## Baseline Manual Test Checklist
 

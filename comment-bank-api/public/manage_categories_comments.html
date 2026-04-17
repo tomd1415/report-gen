@@ -46,6 +46,11 @@
 
             <div id="manage-comments-context" class="context-summary" hidden></div>
             <div id="manage-comments-status" class="status-panel" hidden></div>
+            <div class="category-controls manage-comment-controls" id="manage-comment-controls" hidden>
+                <button type="button" class="button inline-button" onclick="setAllManageCategoriesExpanded(true)">Expand all</button>
+                <button type="button" class="button inline-button" onclick="setAllManageCategoriesExpanded(false)">Collapse all</button>
+                <span id="comment-bank-counts" class="context-chip"></span>
+            </div>
 
             <div id="new-category">
                 <div class="form-section">
@@ -200,6 +205,55 @@
             categoryDiv.classList.toggle('collapsed');
         }
 
+        function countComments(categories) {
+            return categories.reduce((sum, category) => sum + (category.Comments || []).length, 0);
+        }
+
+        function updateCommentBankCounts(categories) {
+            const controls = document.getElementById('manage-comment-controls');
+            const counts = document.getElementById('comment-bank-counts');
+            if (!controls || !counts) {
+                return;
+            }
+
+            if (!categories.length) {
+                controls.hidden = true;
+                counts.textContent = '';
+                return;
+            }
+
+            const categoryCount = categories.length;
+            const commentCount = countComments(categories);
+            counts.textContent = `${categoryCount} ${categoryCount === 1 ? 'category' : 'categories'} / ${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`;
+            controls.hidden = false;
+        }
+
+        function setAllManageCategoriesExpanded(expanded) {
+            document.querySelectorAll('#categories-container .category').forEach((categoryDiv) => {
+                const commentsContainer = categoryDiv.querySelector('.comments-container');
+                const expand = categoryDiv.querySelector('.expand');
+                if (commentsContainer) {
+                    commentsContainer.style.display = expanded ? 'block' : 'none';
+                }
+                if (expand) {
+                    expand.textContent = expanded ? '-' : '+';
+                }
+                categoryDiv.classList.toggle('collapsed', !expanded);
+            });
+        }
+
+        function getCategoryDetails(button) {
+            const category = button.closest('.category');
+            const name = category?.dataset.categoryName || 'this category';
+            const count = Number(category?.dataset.commentCount || 0);
+            return { name, count };
+        }
+
+        function getCommentDetails(button) {
+            const text = button.closest('.comment')?.querySelector('.comment-content')?.textContent.trim() || 'this comment';
+            return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+        }
+
         // Fetch and populate categories and comments
         async function loadCategoriesAndComments() {
             const subjectId = document.getElementById('subject-select').value;
@@ -219,15 +273,27 @@
                     categoriesContainer.innerHTML = '';
                     document.getElementById('new-category').style.display = 'block';
                     if (categories.length === 0) {
+                        categoriesContainer.innerHTML = `
+                            <div class="empty-state">
+                                <h3>No categories yet</h3>
+                                <p>This comment bank has no saved categories.</p>
+                            </div>
+                        `;
+                        updateCommentBankCounts([]);
                         window.ReportGenUI?.showStatus('#manage-comments-status', 'No categories yet for this subject and year group. Add one to start building this comment bank.', { tone: 'info' });
                         return;
                     }
                     categories.forEach(category => {
+                        const commentCount = (category.Comments || []).length;
                         const categoryDiv = document.createElement('div');
                         categoryDiv.classList.add('category', 'm-1', 'p-1', 'bg-blue-300', 'rounded-md', 'shadow-sm');
+                        categoryDiv.dataset.categoryName = category.name;
+                        categoryDiv.dataset.commentCount = String(commentCount);
                         categoryDiv.innerHTML = `
                             <h3 class="category-title" onclick="toggleCategory(this.parentElement)" data-category-id="${category.id}">
-                                ${escapeHtml(category.name)} <span class="expand">+</span>
+                                ${escapeHtml(category.name)}
+                                <span class="category-count">${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}</span>
+                                <span class="expand">+</span>
                             </h3>
                             <button class="button delete" onclick="deleteCategory(${category.id}, this)">Delete Category</button>
                             <div class="comments-container" style="display: none;">
@@ -255,6 +321,7 @@
                         `;
                         categoriesContainer.appendChild(categoryDiv);
                     });
+                    updateCommentBankCounts(categories);
                     window.ReportGenUI?.showStatus('#manage-comments-status', `Loaded ${categories.length} categories.`, { tone: 'success' });
                     applyCommentBankFilter();
                 } catch (error) {
@@ -264,6 +331,7 @@
             } else {
                 document.getElementById('new-category').style.display = 'none';
                 document.getElementById('categories-container').innerHTML = '';
+                updateCommentBankCounts([]);
                 window.ReportGenUI?.clearStatus('#manage-comments-status');
             }
         }
@@ -338,7 +406,9 @@
 
         // Delete category
         async function deleteCategory(id, button) {
-            if (confirm('Are you sure you want to delete this category? All comments in this category will also be deleted.')) {
+            const { name, count } = getCategoryDetails(button);
+            const commentLabel = `${count} ${count === 1 ? 'comment' : 'comments'}`;
+            if (confirm(`Delete "${name}" and its ${commentLabel}? This cannot be undone.`)) {
                 window.ReportGenUI?.setButtonLoading(button, true, 'Deleting...');
                 try {
                     const response = await fetch(`/api/categories/${id}`, {
@@ -416,7 +486,8 @@
 
         // Delete comment
         async function deleteComment(id, button) {
-            if (confirm('Are you sure you want to delete this comment?')) {
+            const commentPreview = getCommentDetails(button);
+            if (confirm(`Delete this comment?\n\n"${commentPreview}"`)) {
                 window.ReportGenUI?.setButtonLoading(button, true, 'Deleting...');
                 try {
                     const response = await fetch(`/api/comments/${id}`, {

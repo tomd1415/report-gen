@@ -22,9 +22,16 @@ The system also supports a per-subject/year-group subject description (shown to 
 - Per subject/year-group subject description and optional word limit.
 - Strength focus for paragraph 3 (topic + level) to guarantee subject-specific detail.
 - Relevance check: warns if selected comments are out of scope for the subject description (with an override option).
+- Generate Report ready checklist, selection summary, paragraph tabs, and
+  field-specific validation to make missing inputs clear before generation.
+- Manage Comments search, category/comment counts, expand/collapse controls, and
+  specific delete confirmations.
 - Import pipeline uses structured outputs (JSON schema) and can add a few extra helpful comments per category, grounded in the subject description.
+- Import and CSV pages show page-level loading, success, warning, and error
+  states.
 - Privacy controls: `store: false` and hashed `safety_identifier` per user.
 - Admin tools for managing users, subjects, year groups, prompts, and import/export.
+- Admin staff comment-bank imports are shown as a three-step workflow.
 - Rate limiting on OpenAI-backed endpoints.
 
 ---
@@ -140,6 +147,7 @@ You have three options:
 - Select subject + year group.
 - Enter pupil name and pronouns (required).
 - Pick at least one comment in each of the 4 main paragraph groups.
+- Use the Ready Check panel to see what is still needed before generation.
 - Optionally add:
   - Strength focus (topic + level) for paragraph 3.
   - Additional comments to weave across the report.

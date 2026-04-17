@@ -45,7 +45,11 @@ Use this checklist before pulling or deploying changes on the live server.
 - Log in as an admin user.
 - Confirm the shared menu shows Admin.
 - Load subjects and year groups.
+- Confirm the Generate Report ready checklist updates as required fields and
+  comments are selected.
 - Generate a small test report for a known subject/year group.
+- Confirm import pages highlight the first missing required field if submitted
+  incomplete.
 - If deploying import changes, run one small import into a test or low-risk
   account first.
 - Confirm existing saved comments are still visible for a known staff account.
