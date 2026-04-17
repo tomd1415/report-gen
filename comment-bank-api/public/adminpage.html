@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel</title>
     <link rel="stylesheet" href="styles.css">
+    <script type="module" src="site-menu.js"></script>
+    <script type="module" src="page-layout.js"></script>
+    <script type="module" src="import-summary.js"></script>
 </head>
 <body class="bg-light-blue text-dark-gray">
     <div id="header-placeholder"></div>
@@ -58,6 +61,64 @@
             </form>
         </section>
 
+        <!-- Staff Comment Bank Management Section -->
+        <section class="section">
+            <h2>Staff Comment Banks</h2>
+            <div class="form-section">
+                <label for="staff-bank-user">Staff user:</label>
+                <select id="staff-bank-user" onchange="loadStaffBankContext()">
+                    <option value="">Select Staff User</option>
+                </select>
+
+                <label for="staff-bank-subject">Subject:</label>
+                <select id="staff-bank-subject" onchange="loadStaffBankContext()">
+                    <option value="">Select Subject</option>
+                </select>
+
+                <label for="staff-bank-year-group">Year Group:</label>
+                <select id="staff-bank-year-group" onchange="loadStaffBankContext()">
+                    <option value="">Select Year Group</option>
+                </select>
+            </div>
+
+            <div class="form-section">
+                <label for="staff-bank-subject-description">Subject description:</label>
+                <textarea id="staff-bank-subject-description" rows="4" maxlength="2000"></textarea>
+
+                <label for="staff-bank-word-limit">Default word limit (optional):</label>
+                <input type="number" id="staff-bank-word-limit" min="1" placeholder="e.g. 140">
+
+                <label for="staff-bank-prompt">Prompt text:</label>
+                <textarea id="staff-bank-prompt" rows="4" maxlength="5000"></textarea>
+                <button type="button" class="button" onclick="saveStaffBankContextAndPrompt()">Save Staff Context</button>
+            </div>
+
+            <div class="form-section">
+                <label for="staff-bank-pupil-names">Pupil names to redact (comma separated):</label>
+                <input type="text" id="staff-bank-pupil-names" maxlength="2000" placeholder="Enter pupil names separated by commas">
+
+                <label for="staff-bank-report-file">Optional plain text report file:</label>
+                <input type="file" id="staff-bank-report-file" accept=".txt,text/plain" onchange="loadStaffReportFile()">
+
+                <label for="staff-bank-reports">Previous reports:</label>
+                <textarea id="staff-bank-reports" rows="10" maxlength="60000" placeholder="Paste previous reports here"></textarea>
+
+                <label for="staff-bank-import-mode">Import mode:</label>
+                <select id="staff-bank-import-mode" onchange="toggleStaffReplaceConfirm()">
+                    <option value="merge" selected>Merge with existing comments</option>
+                    <option value="replace">Replace selected staff bank</option>
+                </select>
+
+                <label id="staff-bank-replace-confirm-wrapper" style="display: none;">
+                    <input type="checkbox" id="staff-bank-confirm-replace">
+                    I understand this will replace only this staff user's selected subject/year group comments.
+                </label>
+
+                <button type="button" class="button" id="staff-bank-import-button" onclick="importStaffReports()">Import Reports For Staff</button>
+                <div id="staff-bank-result" class="result-section"></div>
+            </div>
+        </section>
+
         <!-- Database Management Section -->
         <section class="section">
             <h2>Database Management</h2>
@@ -71,12 +132,6 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             fetchUsername();
-            fetch("header.html").then(response => response.text()).then(data => {
-                document.getElementById("header-placeholder").innerHTML = data;
-            });
-            fetch("footer.html").then(response => response.text()).then(data => {
-                document.getElementById("footer-placeholder").innerHTML = data;
-            });
 	    // Check if the user is authenticated
             fetch('/api/authenticated')
                 .then(response => {
@@ -107,6 +162,7 @@
 		
             loadYearGroups();
             loadSubjects();
+            loadStaffCommentUsers();
         });
 
         // Fetch username
@@ -139,6 +195,18 @@
                 `;
                 yearGroupList.appendChild(item);
             });
+            const staffYearGroupSelect = document.getElementById('staff-bank-year-group');
+            if (staffYearGroupSelect) {
+                const selectedValue = staffYearGroupSelect.value;
+                staffYearGroupSelect.innerHTML = '<option value="">Select Year Group</option>';
+                yearGroups.forEach(yearGroup => {
+                    const option = document.createElement('option');
+                    option.value = yearGroup.id;
+                    option.textContent = yearGroup.name;
+                    staffYearGroupSelect.appendChild(option);
+                });
+                staffYearGroupSelect.value = selectedValue;
+            }
         }
 
         async function addYearGroup() {
@@ -186,6 +254,18 @@
                 `;
                 subjectList.appendChild(item);
             });
+            const staffSubjectSelect = document.getElementById('staff-bank-subject');
+            if (staffSubjectSelect) {
+                const selectedValue = staffSubjectSelect.value;
+                staffSubjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.id;
+                    option.textContent = subject.name;
+                    staffSubjectSelect.appendChild(option);
+                });
+                staffSubjectSelect.value = selectedValue;
+            }
         }
 
         async function addSubject() {
@@ -289,6 +369,210 @@
     alert('Please fill in both fields.');
   }
 }
+
+
+        async function loadStaffCommentUsers() {
+            try {
+                const response = await fetch('/api/users');
+                if (!response.ok) {
+                    return;
+                }
+                const users = await response.json();
+                const userSelect = document.getElementById('staff-bank-user');
+                userSelect.innerHTML = '<option value="">Select Staff User</option>';
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = `${user.username}${user.isAdmin ? ' (admin)' : ''}`;
+                    userSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading staff users:', error);
+            }
+        }
+
+        function getStaffBankSelection() {
+            return {
+                userId: document.getElementById('staff-bank-user').value,
+                subjectId: document.getElementById('staff-bank-subject').value,
+                yearGroupId: document.getElementById('staff-bank-year-group').value
+            };
+        }
+
+        function setStaffBankResult(message) {
+            document.getElementById('staff-bank-result').textContent = message;
+        }
+
+        async function parseResponseMessage(response) {
+            const text = await response.text();
+            try {
+                const payload = JSON.parse(text);
+                return payload.message || text;
+            } catch {
+                return text;
+            }
+        }
+
+        async function loadStaffBankContext() {
+            const { userId, subjectId, yearGroupId } = getStaffBankSelection();
+            if (!userId || !subjectId || !yearGroupId) {
+                return;
+            }
+
+            try {
+                const [contextResponse, promptResponse, bankResponse] = await Promise.all([
+                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`),
+                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/prompts/${encodeURIComponent(subjectId)}/${encodeURIComponent(yearGroupId)}`),
+                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/comment-bank?subjectId=${encodeURIComponent(subjectId)}&yearGroupId=${encodeURIComponent(yearGroupId)}`)
+                ]);
+
+                if (contextResponse.ok) {
+                    const context = await contextResponse.json();
+                    document.getElementById('staff-bank-subject-description').value = context.subjectDescription || '';
+                    document.getElementById('staff-bank-word-limit').value = context.wordLimit || '';
+                }
+
+                if (promptResponse.ok) {
+                    const prompt = await promptResponse.json();
+                    document.getElementById('staff-bank-prompt').value = prompt.promptPart || '';
+                }
+
+                if (bankResponse.ok) {
+                    const categories = await bankResponse.json();
+                    const commentCount = categories.reduce((sum, category) => sum + ((category.Comments || []).length), 0);
+                    setStaffBankResult(`Current bank: ${categories.length} categories, ${commentCount} comments.`);
+                }
+            } catch (error) {
+                console.error('Error loading staff comment bank context:', error);
+                setStaffBankResult('Error loading staff comment bank context.');
+            }
+        }
+
+        async function saveStaffBankContextAndPrompt() {
+            const { userId, subjectId, yearGroupId } = getStaffBankSelection();
+            if (!userId || !subjectId || !yearGroupId) {
+                alert('Please select a staff user, subject, and year group.');
+                return false;
+            }
+
+            const subjectDescription = document.getElementById('staff-bank-subject-description').value;
+            const wordLimit = document.getElementById('staff-bank-word-limit').value;
+            const promptPart = document.getElementById('staff-bank-prompt').value;
+
+            try {
+                const [contextResponse, promptResponse] = await Promise.all([
+                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/subject-context`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ subjectId, yearGroupId, subjectDescription, wordLimit })
+                    }),
+                    fetch(`/api/admin/staff/${encodeURIComponent(userId)}/prompts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ subjectId, yearGroupId, promptPart })
+                    })
+                ]);
+
+                if (!contextResponse.ok || !promptResponse.ok) {
+                    const message = !contextResponse.ok
+                        ? await parseResponseMessage(contextResponse)
+                        : await parseResponseMessage(promptResponse);
+                    alert(`Error saving staff context: ${message}`);
+                    return false;
+                }
+
+                setStaffBankResult('Staff context saved.');
+                return true;
+            } catch (error) {
+                console.error('Error saving staff context:', error);
+                alert('Error saving staff context.');
+                return false;
+            }
+        }
+
+        async function loadStaffReportFile() {
+            const fileInput = document.getElementById('staff-bank-report-file');
+            const file = fileInput.files[0];
+            if (!file) {
+                return;
+            }
+            const text = await file.text();
+            document.getElementById('staff-bank-reports').value = text;
+        }
+
+        function toggleStaffReplaceConfirm() {
+            const mode = document.getElementById('staff-bank-import-mode').value;
+            const wrapper = document.getElementById('staff-bank-replace-confirm-wrapper');
+            wrapper.style.display = mode === 'replace' ? 'block' : 'none';
+            if (mode !== 'replace') {
+                document.getElementById('staff-bank-confirm-replace').checked = false;
+            }
+        }
+
+        async function importStaffReports() {
+            const { userId, subjectId, yearGroupId } = getStaffBankSelection();
+            const pupilNames = document.getElementById('staff-bank-pupil-names').value;
+            const reports = document.getElementById('staff-bank-reports').value;
+            const mode = document.getElementById('staff-bank-import-mode').value;
+            const confirmReplace = document.getElementById('staff-bank-confirm-replace').checked;
+
+            if (!userId || !subjectId || !yearGroupId || !pupilNames || !reports) {
+                alert('Please select staff, subject, year group, pupil names, and reports.');
+                return;
+            }
+
+            if (mode === 'replace' && !confirmReplace) {
+                alert('Please confirm replace mode before importing.');
+                return;
+            }
+
+            const saved = await saveStaffBankContextAndPrompt();
+            if (!saved) {
+                return;
+            }
+
+            const importButton = document.getElementById('staff-bank-import-button');
+            importButton.disabled = true;
+            setStaffBankResult('Importing reports. This may take a while.');
+
+            try {
+                const response = await fetch(`/api/admin/staff/${encodeURIComponent(userId)}/import-reports`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subjectId,
+                        yearGroupId,
+                        pupilNames,
+                        reports,
+                        mode,
+                        confirmReplace
+                    })
+                });
+
+                const text = await response.text();
+                let payload = {};
+                try {
+                    payload = text ? JSON.parse(text) : {};
+                } catch {
+                    payload = { message: text };
+                }
+                if (!response.ok) {
+                    throw new Error(payload.message || 'Error importing reports for staff.');
+                }
+
+                const summary = window.ReportGenImportSummary?.formatImportSummary(payload, {
+                    targetLabel: 'staff comment bank'
+                }) || payload.message || 'Import completed.';
+                setStaffBankResult(summary);
+                document.getElementById('staff-bank-reports').value = '';
+                document.getElementById('staff-bank-report-file').value = '';
+            } catch (error) {
+                console.error('Error importing reports for staff:', error);
+                setStaffBankResult(error.message);
+            } finally {
+                importButton.disabled = false;
+            }
+        }
 
 
 

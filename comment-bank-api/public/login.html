@@ -9,6 +9,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script type="module" src="site-menu.js"></script>
+    <script type="module" src="page-layout.js"></script>
 </head>
 <body>
     <div id="header-placeholder"></div>
@@ -29,15 +31,6 @@
     </div>
     <div id="footer-placeholder"></div>
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            fetch("header.html").then(response => response.text()).then(data => {
-                document.getElementById("header-placeholder").innerHTML = data;
-            });
-            fetch("footer.html").then(response => response.text()).then(data => {
-                document.getElementById("footer-placeholder").innerHTML = data;
-            });
-        });
-
         document.getElementById('login-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const username = document.getElementById('username').value;

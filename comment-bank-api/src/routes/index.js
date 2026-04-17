@@ -7,6 +7,7 @@ import { Parser } from 'json2csv';
 import rateLimit from 'express-rate-limit';
 import { isAuthenticated, isAdmin } from '../middleware/auth.js';
 import { exportDatabase, backupDatabase } from '../services/dbBackup.js';
+import { importReportsToCommentBank, ReportImportValidationError } from '../services/reportImport.js';
 import { config } from '../config/env.js';
 import { sequelize } from '../db/sequelize.js';
 
@@ -239,6 +240,179 @@ export function registerRoutes(app, { models, openai }) {
     message: { message: 'Rate limit exceeded. Try again later.' }
   });
 
+  const findOwnedCategory = (id, userId, options = {}) => {
+    return Category.findOne({
+      where: { id, userId },
+      ...options
+    });
+  };
+
+  const findOwnedComment = (id, userId) => {
+    return Comment.findOne({
+      where: { id },
+      include: [{
+        model: Category,
+        where: { userId }
+      }]
+    });
+  };
+
+  const findOwnedPrompt = (id, userId) => {
+    return Prompt.findOne({
+      where: { id, userId }
+    });
+  };
+
+  const isTruthy = (value) => value === true || value === 'true' || value === 'on' || value === '1';
+  const serializeUser = (user) => ({
+    id: user.id,
+    username: user.username,
+    isAdmin: Boolean(user.isAdmin)
+  });
+  const isDuplicateUserError = (error) =>
+    error?.name === 'SequelizeUniqueConstraintError' ||
+    error?.parent?.code === 'ER_DUP_ENTRY' ||
+    error?.original?.code === 'ER_DUP_ENTRY';
+  const validateManagedUserPayload = ({ username, password }) => {
+    const cleanedUsername = cleanText(username);
+
+    if (!cleanedUsername) {
+      return { message: 'Username is required.' };
+    }
+    if (cleanedUsername.length > LIMITS.name) {
+      return { message: `Username must be ${LIMITS.name} characters or fewer.` };
+    }
+    if (typeof password !== 'string' || !password.trim()) {
+      return { message: 'Password is required.' };
+    }
+
+    return { username: cleanedUsername, password };
+  };
+  const createManagedUser = async (req, res, successMessage) => {
+    const validation = validateManagedUserPayload(req.body);
+    if (validation.message) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(validation.password, 10);
+      const user = await User.create({
+        username: validation.username,
+        password: hashedPassword,
+        isAdmin: isTruthy(req.body.isAdmin)
+      });
+      res.json({ message: successMessage, user: serializeUser(user) });
+    } catch (error) {
+      if (isDuplicateUserError(error)) {
+        return res.status(409).json({ message: 'A user with that username already exists.' });
+      }
+      console.error('Error creating user:', error);
+      res.status(500).send('Error creating user');
+    }
+  };
+
+  const findTargetUser = async (userId) => {
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (Number.isNaN(parsedUserId)) {
+      return null;
+    }
+    return User.findByPk(parsedUserId);
+  };
+
+  const ensureUserVisibility = async ({ userId, subjectId, yearGroupId }) => {
+    const result = {
+      subjectCreated: false,
+      yearGroupCreated: false
+    };
+
+    if (subjectId) {
+      const [, created] = await UserSubject.findOrCreate({ where: { userId, subjectId } });
+      result.subjectCreated = created;
+    }
+
+    if (yearGroupId) {
+      const [, created] = await UserYearGroup.findOrCreate({ where: { userId, yearGroupId } });
+      result.yearGroupCreated = created;
+    }
+
+    return result;
+  };
+
+  const parseCategoryCsvFile = async (filePath) => {
+    const categories = {};
+    let skippedRows = 0;
+
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (data) => {
+          const categoryName = cleanAndLimit(data['categoryName'], LIMITS.categoryName);
+          const commentText = cleanAndLimit(data['commentText'], LIMITS.commentText);
+
+          if (!categoryName || !commentText) {
+            skippedRows += 1;
+            return;
+          }
+
+          if (!categories[categoryName]) {
+            if (Object.keys(categories).length >= LIMITS.maxCategories) {
+              skippedRows += 1;
+              return;
+            }
+            categories[categoryName] = [];
+          }
+
+          if (categories[categoryName].length >= LIMITS.maxCommentsPerCategory) {
+            skippedRows += 1;
+            return;
+          }
+
+          categories[categoryName].push(commentText);
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    return { categories, skippedRows };
+  };
+
+  const replaceCategoryBankFromArrays = async ({ categories, subjectId, yearGroupId, userId }) => {
+    await sequelize.transaction(async (transaction) => {
+      const existingCategories = await Category.findAll({
+        where: { subjectId, yearGroupId, userId },
+        attributes: ['id'],
+        transaction
+      });
+      const categoryIds = existingCategories
+        .map((category) => category.id)
+        .filter((id) => id !== undefined && id !== null);
+
+      if (categoryIds.length > 0) {
+        await Comment.destroy({
+          where: { categoryId: categoryIds },
+          transaction
+        });
+      }
+
+      await Category.destroy({
+        where: { subjectId, yearGroupId, userId },
+        transaction
+      });
+
+      for (const [name, comments] of Object.entries(categories)) {
+        const category = await Category.create({ name, subjectId, yearGroupId, userId }, { transaction });
+        for (const text of comments) {
+          await Comment.create({ text, categoryId: category.id }, { transaction });
+        }
+      }
+    });
+
+    return {
+      totalCategories: Object.keys(categories).length,
+      totalComments: Object.values(categories).reduce((sum, comments) => sum + comments.length, 0)
+    };
+  };
+
   app.use('/api/subjects', isAuthenticated);
   app.use('/api/year-groups', isAuthenticated);
   app.use('/api/categories-comments', isAuthenticated);
@@ -247,6 +421,7 @@ export function registerRoutes(app, { models, openai }) {
   app.use('/api/move-comment', isAuthenticated);
   app.use('/api/prompts', isAuthenticated);
   app.use('/api/subject-context', isAuthenticated);
+  app.use('/api/admin/staff', isAuthenticated, isAdmin);
   app.use('/api/export-categories-comments', isAuthenticated);
   app.use('/api/import-categories-comments', isAuthenticated);
   app.use('/api/import-reports', isAuthenticated, openAiLimiter);
@@ -270,6 +445,10 @@ export function registerRoutes(app, { models, openai }) {
       console.error('Error fetching user info:', error);
       res.status(500).send('Error fetching user info');
     }
+  });
+
+  app.get('/api/health', (req, res) => {
+    res.json({ ok: true, status: 'ok' });
   });
 
   app.post('/api/register', async (req, res) => {
@@ -398,15 +577,7 @@ export function registerRoutes(app, { models, openai }) {
   });
 
   app.post('/api/admin/user', isAdmin, async (req, res) => {
-    const { username, password, isAdmin: newAdmin } = req.body;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ username, password: hashedPassword, isAdmin: newAdmin });
-      res.json(user);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      res.status(500).send('Error creating user');
-    }
+    await createManagedUser(req, res, 'User added successfully');
   });
 
   app.delete('/api/admin/user/:username', isAdmin, async (req, res) => {
@@ -611,6 +782,7 @@ export function registerRoutes(app, { models, openai }) {
   app.put('/api/categories/:id', async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
+    const userId = req.session.user.id;
     try {
       const cleanedName = cleanText(name);
       if (!cleanedName) {
@@ -619,7 +791,7 @@ export function registerRoutes(app, { models, openai }) {
       if (cleanedName.length > LIMITS.categoryName) {
         return res.status(400).json({ message: `Category name must be ${LIMITS.categoryName} characters or fewer.` });
       }
-      const category = await Category.findByPk(id);
+      const category = await findOwnedCategory(id, userId);
       if (category) {
         category.name = cleanedName;
         await category.save();
@@ -635,8 +807,9 @@ export function registerRoutes(app, { models, openai }) {
 
   app.delete('/api/categories/:id', async (req, res) => {
     const { id } = req.params;
+    const userId = req.session.user.id;
     try {
-      const category = await Category.findByPk(id);
+      const category = await findOwnedCategory(id, userId);
       if (category) {
         await category.destroy();
         res.sendStatus(204);
@@ -666,8 +839,9 @@ export function registerRoutes(app, { models, openai }) {
 
   app.get('/api/categories/:id', async (req, res) => {
     const { id } = req.params;
+    const userId = req.session.user.id;
     try {
-      const category = await Category.findByPk(id, { include: [Comment] });
+      const category = await findOwnedCategory(id, userId, { include: [Comment] });
       if (category) {
         res.json(category);
       } else {
@@ -681,6 +855,7 @@ export function registerRoutes(app, { models, openai }) {
 
   app.post('/api/comments', async (req, res) => {
     const { text, categoryId } = req.body;
+    const userId = req.session.user.id;
     try {
       const cleanedText = cleanText(text);
       if (!cleanedText) {
@@ -688,6 +863,10 @@ export function registerRoutes(app, { models, openai }) {
       }
       if (cleanedText.length > LIMITS.commentText) {
         return res.status(400).json({ message: `Comment must be ${LIMITS.commentText} characters or fewer.` });
+      }
+      const category = await findOwnedCategory(categoryId, userId);
+      if (!category) {
+        return res.status(404).send('Category not found');
       }
       const comment = await Comment.create({ text: cleanedText, categoryId });
       res.json(comment);
@@ -700,6 +879,7 @@ export function registerRoutes(app, { models, openai }) {
   app.put('/api/comments/:id', async (req, res) => {
     const { id } = req.params;
     const { text } = req.body;
+    const userId = req.session.user.id;
     try {
       const cleanedText = cleanText(text);
       if (!cleanedText) {
@@ -708,7 +888,7 @@ export function registerRoutes(app, { models, openai }) {
       if (cleanedText.length > LIMITS.commentText) {
         return res.status(400).json({ message: `Comment must be ${LIMITS.commentText} characters or fewer.` });
       }
-      const comment = await Comment.findByPk(id);
+      const comment = await findOwnedComment(id, userId);
       if (comment) {
         comment.text = cleanedText;
         await comment.save();
@@ -724,8 +904,9 @@ export function registerRoutes(app, { models, openai }) {
 
   app.delete('/api/comments/:id', async (req, res) => {
     const { id } = req.params;
+    const userId = req.session.user.id;
     try {
-      const comment = await Comment.findByPk(id);
+      const comment = await findOwnedComment(id, userId);
       if (comment) {
         await comment.destroy();
         res.sendStatus(204);
@@ -740,7 +921,12 @@ export function registerRoutes(app, { models, openai }) {
 
   app.get('/api/comments', async (req, res) => {
     const { categoryId } = req.query;
+    const userId = req.session.user.id;
     try {
+      const category = await findOwnedCategory(categoryId, userId);
+      if (!category) {
+        return res.status(404).send('Category not found');
+      }
       const comments = await Comment.findAll({
         where: { categoryId }
       });
@@ -753,8 +939,9 @@ export function registerRoutes(app, { models, openai }) {
 
   app.get('/api/comments/:id', async (req, res) => {
     const { id } = req.params;
+    const userId = req.session.user.id;
     try {
-      const comment = await Comment.findByPk(id);
+      const comment = await findOwnedComment(id, userId);
       if (comment) {
         res.json(comment);
       } else {
@@ -768,15 +955,19 @@ export function registerRoutes(app, { models, openai }) {
 
   app.post('/api/move-comment', async (req, res) => {
     const { commentId, newCategoryId } = req.body;
+    const userId = req.session.user.id;
     try {
-      const comment = await Comment.findByPk(commentId);
-      if (comment) {
-        comment.categoryId = newCategoryId;
-        await comment.save();
-        res.json(comment);
-      } else {
+      const [comment, newCategory] = await Promise.all([
+        findOwnedComment(commentId, userId),
+        findOwnedCategory(newCategoryId, userId)
+      ]);
+      if (!comment || !newCategory) {
         res.status(404).send('Comment not found');
+        return;
       }
+      comment.categoryId = newCategoryId;
+      await comment.save();
+      res.json(comment);
     } catch (error) {
       console.error('Error moving comment:', error);
       res.status(500).send('Error moving comment');
@@ -1001,194 +1192,27 @@ export function registerRoutes(app, { models, openai }) {
         ? subjectContext.subjectDescription.trim()
         : '';
 
-      const placeholder = 'PUPIL_NAME';
-      const safePupilNames = typeof pupilNames === 'string' ? pupilNames.trim() : '';
-      const safeReports = typeof reports === 'string' ? reports.trim() : '';
-
-      if (!safeReports) {
-        return res.status(400).json({ message: 'Reports are required.' });
-      }
-      if (safePupilNames.length > LIMITS.pupilNames) {
-        return res.status(400).json({ message: `Pupil names must be ${LIMITS.pupilNames} characters or fewer.` });
-      }
-      if (safeReports.length > LIMITS.reports) {
-        return res.status(400).json({ message: `Reports must be ${LIMITS.reports} characters or fewer.` });
-      }
-
-      const namesArray = safePupilNames
-        .split(',')
-        .map((name) => cleanText(name))
-        .filter((name) => name && name.length <= LIMITS.name);
-      let reportsWithPlaceholder = safeReports;
-
-      namesArray.forEach((name) => {
-        const escapedName = escapeRegex(name);
-        const regex = new RegExp(`(^|[^\\w])${escapedName}([^\\w]|$)`, 'g');
-        reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, (match, prefix, suffix) => {
-          return `${prefix || ''}${placeholder}${suffix || ''}`;
-        });
+      const result = await importReportsToCommentBank({
+        models,
+        openai,
+        sequelize,
+        openAIParams: buildOpenAIParams(req),
+        logRequestId,
+        ownerUserId: userId,
+        actorUserId: userId,
+        subjectId,
+        yearGroupId,
+        pupilNames,
+        reports,
+        mode: 'merge',
+        subjectDescription
       });
 
-      const extractionPrompt = `
-Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports.
-Subject description (scope for this year group):
-${subjectDescription || 'Not provided.'}
-Rules:
-- Use no more than 5 categories aligned to the report structure:
-  1) Topics studied / knowledge / skills acquired
-  2) Effort / motivation / attendance
-  3) Strengths / achievements
-  4) Areas for development / targets toward end-of-year Teacher Target
-  5) General / Other (only for comments that do not fit above)
-- Use the category names above (shorten slightly if needed but keep clear alignment).
-- No more than 10 comments per category (including any new comments you add); merge or remove similar comments.
-- Keep each comment concise and standalone (aim for 12 words or fewer).
-- Order comments from least able to most able; cover a range of abilities/behaviours.
-- Keep knowledge/skills comments aligned to the subject description. Effort/behaviour/attendance comments are always allowed.
-- Add 1-3 helpful new comments per category to fill likely gaps, grounded in the subject description and typical classroom expectations. If you cannot justify a new comment from the subject description, do not add it.
-- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "${TARGET_PLACEHOLDER_COMMENT}".
-
-Reports:
-${reportsWithPlaceholder}
-`;
-
-      const extractResponse = await openai.responses.parse({
-        ...buildOpenAIParams(req),
-        input: [{ role: 'user', content: extractionPrompt }],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'category_bank',
-            schema: categorySchema,
-            strict: true
-          }
-        },
-        max_output_tokens: 2000,
-        temperature: 0.6
-      });
-      logRequestId(extractResponse, 'import-reports-extract');
-
-      const extracted = extractResponse.output_parsed || {};
-      let newCategories = normalizeCategories(extracted.categories || []);
-      const newItems = subjectDescription ? buildCommentItems(newCategories) : [];
-
-      if (subjectDescription && newItems.length > 0) {
-        const relevanceResponse = await openai.responses.parse({
-          ...buildOpenAIParams(req),
-          input: [{ role: 'user', content: buildRelevancePrompt(subjectDescription, newItems) }],
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'comment_relevance_import',
-              schema: relevanceSchema,
-              strict: true
-            }
-          },
-          max_output_tokens: 1200,
-          temperature: 0.2
-        });
-        logRequestId(relevanceResponse, 'import-reports-relevance');
-        const relevance = relevanceResponse.output_parsed || {};
-        const flagged = Array.isArray(relevance.flagged) ? relevance.flagged : [];
-        newCategories = filterCategoryMapByRelevance(newCategories, flagged);
-      }
-
-      const existingCategories = await Category.findAll({
-        where: { subjectId, yearGroupId, userId },
-        include: [Comment]
-      });
-
-      if (existingCategories.length > 0) {
-        const existingCategoryPayload = existingCategories.map((category) => ({
-          name: category.name,
-          comments: category.Comments.map((comment) => cleanText(comment.text)).filter(Boolean)
-        }));
-
-        const mergePrompt = `I have two sets of categories and comments for student reports. Merge them into a single set aligned to the report structure.
-Subject description (scope for this year group):
-${subjectDescription || 'Not provided.'}
-Rules:
-- Use no more than 5 categories aligned to:
-  1) Topics studied / knowledge / skills acquired
-  2) Effort / motivation / attendance
-  3) Strengths / achievements
-  4) Areas for development / targets toward end-of-year Teacher Target
-  5) General / Other (only for comments that do not fit above)
-- If categories are similar, merge them. Use the category names above (shorten slightly if needed but keep clear alignment).
-- No more than 10 comments per category (including any new comments you add); merge or remove similar comments.
-- Keep each comment concise and standalone (aim for 12 words or fewer).
-- Keep comments ordered from least able to most able.
-- Keep knowledge/skills comments aligned to the subject description. Effort/behaviour/attendance comments are always allowed.
-- Add 1-3 helpful new comments per category to fill likely gaps, grounded in the subject description and typical classroom expectations. If you cannot justify a new comment from the subject description, do not add it.
-- Include a comment in the "Areas for development / targets toward end-of-year Teacher Target" category that is exactly: "${TARGET_PLACEHOLDER_COMMENT}".
-- Give priority to the New categories and comments.
-
-Existing categories and comments:
-${JSON.stringify(existingCategoryPayload, null, 2)}
-
-New categories and comments:
-${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
-`;
-
-        const mergeResponse = await openai.responses.parse({
-          ...buildOpenAIParams(req),
-          input: [{ role: 'user', content: mergePrompt }],
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'category_bank_merge',
-              schema: categorySchema,
-              strict: true
-            }
-          },
-          max_output_tokens: 2000,
-          temperature: 0.6
-        });
-        logRequestId(mergeResponse, 'import-reports-merge');
-
-        const mergedParsed = mergeResponse.output_parsed || {};
-        let mergedCategories = normalizeCategories(mergedParsed.categories || []);
-        const mergedItems = subjectDescription ? buildCommentItems(mergedCategories) : [];
-        if (subjectDescription && mergedItems.length > 0) {
-          const relevanceResponse = await openai.responses.parse({
-            ...buildOpenAIParams(req),
-            input: [{ role: 'user', content: buildRelevancePrompt(subjectDescription, mergedItems) }],
-            text: {
-              format: {
-                type: 'json_schema',
-                name: 'comment_relevance_merge',
-                schema: relevanceSchema,
-                strict: true
-              }
-            },
-            max_output_tokens: 1200,
-            temperature: 0.2
-          });
-          logRequestId(relevanceResponse, 'import-reports-merge-relevance');
-          const relevance = relevanceResponse.output_parsed || {};
-          const flagged = Array.isArray(relevance.flagged) ? relevance.flagged : [];
-          mergedCategories = filterCategoryMapByRelevance(mergedCategories, flagged);
-        }
-
-        await Category.destroy({ where: { subjectId, yearGroupId, userId } });
-
-        for (const [categoryName, comments] of Object.entries(mergedCategories)) {
-          const category = await Category.create({ name: categoryName, subjectId, yearGroupId, userId });
-          for (const comment of comments) {
-            await Comment.create({ text: comment, categoryId: category.id });
-          }
-        }
-      } else {
-        for (const [categoryName, comments] of Object.entries(newCategories)) {
-          const category = await Category.create({ name: categoryName, subjectId, yearGroupId, userId });
-          for (const comment of comments) {
-            await Comment.create({ text: comment, categoryId: category.id });
-          }
-        }
-      }
-
-      res.json({ message: 'Reports imported successfully and categories/comments generated.' });
+      res.json(result);
     } catch (error) {
+      if (error instanceof ReportImportValidationError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
       console.error('Error importing reports:', error);
       res.status(500).send('Error importing reports');
     }
@@ -1249,6 +1273,327 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
     } catch (error) {
       console.error('Error saving subject context:', error);
       res.status(500).send('Error saving subject context');
+    }
+  });
+
+  app.get('/api/admin/staff/:userId/comment-bank', async (req, res) => {
+    const { userId } = req.params;
+    const { subjectId, yearGroupId } = req.query;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const categories = await Category.findAll({
+        where: { subjectId, yearGroupId, userId: targetUser.id },
+        include: [Comment]
+      });
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching target comment bank:', error);
+      res.status(500).send('Error fetching target comment bank');
+    }
+  });
+
+  app.post('/api/admin/staff/:userId/import-reports', openAiLimiter, async (req, res) => {
+    const { userId } = req.params;
+    const {
+      subjectId,
+      yearGroupId,
+      pupilNames,
+      reports,
+      mode = 'merge',
+      confirmReplace
+    } = req.body;
+    const normalizedMode = mode === 'replace' ? 'replace' : 'merge';
+
+    if (normalizedMode === 'replace' && !isTruthy(confirmReplace)) {
+      return res.status(400).json({ message: 'Replace mode requires confirmation.' });
+    }
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const subjectContext = await SubjectContext.findOne({
+        where: { subjectId, yearGroupId, userId: targetUser.id }
+      });
+      const subjectDescription = subjectContext?.subjectDescription
+        ? subjectContext.subjectDescription.trim()
+        : '';
+
+      const result = await importReportsToCommentBank({
+        models,
+        openai,
+        sequelize,
+        openAIParams: buildOpenAIParams(req),
+        logRequestId,
+        ownerUserId: targetUser.id,
+        actorUserId: req.session.user.id,
+        subjectId,
+        yearGroupId,
+        pupilNames,
+        reports,
+        mode: normalizedMode,
+        subjectDescription
+      });
+      const visibility = await ensureUserVisibility({
+        userId: targetUser.id,
+        subjectId,
+        yearGroupId
+      });
+
+      res.json({
+        ...result,
+        targetUser: {
+          id: targetUser.id,
+          username: targetUser.username
+        },
+        visibility
+      });
+    } catch (error) {
+      if (error instanceof ReportImportValidationError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      console.error('Error importing reports for target user:', error);
+      res.status(500).send('Error importing reports for target user');
+    }
+  });
+
+  app.get('/api/admin/staff/:userId/export-categories-comments', async (req, res) => {
+    const { userId } = req.params;
+    const { subjectId, yearGroupId } = req.query;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const categories = await Category.findAll({
+        where: { subjectId, yearGroupId, userId: targetUser.id },
+        include: [Comment]
+      });
+
+      const data = categories.flatMap(category => {
+        return category.Comments.map(comment => ({
+          categoryName: category.name,
+          commentText: comment.text ? comment.text.replace(/\s+/g, ' ').trim() : ''
+        }));
+      });
+
+      const json2csvParser = new Parser({ fields: ['categoryName', 'commentText'] });
+      const csvText = json2csvParser.parse(data);
+
+      res.header('Content-Type', 'text/csv');
+      res.attachment(`categories-comments-user-${targetUser.id}-${subjectId}-${yearGroupId}.csv`);
+      res.send(csvText);
+    } catch (error) {
+      console.error('Error exporting target categories and comments:', error);
+      res.status(500).send('Error exporting target categories and comments');
+    }
+  });
+
+  app.post('/api/admin/staff/:userId/import-categories-comments', upload.single('file'), async (req, res) => {
+    const { userId } = req.params;
+    const { subjectId, yearGroupId, confirmReplace } = req.body;
+    const filePath = req.file?.path;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).send('Missing subjectId or yearGroupId');
+    }
+
+    if (!isTruthy(confirmReplace)) {
+      return res.status(400).json({ message: 'CSV import replaces the target comment bank and requires confirmation.' });
+    }
+
+    if (!req.file) {
+      return res.status(400).send('No file uploaded');
+    }
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const { categories, skippedRows } = await parseCategoryCsvFile(filePath);
+      const totals = await replaceCategoryBankFromArrays({
+        categories,
+        subjectId,
+        yearGroupId,
+        userId: targetUser.id
+      });
+      const visibility = await ensureUserVisibility({
+        userId: targetUser.id,
+        subjectId,
+        yearGroupId
+      });
+
+      res.json({
+        message: 'Categories and comments imported successfully for target staff user.',
+        ...totals,
+        skippedRows,
+        targetUser: {
+          id: targetUser.id,
+          username: targetUser.username
+        },
+        visibility
+      });
+    } catch (error) {
+      console.error('Error importing target categories and comments:', error);
+      res.status(500).send('Error importing target categories and comments');
+    } finally {
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  });
+
+  app.get('/api/admin/staff/:userId/subject-context', async (req, res) => {
+    const { userId } = req.params;
+    const { subjectId, yearGroupId } = req.query;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const context = await SubjectContext.findOne({
+        where: { subjectId, yearGroupId, userId: targetUser.id }
+      });
+      res.json({
+        subjectDescription: context?.subjectDescription || '',
+        wordLimit: context?.wordLimit ?? null
+      });
+    } catch (error) {
+      console.error('Error fetching target subject context:', error);
+      res.status(500).send('Error fetching target subject context');
+    }
+  });
+
+  app.post('/api/admin/staff/:userId/subject-context', async (req, res) => {
+    const { userId } = req.params;
+    const { subjectId, yearGroupId, subjectDescription, wordLimit } = req.body;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    const cleanedDescription = typeof subjectDescription === 'string' ? subjectDescription.trim() : '';
+    if (cleanedDescription.length > LIMITS.subjectDescription) {
+      return res.status(400).json({ message: `Subject description must be ${LIMITS.subjectDescription} characters or fewer.` });
+    }
+    const parsedWordLimit = parseWordLimit(wordLimit);
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const [context, created] = await SubjectContext.findOrCreate({
+        where: { subjectId, yearGroupId, userId: targetUser.id },
+        defaults: {
+          subjectDescription: cleanedDescription || null,
+          wordLimit: parsedWordLimit
+        }
+      });
+
+      if (!created) {
+        context.subjectDescription = cleanedDescription || null;
+        context.wordLimit = parsedWordLimit;
+        await context.save();
+      }
+
+      const visibility = await ensureUserVisibility({
+        userId: targetUser.id,
+        subjectId,
+        yearGroupId
+      });
+
+      res.json({ context, visibility });
+    } catch (error) {
+      console.error('Error saving target subject context:', error);
+      res.status(500).send('Error saving target subject context');
+    }
+  });
+
+  app.get('/api/admin/staff/:userId/prompts/:subjectId/:yearGroupId', async (req, res) => {
+    const { userId, subjectId, yearGroupId } = req.params;
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const prompt = await Prompt.findOne({
+        where: { subjectId, yearGroupId, userId: targetUser.id }
+      });
+      res.json({ promptPart: prompt?.promptPart || '' });
+    } catch (error) {
+      console.error('Error fetching target prompt:', error);
+      res.status(500).send('Error fetching target prompt');
+    }
+  });
+
+  app.post('/api/admin/staff/:userId/prompts', async (req, res) => {
+    const { userId } = req.params;
+    const { subjectId, yearGroupId, promptPart } = req.body;
+
+    if (!subjectId || !yearGroupId) {
+      return res.status(400).json({ message: 'Missing subjectId or yearGroupId' });
+    }
+
+    try {
+      const targetUser = await findTargetUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Target user not found' });
+      }
+
+      const trimmedPrompt = typeof promptPart === 'string' ? promptPart.trim() : '';
+      if (trimmedPrompt.length > LIMITS.promptPart) {
+        return res.status(400).json({ message: `Prompt text must be ${LIMITS.promptPart} characters or fewer.` });
+      }
+
+      const [prompt, created] = await Prompt.findOrCreate({
+        where: { subjectId, yearGroupId, userId: targetUser.id },
+        defaults: { promptPart: trimmedPrompt }
+      });
+
+      if (!created) {
+        prompt.promptPart = trimmedPrompt;
+        await prompt.save();
+      }
+
+      const visibility = await ensureUserVisibility({
+        userId: targetUser.id,
+        subjectId,
+        yearGroupId
+      });
+
+      res.json({ prompt, visibility });
+    } catch (error) {
+      console.error('Error saving target prompt:', error);
+      res.status(500).send('Error saving target prompt');
     }
   });
 
@@ -1315,12 +1660,13 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
   app.put('/api/prompts/:id', async (req, res) => {
     const { id } = req.params;
     const { promptPart } = req.body;
+    const userId = req.session.user.id;
     try {
       const trimmedPrompt = typeof promptPart === 'string' ? promptPart.trim() : '';
       if (trimmedPrompt.length > LIMITS.promptPart) {
         return res.status(400).json({ message: `Prompt text must be ${LIMITS.promptPart} characters or fewer.` });
       }
-      const prompt = await Prompt.findByPk(id);
+      const prompt = await findOwnedPrompt(id, userId);
       if (prompt) {
         prompt.promptPart = trimmedPrompt;
         await prompt.save();
@@ -1336,8 +1682,9 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
 
   app.delete('/api/prompts/:id', async (req, res) => {
     const { id } = req.params;
+    const userId = req.session.user.id;
     try {
-      const prompt = await Prompt.findByPk(id);
+      const prompt = await findOwnedPrompt(id, userId);
       if (prompt) {
         await prompt.destroy();
         res.sendStatus(204);
@@ -1461,15 +1808,7 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
   });
 
   app.post('/api/users', isAdmin, async (req, res) => {
-    const { username, password, isAdmin: newAdmin } = req.body;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ username, password: hashedPassword, isAdmin: newAdmin });
-      res.json({ message: 'User added successfully', user });
-    } catch (error) {
-      console.error('Error adding user:', error);
-      res.status(500).send('Error adding user');
-    }
+    await createManagedUser(req, res, 'User added successfully');
   });
 
   app.delete('/api/users/:username', isAdmin, async (req, res) => {
@@ -1517,10 +1856,14 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
   app.put('/api/admin/user/:username/password', isAdmin, async (req, res) => {
     const { username } = req.params;
     const { newPassword } = req.body;
+    if (typeof newPassword !== 'string' || !newPassword.trim()) {
+      return res.status(400).json({ message: 'New password is required.' });
+    }
+
     try {
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
       const user = await User.findOne({ where: { username } });
       if (user) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
         user.password = hashedPassword;
         await user.save();
         res.json({ message: 'Password updated successfully' });
@@ -1546,68 +1889,27 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
       return res.status(400).send('No file uploaded');
     }
 
-    const categories = {};
-    let skippedRows = 0;
-
     try {
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(filePath)
-          .pipe(csv())
-          .on('data', (data) => {
-            const categoryName = cleanAndLimit(data['categoryName'], LIMITS.categoryName);
-            const commentText = cleanAndLimit(data['commentText'], LIMITS.commentText);
-
-            if (!categoryName || !commentText) {
-              skippedRows += 1;
-              return;
-            }
-
-            if (!categories[categoryName]) {
-              if (Object.keys(categories).length >= LIMITS.maxCategories) {
-                skippedRows += 1;
-                return;
-              }
-              categories[categoryName] = [];
-            }
-
-            if (categories[categoryName].length >= LIMITS.maxCommentsPerCategory) {
-              skippedRows += 1;
-              return;
-            }
-
-            categories[categoryName].push(commentText);
-          })
-          .on('end', resolve)
-          .on('error', reject);
+      const { categories, skippedRows } = await parseCategoryCsvFile(filePath);
+      const totals = await replaceCategoryBankFromArrays({
+        categories,
+        subjectId,
+        yearGroupId,
+        userId
       });
 
-      await sequelize.transaction(async (transaction) => {
-        await Category.destroy({
-          where: { subjectId, yearGroupId, userId },
-          transaction
-        });
-
-        for (const [name, comments] of Object.entries(categories)) {
-          const category = await Category.create({ name, subjectId, yearGroupId, userId }, { transaction });
-          for (const text of comments) {
-            await Comment.create({ text, categoryId: category.id }, { transaction });
-          }
-        }
-      });
-
-      const totalCategories = Object.keys(categories).length;
-      const totalComments = Object.values(categories).reduce((sum, comments) => sum + comments.length, 0);
       res.json({
         message: 'Categories and comments imported successfully.',
-        totalCategories,
-        totalComments,
+        ...totals,
         skippedRows
       });
     } catch (error) {
       console.error('Error importing categories and comments:', error);
       res.status(500).send('Error importing categories and comments');
     } finally {
-      fs.unlinkSync(filePath);
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
   });
 
@@ -1676,11 +1978,12 @@ ${JSON.stringify(serializeCategoryMap(newCategories), null, 2)}
   });
 
   app.post('/api/change-password', isAuthenticated, async (req, res) => {
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, currentPassword, newPassword } = req.body;
     const userId = req.session.user.id;
     try {
+      const suppliedOldPassword = oldPassword ?? currentPassword;
       const user = await User.findByPk(userId);
-      if (user && await bcrypt.compare(oldPassword, user.password)) {
+      if (user && await bcrypt.compare(suppliedOldPassword, user.password)) {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         user.password = hashedPassword;
         await user.save();

@@ -33,10 +33,12 @@ describe('import-categories-comments', () => {
     fs.mkdirSync('uploads', { recursive: true });
     models = {
       Category: {
+        findAll: vi.fn().mockResolvedValue([]),
         destroy: vi.fn(),
         create: vi.fn().mockResolvedValue({ id: 1 })
       },
       Comment: {
+        destroy: vi.fn(),
         create: vi.fn()
       },
       Prompt: { findOne: vi.fn() },

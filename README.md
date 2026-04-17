@@ -184,7 +184,9 @@ The comment:
 
 ## Environment Variables (Complete Reference)
 
-All variables live in `comment-bank-api/.env`.
+All variables live in `comment-bank-api/.env`. Use
+`comment-bank-api/.env.example` as the safe template and replace the placeholder
+values locally.
 
 ### Core
 - `NODE_ENV`: `development`, `test`, `production`
@@ -231,6 +233,13 @@ All variables live in `comment-bank-api/.env`.
 - Reset a user password (admin only API):
   - `PUT /api/admin/user/:username/password`
 
+### Admin uploads for staff comment banks
+- Admins can import previous reports for a selected staff user, subject, and year group from the Admin Panel.
+- Imports default to merge mode and write categories/comments to the selected staff user's comment bank.
+- Replace mode requires explicit confirmation and is scoped to the selected staff user + subject + year group.
+- Successful admin imports make the selected subject/year group visible to the target staff user.
+- See `docs/admin_staff_report_upload_plan.md` for the implementation and deployment-safety details.
+
 ### Manage subjects, year groups, prompts
 - Use the admin pages to create/edit subjects and year groups.
 - Prompts are per user + subject + year group.
@@ -239,6 +248,10 @@ All variables live in `comment-bank-api/.env`.
 - `GET /api/export-database`
 - `POST /api/backup-database`
 - Requires `ENABLE_DB_BACKUP=true`
+
+### Health check
+- `GET /api/health`
+- Returns `{ "ok": true, "status": "ok" }` when Express is responding.
 
 ---
 
@@ -286,6 +299,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable reportgen
 sudo systemctl start reportgen
 ```
+
+Before live updates, use `docs/release_checklist.md` to check backup, pull,
+restart, health check, and smoke-test steps.
 
 ### Reverse proxy (optional but recommended)
 Use Nginx or Apache and set:

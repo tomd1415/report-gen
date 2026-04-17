@@ -29,6 +29,7 @@ npm start
 
 ## Health Check
 
+- API check: `curl http://localhost:44344/api/health`
 - Visit `http://localhost:44344`
 - Log in and generate a test report for a known subject/year group.
 
