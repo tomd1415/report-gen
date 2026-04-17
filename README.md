@@ -314,6 +314,9 @@ sudo systemctl start reportgen
 Before live updates, use `docs/release_checklist.md` to check backup, pull,
 restart, health check, and smoke-test steps.
 
+Use `docs/restore_drill.md` to prove a backup can be restored into a test
+database before relying on it for a live update.
+
 ### Reverse proxy (optional but recommended)
 Use Nginx or Apache and set:
 - `SESSION_TRUST_PROXY=true`

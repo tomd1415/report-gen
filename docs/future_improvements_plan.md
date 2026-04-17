@@ -46,22 +46,22 @@ Completed on `2026-04-17`:
 - Shared frontend UI helpers now include status, context, loading, filtering,
   and invalid-field helpers with jsdom coverage.
 - Playwright smoke tests now cover the main UI regressions from this batch.
+- A first restore drill is documented in `docs/restore_drill.md`.
 
 ## Priority 1: Data Safety And Operations
 
 These should come before larger feature work because they reduce deployment and
 recovery risk.
 
-### Restore Drill Documentation
+### Restore Drill Practice
 
-Create a documented restore drill, not just backup commands.
+Run and refine the documented restore drill, not just backup commands.
 
 Tasks:
 
-- Add step-by-step restore instructions for a test database.
-- Record how to verify that restored users, subjects, year groups, prompts, and
-  comments are usable.
-- Add a small checklist for confirming a backup is valid before risky changes.
+- Run the drill in `docs/restore_drill.md` against a recent backup.
+- Record any site-specific adjustments needed for the live server.
+- Repeat the drill before risky schema or import changes.
 
 Acceptance criteria:
 

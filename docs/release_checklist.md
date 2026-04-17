@@ -5,6 +5,8 @@ Use this checklist before pulling or deploying changes on the live server.
 ## Before Pulling
 
 - Confirm a recent database backup exists.
+- If the update is risky, confirm the backup has recently passed the restore
+  drill in `docs/restore_drill.md`.
 - Confirm a recent file/server backup exists if uploads, `.env`, or service
   files may have changed.
 - Note the currently deployed git commit:

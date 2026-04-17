@@ -125,6 +125,9 @@ const mockApis = async (page, {
   });
 
   await page.route('**/generate-report', async (route) => {
+    if (typeof generateReportResponse === 'function') {
+      return generateReportResponse(route);
+    }
     return fulfillJson(route, generateReportResponse.body, generateReportResponse.status);
   });
 };
@@ -140,9 +143,12 @@ const selectCommentForStep = async (page, stepName, commentText) => {
 };
 
 test('Generate Report ready check validates required fields and reaches a generated report', async ({ page }) => {
-  await mockApis(page);
+  await mockApis(page, { isAdmin: false, username: 'teacher' });
 
   await page.goto('/index.html');
+  await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Logout' })).toBeVisible();
+  await expect(page.locator('[data-admin-menu-item]')).toBeHidden();
   await chooseSubjectAndYear(page);
 
   await expect(page.locator('#generate-status')).toContainText('Loaded 4 categories');
@@ -156,6 +162,12 @@ test('Generate Report ready check validates required fields and reaches a genera
   await page.fill('#pupil-name', 'Alex');
   await page.fill('#pupil-pronouns', 'they/them');
   await selectCommentForStep(page, 'Paragraph 1', 'Understands fractions well.');
+
+  await page.getByRole('button', { name: 'Generate Report' }).click();
+  await expect(page.locator('#generate-status')).toContainText('Effort / Motivation / Attendance');
+  await expect(page.getByRole('button', { name: /Paragraph 2/i })).toHaveClass(/active/);
+  await expect(page.getByRole('button', { name: /Paragraph 2/i })).toBeFocused();
+
   await selectCommentForStep(page, 'Paragraph 2', 'Works hard in lessons.');
   await selectCommentForStep(page, 'Paragraph 3', 'Explains mathematical ideas clearly.');
   await selectCommentForStep(page, 'Paragraph 4', 'Should practise checking calculations.');
@@ -171,13 +183,20 @@ test('Generate Report ready check validates required fields and reaches a genera
 });
 
 test('Generate Report keeps entered data when the returned report is incomplete', async ({ page }) => {
+  let attempts = 0;
   await mockApis(page, {
-    generateReportResponse: {
-      body: {
-        report: 'Only one paragraph.',
-        paragraphs: ['Only one paragraph.']
-      },
-      status: 200
+    generateReportResponse: (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        return fulfillJson(route, {
+          report: 'Only one paragraph.',
+          paragraphs: ['Only one paragraph.']
+        });
+      }
+      return fulfillJson(route, {
+        report: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.\n\nParagraph four.',
+        paragraphs: ['Paragraph one.', 'Paragraph two.', 'Paragraph three.', 'Paragraph four.']
+      });
     }
   });
 
@@ -199,6 +218,12 @@ test('Generate Report keeps entered data when the returned report is incomplete'
   await expect(page.locator('#pupil-pronouns')).toHaveValue('they/them');
   await expect(page.locator('#additional-comments')).toHaveValue('Keep this note.');
   await expect(page.locator('input[value="Understands fractions well."]')).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Try Again' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Try Again' }).click();
+  await expect(page.locator('#generate-status')).toContainText('Report generated');
+  await expect(page.locator('#pupil-name')).toHaveValue('');
+  await expect(page.locator('input[value="Understands fractions well."]')).not.toBeChecked();
 });
 
 test('Generate Report shows an empty state when no comment bank exists', async ({ page }) => {
@@ -258,10 +283,31 @@ test('Admin staff comment bank workflow is presented as three clear steps', asyn
 
   await page.goto('/adminpage.html');
 
+  await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Admin' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Logout' })).toBeVisible();
   await expect(page.locator('.admin-step-number')).toHaveText(['1', '2', '3']);
   await expect(page.locator('.admin-step-heading')).toContainText([
     'Choose Staff And Class',
     'Set Staff Context',
     'Import Previous Reports'
   ]);
+
+  let subjectDialog = '';
+  page.once('dialog', async (dialog) => {
+    subjectDialog = dialog.message();
+    await dialog.dismiss();
+  });
+  await page.locator('#subject-list').getByRole('button', { name: 'Delete' }).first().click();
+  expect(subjectDialog).toContain('Delete subject "Mathematics"?');
+  expect(subjectDialog).toContain('global subject');
+
+  let yearGroupDialog = '';
+  page.once('dialog', async (dialog) => {
+    yearGroupDialog = dialog.message();
+    await dialog.dismiss();
+  });
+  await page.locator('#year-group-list').getByRole('button', { name: 'Delete' }).first().click();
+  expect(yearGroupDialog).toContain('Delete year group "Year 7"?');
+  expect(yearGroupDialog).toContain('global year group');
 });

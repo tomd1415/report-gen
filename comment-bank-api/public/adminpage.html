@@ -205,10 +205,15 @@
             yearGroups.forEach(yearGroup => {
                 const item = document.createElement('div');
                 item.classList.add('list-item');
-                item.innerHTML = `
-                    <span>${yearGroup.name}</span>
-                    <button class="button delete" onclick="deleteYearGroup(${yearGroup.id})">Delete</button>
-                `;
+                const name = document.createElement('span');
+                name.textContent = yearGroup.name;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.classList.add('button', 'delete');
+                button.textContent = 'Delete';
+                button.dataset.name = yearGroup.name;
+                button.addEventListener('click', () => deleteYearGroup(yearGroup.id, button));
+                item.append(name, button);
                 yearGroupList.appendChild(item);
             });
             const staffYearGroupSelect = document.getElementById('staff-bank-year-group');
@@ -245,8 +250,10 @@
             }
         }
 
-        async function deleteYearGroup(id) {
-            if (confirm('Are you sure you want to delete this year group?')) {
+        async function deleteYearGroup(id, button) {
+            const name = button?.dataset.name || 'this year group';
+            const message = `Delete year group "${name}"? This is a global year group and may affect staff settings and comment banks that use it. This cannot be undone.`;
+            if (confirm(message)) {
                 const response = await fetch(`/api/year-groups/${id}`, { method: 'DELETE' });
                 if (response.ok) {
                     loadYearGroups();
@@ -266,10 +273,15 @@
             subjects.forEach(subject => {
                 const item = document.createElement('div');
                 item.classList.add('list-item');
-                item.innerHTML = `
-                    <span>${subject.name}</span>
-                    <button class="button delete" onclick="deleteSubject(${subject.id})">Delete</button>
-                `;
+                const name = document.createElement('span');
+                name.textContent = subject.name;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.classList.add('button', 'delete');
+                button.textContent = 'Delete';
+                button.dataset.name = subject.name;
+                button.addEventListener('click', () => deleteSubject(subject.id, button));
+                item.append(name, button);
                 subjectList.appendChild(item);
             });
             const staffSubjectSelect = document.getElementById('staff-bank-subject');
@@ -306,8 +318,10 @@
             }
         }
 
-        async function deleteSubject(id) {
-            if (confirm('Are you sure you want to delete this subject?')) {
+        async function deleteSubject(id, button) {
+            const name = button?.dataset.name || 'this subject';
+            const message = `Delete subject "${name}"? This is a global subject and may affect staff settings and comment banks that use it. This cannot be undone.`;
+            if (confirm(message)) {
                 const response = await fetch(`/api/subjects/${id}`, { method: 'DELETE' });
                 if (response.ok) {
                     loadSubjects();

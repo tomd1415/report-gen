@@ -75,5 +75,5 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Deployment and Operations
 
-- `2026-04-17`: Document restore drills, not just backup commands, so backups are
-  known to be usable.
+- `2026-04-17`: Run the restore drill in `docs/restore_drill.md` against a
+  recent backup and record any live-server-specific adjustments.

@@ -71,6 +71,8 @@ mysqldump -u reportgen -p comment_bank > comment_bank_backup.sql
 mysql -u reportgen -p comment_bank < comment_bank_backup.sql
 ```
 
+For a non-production restore test, follow `docs/restore_drill.md`.
+
 ---
 
 ## Migrations

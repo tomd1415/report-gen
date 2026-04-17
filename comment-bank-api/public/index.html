@@ -631,6 +631,22 @@
             applyFilters();
         }
 
+        function focusFirstMissingParagraph(missingGroups) {
+            const categoryGroups = window.ReportSelection?.categoryGroups || [];
+            const firstMissing = categoryGroups.find(group => missingGroups.includes(group.label));
+            if (!firstMissing) {
+                return false;
+            }
+
+            setActiveStep(firstMissing.key);
+            const tab = document.querySelector(`.step-tab[data-step="${firstMissing.key}"]`);
+            if (tab) {
+                tab.focus();
+                tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+            return true;
+        }
+
         function setupFilters() {
             if (filterInitialized) {
                 return;
@@ -1046,11 +1062,22 @@
             return splitParagraphs.length === 4 ? splitParagraphs : [];
         }
 
-        function showResultMessage(resultContainer, message) {
+        function showResultMessage(resultContainer, message, { showRetry = false, retryOptions = {} } = {}) {
             resultContainer.innerHTML = '';
             const paragraph = document.createElement('p');
             paragraph.textContent = message;
             resultContainer.appendChild(paragraph);
+
+            if (showRetry) {
+                const retryButton = document.createElement('button');
+                retryButton.type = 'button';
+                retryButton.classList.add('button', 'inline-button');
+                retryButton.textContent = 'Try Again';
+                retryButton.addEventListener('click', () => {
+                    generateReport(retryOptions);
+                });
+                resultContainer.appendChild(retryButton);
+            }
         }
 
         function clearGenerateFormAfterSuccessfulReport() {
@@ -1114,6 +1141,7 @@
             if (missingGroups.length > 0) {
                 setValidationState(true);
                 updateReadyChecklist();
+                focusFirstMissingParagraph(missingGroups);
                 showGenerateStatus(`Please select at least one comment for: ${missingGroups.join(', ')}.`, 'warning');
                 return;
             }
@@ -1184,7 +1212,7 @@
                 clearGenerateFormAfterSuccessfulReport();
             } catch (error) {
                 console.error('Error:', error);
-                showResultMessage(resultContainer, error.message);
+                showResultMessage(resultContainer, error.message, { showRetry: true, retryOptions: options });
                 showGenerateStatus(error.message, 'error');
             } finally {
                 window.ReportGenUI?.setButtonLoading(generateButton, false);

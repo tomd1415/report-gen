@@ -88,6 +88,10 @@ a:hover {
     text-decoration: underline;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 .report-page .container {
     background-color: var(--panel);
     border-radius: 16px;

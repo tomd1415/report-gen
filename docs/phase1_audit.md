@@ -170,7 +170,8 @@ instead of the currently logged-in admin user.
 - Playwright browser smoke tests for the Generate Report ready checklist and
   empty state, valid-report form clearing, incomplete-report form retention,
   Manage Comments expand/collapse and delete confirmation, import validation,
-  and the admin staff-bank step layout.
+  shared menu permissions, and the admin staff-bank step layout.
+- Restore drill documentation for testing backups against a separate database.
 
 ## Baseline Manual Test Checklist
 
