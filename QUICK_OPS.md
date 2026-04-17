@@ -33,6 +33,20 @@ npm start
 - Visit `http://localhost:44344`
 - Log in and generate a test report for a known subject/year group.
 
+## Tests
+
+```
+cd /path/to/report-gen/comment-bank-api
+npm test
+npm run test:e2e
+```
+
+If Playwright has not been used on that machine before, install its Chromium
+browser once:
+```
+npx playwright install chromium
+```
+
 ---
 
 ## Database

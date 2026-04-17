@@ -7,6 +7,8 @@ comment-bank-api/cookies.*
 
 node_modules/
 comment-bank-api/node_modules/
+comment-bank-api/test-results/
+comment-bank-api/playwright-report/
 openapiinfo/
 .venv/
 dbbackup_web/

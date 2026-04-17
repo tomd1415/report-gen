@@ -50,8 +50,9 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 - `2026-04-17`: Add a small integration-style test around staff settings:
   selecting subjects/year groups, then confirming dropdown options use those
   settings.
-- `2026-04-17`: Consider Playwright smoke tests for the main browser workflows:
-  login, import reports, generate report, admin user management.
+- `2026-04-17`: Expand Playwright coverage later to include login, settings
+  persistence, successful report imports against a test backend, and admin user
+  management. The first browser smoke tests now cover the recent UI regressions.
 
 ## Code Organization
 

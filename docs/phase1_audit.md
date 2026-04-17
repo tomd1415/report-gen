@@ -167,6 +167,9 @@ instead of the currently logged-in admin user.
 - Password-change field consistency.
 - Shared UI helper coverage for status panels, context chips, button loading,
   invalid-field styling, and comment-bank filtering.
+- Playwright browser smoke tests for the Generate Report ready checklist and
+  empty state, Manage Comments expand/collapse and delete confirmation, import
+  validation, and the admin staff-bank step layout.
 
 ## Baseline Manual Test Checklist
 

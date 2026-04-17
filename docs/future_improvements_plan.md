@@ -43,6 +43,7 @@ Completed on `2026-04-17`:
   visual steps.
 - Shared frontend UI helpers now include status, context, loading, filtering,
   and invalid-field helpers with jsdom coverage.
+- Playwright smoke tests now cover the main UI regressions from this batch.
 
 ## Priority 1: Data Safety And Operations
 

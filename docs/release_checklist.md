@@ -29,6 +29,8 @@ Use this checklist before pulling or deploying changes on the live server.
 
 - Run the automated tests when practical:
   `npm test`
+- Run browser smoke tests when UI behaviour changed:
+  `npm run test:e2e`
 - Start or restart the service:
   `sudo systemctl restart reportgen`
 - Check service status:

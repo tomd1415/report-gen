@@ -344,6 +344,13 @@ cd comment-bank-api
 npm test
 ```
 
+Run browser smoke tests:
+```
+cd comment-bank-api
+npx playwright install chromium
+npm run test:e2e
+```
+
 Watch mode:
 ```
 cd comment-bank-api
