@@ -10,6 +10,8 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
+    <script type="module" src="page-layout.js"></script>
+    <script type="module" src="import-summary.js"></script>
 </head>
 <body>
     <!-- Include header -->
@@ -61,18 +63,6 @@
                 window.location.href = 'login.html';
                 return;
             }
-
-            fetch("header.html")
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById("header-placeholder").innerHTML = data;
-                });
-
-            fetch("footer.html")
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('footer-placeholder').innerHTML = data;
-                });
 
             loadSettings();
         });
@@ -189,11 +179,14 @@
             });
 
             const result = await response.json();
-            alert('Finished!')
+            const summary = window.ReportGenImportSummary?.formatImportSummary(result, {
+                targetLabel: 'your comment bank'
+            }) || result.message || 'Import completed.';
+            alert(summary);
 
             genReportButton.className = document.getElementById('genReportButton').className.replace('savePromptDisabled', 'savePrompt');
             const resultContainer = document.getElementById('result-container');
-            resultContainer.innerHTML = `<p>${result.message}</p>`;
+            resultContainer.textContent = summary;
         }
     </script>
 </body>

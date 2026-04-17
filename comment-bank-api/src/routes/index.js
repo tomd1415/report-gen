@@ -264,6 +264,52 @@ export function registerRoutes(app, { models, openai }) {
   };
 
   const isTruthy = (value) => value === true || value === 'true' || value === 'on' || value === '1';
+  const serializeUser = (user) => ({
+    id: user.id,
+    username: user.username,
+    isAdmin: Boolean(user.isAdmin)
+  });
+  const isDuplicateUserError = (error) =>
+    error?.name === 'SequelizeUniqueConstraintError' ||
+    error?.parent?.code === 'ER_DUP_ENTRY' ||
+    error?.original?.code === 'ER_DUP_ENTRY';
+  const validateManagedUserPayload = ({ username, password }) => {
+    const cleanedUsername = cleanText(username);
+
+    if (!cleanedUsername) {
+      return { message: 'Username is required.' };
+    }
+    if (cleanedUsername.length > LIMITS.name) {
+      return { message: `Username must be ${LIMITS.name} characters or fewer.` };
+    }
+    if (typeof password !== 'string' || !password.trim()) {
+      return { message: 'Password is required.' };
+    }
+
+    return { username: cleanedUsername, password };
+  };
+  const createManagedUser = async (req, res, successMessage) => {
+    const validation = validateManagedUserPayload(req.body);
+    if (validation.message) {
+      return res.status(400).json({ message: validation.message });
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(validation.password, 10);
+      const user = await User.create({
+        username: validation.username,
+        password: hashedPassword,
+        isAdmin: isTruthy(req.body.isAdmin)
+      });
+      res.json({ message: successMessage, user: serializeUser(user) });
+    } catch (error) {
+      if (isDuplicateUserError(error)) {
+        return res.status(409).json({ message: 'A user with that username already exists.' });
+      }
+      console.error('Error creating user:', error);
+      res.status(500).send('Error creating user');
+    }
+  };
 
   const findTargetUser = async (userId) => {
     const parsedUserId = Number.parseInt(userId, 10);
@@ -401,6 +447,10 @@ export function registerRoutes(app, { models, openai }) {
     }
   });
 
+  app.get('/api/health', (req, res) => {
+    res.json({ ok: true, status: 'ok' });
+  });
+
   app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -527,15 +577,7 @@ export function registerRoutes(app, { models, openai }) {
   });
 
   app.post('/api/admin/user', isAdmin, async (req, res) => {
-    const { username, password, isAdmin: newAdmin } = req.body;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ username, password: hashedPassword, isAdmin: newAdmin });
-      res.json(user);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      res.status(500).send('Error creating user');
-    }
+    await createManagedUser(req, res, 'User added successfully');
   });
 
   app.delete('/api/admin/user/:username', isAdmin, async (req, res) => {
@@ -1766,15 +1808,7 @@ export function registerRoutes(app, { models, openai }) {
   });
 
   app.post('/api/users', isAdmin, async (req, res) => {
-    const { username, password, isAdmin: newAdmin } = req.body;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ username, password: hashedPassword, isAdmin: newAdmin });
-      res.json({ message: 'User added successfully', user });
-    } catch (error) {
-      console.error('Error adding user:', error);
-      res.status(500).send('Error adding user');
-    }
+    await createManagedUser(req, res, 'User added successfully');
   });
 
   app.delete('/api/users/:username', isAdmin, async (req, res) => {
@@ -1822,10 +1856,14 @@ export function registerRoutes(app, { models, openai }) {
   app.put('/api/admin/user/:username/password', isAdmin, async (req, res) => {
     const { username } = req.params;
     const { newPassword } = req.body;
+    if (typeof newPassword !== 'string' || !newPassword.trim()) {
+      return res.status(400).json({ message: 'New password is required.' });
+    }
+
     try {
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
       const user = await User.findOne({ where: { username } });
       if (user) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
         user.password = hashedPassword;
         await user.save();
         res.json({ message: 'Password updated successfully' });

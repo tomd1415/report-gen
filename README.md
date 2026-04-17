@@ -184,7 +184,9 @@ The comment:
 
 ## Environment Variables (Complete Reference)
 
-All variables live in `comment-bank-api/.env`.
+All variables live in `comment-bank-api/.env`. Use
+`comment-bank-api/.env.example` as the safe template and replace the placeholder
+values locally.
 
 ### Core
 - `NODE_ENV`: `development`, `test`, `production`
@@ -247,6 +249,10 @@ All variables live in `comment-bank-api/.env`.
 - `POST /api/backup-database`
 - Requires `ENABLE_DB_BACKUP=true`
 
+### Health check
+- `GET /api/health`
+- Returns `{ "ok": true, "status": "ok" }` when Express is responding.
+
 ---
 
 ## Deployment (Debian-oriented)
@@ -293,6 +299,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable reportgen
 sudo systemctl start reportgen
 ```
+
+Before live updates, use `docs/release_checklist.md` to check backup, pull,
+restart, health check, and smoke-test steps.
 
 ### Reverse proxy (optional but recommended)
 Use Nginx or Apache and set:

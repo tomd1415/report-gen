@@ -18,9 +18,6 @@ needed for the immediate feature, add a dated note here.
   namespace. The code currently has both `/api/admin/*` and non-admin-looking
   admin-protected routes such as `/api/users`, `/api/subjects`, and
   `/api/year-groups`.
-- `2026-04-17`: Add stronger validation for user creation and password reset
-  endpoints, including empty password rejection and clearer duplicate-user
-  errors.
 
 ## Reliability and Data Safety
 
@@ -37,23 +34,14 @@ needed for the immediate feature, add a dated note here.
 
 ## UX and Admin Workflows
 
-- `2026-04-17`: Replace the repeated per-page header/footer loading scripts
-  with a single shared layout loader or server-rendered layout. The current menu
-  now has shared behavior, but each HTML page still has to opt into shared
-  assets separately.
 - `2026-04-17`: Split large inline scripts out of HTML pages into dedicated JS
   modules. `adminpage.html`, `index.html`, and management pages would be easier
   to test and maintain.
-- `2026-04-17`: Improve import result summaries. Admin and staff imports should
-  show category count, comment count, filtered count, and whether the import was
-  merged or replaced.
 - `2026-04-17`: Improve loading and error states on import pages. Current import
   pages use alerts and basic button class swaps.
 
 ## Testing
 
-- `2026-04-17`: Add route tests for user management endpoints, especially admin
-  creation/deletion/password reset.
 - `2026-04-17`: Add tests for ownership checks on category/comment/prompt routes.
 - `2026-04-17`: Add a small integration-style test around staff settings:
   selecting subjects/year groups, then confirming dropdown options use those
@@ -82,9 +70,5 @@ needed for the immediate feature, add a dated note here.
 
 ## Deployment and Operations
 
-- `2026-04-17`: Add a release checklist template to the repo for live server
-  updates.
-- `2026-04-17`: Add a simple health endpoint such as `GET /api/health` for
-  service monitoring.
 - `2026-04-17`: Document restore drills, not just backup commands, so backups are
   known to be usable.

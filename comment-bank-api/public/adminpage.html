@@ -6,6 +6,8 @@
     <title>Admin Panel</title>
     <link rel="stylesheet" href="styles.css">
     <script type="module" src="site-menu.js"></script>
+    <script type="module" src="page-layout.js"></script>
+    <script type="module" src="import-summary.js"></script>
 </head>
 <body class="bg-light-blue text-dark-gray">
     <div id="header-placeholder"></div>
@@ -130,12 +132,6 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             fetchUsername();
-            fetch("header.html").then(response => response.text()).then(data => {
-                document.getElementById("header-placeholder").innerHTML = data;
-            });
-            fetch("footer.html").then(response => response.text()).then(data => {
-                document.getElementById("footer-placeholder").innerHTML = data;
-            });
 	    // Check if the user is authenticated
             fetch('/api/authenticated')
                 .then(response => {
@@ -564,9 +560,10 @@
                     throw new Error(payload.message || 'Error importing reports for staff.');
                 }
 
-                setStaffBankResult(
-                    `Imported for ${payload.targetUser?.username || 'staff user'}: ${payload.totalCategories} categories, ${payload.totalComments} comments, ${payload.mode} mode.`
-                );
+                const summary = window.ReportGenImportSummary?.formatImportSummary(payload, {
+                    targetLabel: 'staff comment bank'
+                }) || payload.message || 'Import completed.';
+                setStaffBankResult(summary);
                 document.getElementById('staff-bank-reports').value = '';
                 document.getElementById('staff-bank-report-file').value = '';
             } catch (error) {

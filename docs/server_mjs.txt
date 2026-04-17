@@ -63,6 +63,7 @@ member's `User.id` must be used as the owner, not the admin's session user id.
 
 ### Auth and Sessions
 
+- `GET /api/health`
 - `POST /api/register`
 - `POST /api/login`
 - `POST /api/admin/login`
