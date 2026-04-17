@@ -14,6 +14,8 @@ server implementation.
 - OpenAI: Responses API via `openai.responses.parse`.
 - Sessions: `express-session` with `connect-session-sequelize` persisted in the
   `Sessions` table.
+- Security headers: Helmet with Content Security Policy disabled while inline
+  scripts remain in the static pages.
 - Static UI: `comment-bank-api/public/`.
 
 ## Static Pages
@@ -144,6 +146,11 @@ instead of the currently logged-in admin user.
   requests fail with a useful message instead of hanging indefinitely.
 - API route errors that previously returned plain text now use a consistent
   JSON `{ "message": "..." }` shape.
+- Login, admin login, and registration attempts are rate limited separately
+  from OpenAI-backed report generation/import requests.
+- Registration and admin user creation responses return safe user details
+  without password hashes.
+- Admin password-reset UI no longer logs password values to the browser console.
 - Admin target-staff endpoints exist under `/api/admin/staff/:userId/*`.
 - The existing OpenAI import flow already supports subject/year scoped comments,
   name placeholder replacement, relevance filtering, and merge with existing
@@ -167,7 +174,13 @@ instead of the currently logged-in admin user.
 - CSV import caps and skipped-row reporting.
 - Subject context validation.
 - UI selection helper grouping.
-- Rate limiting for OpenAI-backed generation.
+- Rate limiting for OpenAI-backed generation and authentication attempts.
+- Security header coverage verifies conservative Helmet headers are active
+  while CSP remains disabled until inline scripts are moved.
+- Static coverage verifies the admin password-reset page does not log password
+  reset values.
+- Registration coverage verifies password hashes are not returned to the
+  browser.
 - Admin target-staff import, non-admin rejection, replace confirmation, and
   target ownership.
 - Category/comment/prompt ownership checks.

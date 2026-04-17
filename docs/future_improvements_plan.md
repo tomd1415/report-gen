@@ -51,6 +51,10 @@ Completed on `2026-04-17`:
 - Reliability guardrails now include JSON API errors for route-local failures,
   frontend request timeouts on higher-risk browser workflows, `/api/version`,
   admin-only `/api/health/db`, and a combined `npm run check:deploy` command.
+- Safe security hardening now includes conservative Helmet headers, disabled
+  `X-Powered-By`, auth endpoint rate limiting, removal of password debug
+  logging, safe registration responses that do not return password hashes, and
+  tests for these protections.
 
 ## Priority 1: Data Safety And Operations
 
@@ -170,6 +174,40 @@ Acceptance criteria:
 
 These reduce route confusion and make future changes easier to reason about.
 
+### Content Security Policy
+
+Enable a real CSP after inline page scripts have been moved into dedicated JS
+modules.
+
+Tasks:
+
+- Move inline scripts out of the static HTML pages.
+- Add nonces or script hashes only if a small amount of inline script remains.
+- Enable Helmet CSP in report-only mode first, then enforce once warnings are
+  resolved.
+
+Acceptance criteria:
+
+- Browser workflows still pass with CSP enabled.
+- Unexpected inline script execution is blocked.
+
+### Session And Password Hardening
+
+Reduce auth risk without changing existing user data.
+
+Tasks:
+
+- Regenerate sessions after successful normal and admin login.
+- Add a modest minimum length for newly created or changed passwords.
+- Add a pre-deploy security config check script for production `.env` values.
+
+Acceptance criteria:
+
+- Existing users can still log in.
+- New weak passwords are rejected with a clear message.
+- Production deployments have an automated check for unsafe session/CORS/auth
+  settings.
+
 ### Consolidate Admin Routes
 
 Move admin-only routes under a clearer namespace.
@@ -192,14 +230,15 @@ Acceptance criteria:
 - Route naming makes admin-only behaviour obvious.
 - Existing live workflows continue to work during the transition.
 
-### Central Error Responses
+### Formal Error Middleware
 
-Make API errors easier for frontend code to parse.
+Move the current shared JSON error helper into formal Express error middleware
+when the large route file is split.
 
 Tasks:
 
-- Add a small helper for JSON error responses.
-- Replace plain text error responses on routes used by the browser.
+- Keep browser-facing API errors in the `{ "message": "..." }` shape.
+- Let route handlers throw typed errors where that reduces duplication.
 - Keep status codes consistent.
 
 Acceptance criteria:

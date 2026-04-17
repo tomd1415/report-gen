@@ -26,6 +26,11 @@ Use this checklist before pulling or deploying changes on the live server.
   `node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(console.error)"`
 - Check that `.env` still has all variables listed in
   `comment-bank-api/.env.example`.
+- For production, confirm `SESSION_SECRET` is a long random value,
+  `ALLOW_REGISTRATION_IN_PROD=false`, `CORS_ORIGINS` is set to the live origin,
+  and HTTPS deployments use `SESSION_SECURE=true`.
+- Confirm auth throttling is present in `.env` or using defaults:
+  `AUTH_RATE_LIMIT_WINDOW_MS=900000` and `AUTH_RATE_LIMIT_MAX=20`.
 
 ## Verify Before Restart
 

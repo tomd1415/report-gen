@@ -115,6 +115,11 @@ Set these in `comment-bank-api/.env` for production hardening:
 - `NODE_ENV=production`
 - `CORS_ORIGINS=https://your-domain.example`
 - `ALLOW_REGISTRATION_IN_PROD=false`
+- `SESSION_SECRET=<long-random-secret>`
+- `SESSION_SECURE=true` when the site is served over HTTPS
+- `SESSION_TRUST_PROXY=true` when running behind Nginx/Apache
+- `AUTH_RATE_LIMIT_WINDOW_MS=900000`
+- `AUTH_RATE_LIMIT_MAX=20`
 
 Restart after changes:
 ```

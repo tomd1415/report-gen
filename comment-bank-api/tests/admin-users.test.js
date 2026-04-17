@@ -125,6 +125,33 @@ describe('database health endpoint', () => {
   });
 });
 
+describe('registration endpoint', () => {
+  it('creates a user without returning the password hash', async () => {
+    const models = createModels({
+      create: vi.fn().mockResolvedValue({
+        id: 4,
+        username: 'newteacher',
+        password: 'stored-hash',
+        isAdmin: false
+      })
+    });
+    const app = createTestApp({ models, sessionUser: null });
+
+    const response = await request(app)
+      .post('/api/register')
+      .send({ username: 'newteacher', password: 'secret' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      message: 'User registered successfully',
+      user: { id: 4, username: 'newteacher', isAdmin: false }
+    });
+    expect(response.body.user.password).toBeUndefined();
+    const createdPayload = models.User.create.mock.calls[0][0];
+    await expect(bcrypt.compare('secret', createdPayload.password)).resolves.toBe(true);
+  });
+});
+
 describe('admin user management', () => {
   it('creates users with a hashed password and without returning the hash', async () => {
     const models = createModels({

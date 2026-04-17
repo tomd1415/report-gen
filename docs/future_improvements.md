@@ -20,6 +20,18 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   namespace. The code currently has both `/api/admin/*` and non-admin-looking
   admin-protected routes such as `/api/users`, `/api/subjects`, and
   `/api/year-groups`.
+- `2026-04-17`: Enable a strict Content Security Policy after large inline page
+  scripts have been moved into dedicated JS files. Helmet is in place, but CSP
+  is intentionally disabled until that refactor is complete.
+- `2026-04-17`: Consider regenerating sessions after successful normal/admin
+  login and adding minimum password length checks for newly created or changed
+  passwords.
+- `2026-04-17`: Add an automated production security config check for unsafe
+  `.env` values such as placeholder session secrets, missing CORS origins, or
+  insecure cookie settings.
+- `2026-04-17`: Review the moderate `npm audit` advisory through `umzug` /
+  `@rushstack` / `ajv` when there is a clean targeted dependency update. Avoid
+  broad `npm audit fix` changes on the live branch without a separate test pass.
 
 ## Reliability and Data Safety
 

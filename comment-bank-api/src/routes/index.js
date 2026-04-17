@@ -278,6 +278,13 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     keyGenerator: (req) => req.session?.user?.id?.toString() || req.ip,
     message: { message: 'Rate limit exceeded. Try again later.' }
   });
+  const authLimiter = rateLimit({
+    windowMs: config.authRateLimit.windowMs,
+    limit: config.authRateLimit.max,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { message: 'Too many authentication attempts. Please try again later.' }
+  });
 
   const findOwnedCategory = (id, userId, options = {}) => {
     return Category.findOne({
@@ -464,6 +471,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
   app.use('/api/export-categories-comments', isAuthenticated);
   app.use('/api/import-categories-comments', isAuthenticated);
   app.use('/api/import-reports', isAuthenticated, openAiLimiter);
+  app.use(['/api/login', '/api/admin/login', '/api/register'], authLimiter);
 
   app.get('/api/authenticated', (req, res) => {
     if (req.session.user) {
@@ -521,7 +529,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
       }
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await User.create({ username, password: hashedPassword });
-      res.json({ message: 'User registered successfully', user });
+      res.json({ message: 'User registered successfully', user: serializeUser(user) });
     } catch (error) {
       console.error('Error registering user:', error);
       sendError(res, 500, 'Error registering user');

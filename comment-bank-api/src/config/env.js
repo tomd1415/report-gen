@@ -56,6 +56,10 @@ export const config = {
     windowMs: toInt(process.env.RATE_LIMIT_WINDOW_MS, 60 * 1000),
     max: toInt(process.env.RATE_LIMIT_MAX, 30)
   },
+  authRateLimit: {
+    windowMs: toInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+    max: toInt(process.env.AUTH_RATE_LIMIT_MAX, 20)
+  },
   backup: {
     enabled: toBool(process.env.ENABLE_DB_BACKUP, false),
     dir: process.env.DB_BACKUP_DIR || './dbbackup_web'

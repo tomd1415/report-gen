@@ -2,12 +2,33 @@ import express from 'express';
 import request from 'supertest';
 import { describe, it, expect, vi } from 'vitest';
 
-const buildApp = async ({ max, windowMs }) => {
-  const originalMax = process.env.RATE_LIMIT_MAX;
-  const originalWindow = process.env.RATE_LIMIT_WINDOW_MS;
+const withTemporaryEnv = (values) => {
+  const originals = Object.fromEntries(
+    Object.keys(values).map((key) => [key, process.env[key]])
+  );
 
-  process.env.RATE_LIMIT_MAX = String(max);
-  process.env.RATE_LIMIT_WINDOW_MS = String(windowMs);
+  Object.entries(values).forEach(([key, value]) => {
+    process.env[key] = String(value);
+  });
+
+  return () => {
+    Object.entries(originals).forEach(([key, value]) => {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    });
+  };
+};
+
+const buildApp = async ({ max, windowMs, authMax, authWindowMs, models: modelOverrides = {} }) => {
+  const restoreEnv = withTemporaryEnv({
+    RATE_LIMIT_MAX: max,
+    RATE_LIMIT_WINDOW_MS: windowMs,
+    AUTH_RATE_LIMIT_MAX: authMax ?? 20,
+    AUTH_RATE_LIMIT_WINDOW_MS: authWindowMs ?? 60000
+  });
 
   vi.resetModules();
   const { registerRoutes } = await import('../src/routes/index.js');
@@ -21,8 +42,10 @@ const buildApp = async ({ max, windowMs }) => {
   };
 
   const models = {
+    User: { findOne: vi.fn() },
     Prompt: { findOne: vi.fn() },
-    SubjectContext: { findOne: vi.fn() }
+    SubjectContext: { findOne: vi.fn() },
+    ...modelOverrides
   };
 
   const app = express();
@@ -35,18 +58,7 @@ const buildApp = async ({ max, windowMs }) => {
 
   return {
     app,
-    restoreEnv: () => {
-      if (originalMax === undefined) {
-        delete process.env.RATE_LIMIT_MAX;
-      } else {
-        process.env.RATE_LIMIT_MAX = originalMax;
-      }
-      if (originalWindow === undefined) {
-        delete process.env.RATE_LIMIT_WINDOW_MS;
-      } else {
-        process.env.RATE_LIMIT_WINDOW_MS = originalWindow;
-      }
-    }
+    restoreEnv
   };
 };
 
@@ -54,20 +66,47 @@ describe('rate limiting', () => {
   it('limits generate-report after the configured max', async () => {
     const { app, restoreEnv } = await buildApp({ max: 2, windowMs: 60000 });
 
-    const payload = {
-      name: 'Alex',
-      pronouns: 'they/them',
-      subjectId: 1,
-      yearGroupId: 2
-    };
+    try {
+      const payload = {
+        name: 'Alex',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2
+      };
 
-    const first = await request(app).post('/generate-report').send(payload);
-    const second = await request(app).post('/generate-report').send(payload);
-    const third = await request(app).post('/generate-report').send(payload);
+      const first = await request(app).post('/generate-report').send(payload);
+      const second = await request(app).post('/generate-report').send(payload);
+      const third = await request(app).post('/generate-report').send(payload);
 
-    expect(first.status).toBe(200);
-    expect(second.status).toBe(200);
-    expect(third.status).toBe(429);
-    restoreEnv();
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(third.status).toBe(429);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it('limits repeated login attempts after the configured auth max', async () => {
+    const { app, restoreEnv } = await buildApp({
+      max: 30,
+      windowMs: 60000,
+      authMax: 2,
+      authWindowMs: 60000
+    });
+
+    try {
+      const payload = { username: 'teacher', password: 'wrong-password' };
+
+      const first = await request(app).post('/api/login').send(payload);
+      const second = await request(app).post('/api/login').send(payload);
+      const third = await request(app).post('/api/login').send(payload);
+
+      expect(first.status).toBe(401);
+      expect(second.status).toBe(401);
+      expect(third.status).toBe(429);
+      expect(third.body.message).toMatch(/too many authentication attempts/i);
+    } finally {
+      restoreEnv();
+    }
   });
 });

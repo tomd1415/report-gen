@@ -231,6 +231,12 @@ values locally.
 - `RATE_LIMIT_WINDOW_MS`: time window in ms (default `60000`)
 - `RATE_LIMIT_MAX`: max requests per window per user/IP (default `30`)
 
+### Rate Limiting (Auth endpoints)
+- `AUTH_RATE_LIMIT_WINDOW_MS`: login/register limit window in ms (default
+  `900000` = 15 minutes)
+- `AUTH_RATE_LIMIT_MAX`: max login/register attempts per window per IP
+  (default `20`)
+
 ### Database Backups (Admin only)
 - `ENABLE_DB_BACKUP`: `true` or `false`
 - `DB_BACKUP_DIR`: backup directory (default `./dbbackup_web`)
@@ -268,6 +274,19 @@ values locally.
   a supported commit environment variable is set.
 - `GET /api/health/db` (admin only)
 - Checks the Sequelize database connection and returns a JSON status.
+
+### Security hardening
+- Express security headers are set with Helmet. Content Security Policy is
+  intentionally disabled for now because the static pages still contain inline
+  scripts.
+- `X-Powered-By` is disabled.
+- Login, admin login, and registration attempts are rate limited separately from
+  report generation/import rate limits.
+- Registration and admin user creation responses return safe user details only;
+  password hashes are not sent back to the browser.
+- In production, use a long random `SESSION_SECRET`, set
+  `ALLOW_REGISTRATION_IN_PROD=false`, and set `SESSION_SECURE=true` when the
+  site is served over HTTPS.
 
 ---
 

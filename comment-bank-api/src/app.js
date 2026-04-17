@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import session from 'express-session';
@@ -14,6 +15,7 @@ const SequelizeStore = connectSessionSequelize(session.Store);
 
 export async function createApp() {
   const app = express();
+  app.disable('x-powered-by');
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -28,6 +30,10 @@ export async function createApp() {
   if (config.session.trustProxy) {
     app.set('trust proxy', 1);
   }
+
+  app.use(helmet({
+    contentSecurityPolicy: false
+  }));
 
   if (config.env === 'production') {
     app.use(cors({
