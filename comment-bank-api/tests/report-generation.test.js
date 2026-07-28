@@ -259,6 +259,68 @@ describe('generate-report', () => {
     expect(prompt).toContain('Subject strength focus for paragraph 3 (include at least one): Fractions (strong)');
   });
 
+  it('redacts pupil names from additional comments and strength focus before they reach the model', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    // No subject description -> no relevance call, so generation is the only call.
+    models.SubjectContext.findOne.mockResolvedValue(null);
+
+    openai.responses.parse.mockResolvedValueOnce({
+      output_parsed: { paragraphs: ['p1', 'p2', 'p3', 'p4'] }
+    });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex Morgan',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        additionalComments: 'Alex Morgan improved a lot this term; Morgan supported peers.',
+        strengthFocus: [{ topic: 'Alex leads group work', level: 'confident' }]
+      });
+
+    expect(response.status).toBe(200);
+
+    const prompt = openai.responses.parse.mock.calls[0][0].input[0].content;
+    // The free-text fields must be routed through the placeholder pass...
+    expect(prompt).toContain('PUPIL_NAME improved a lot this term');
+    expect(prompt).toContain('Subject strength focus for paragraph 3 (include at least one): PUPIL_NAME leads group work (confident)');
+    // ...and the raw name must never appear verbatim anywhere in the prompt.
+    expect(prompt).not.toMatch(/Alex/i);
+    expect(prompt).not.toMatch(/Morgan/i);
+  });
+
+  it('redacts pupil names from strength focus before the relevance check too', async () => {
+    models.Prompt.findOne.mockResolvedValue(null);
+    // A subject description plus a non-empty selection triggers the relevance call.
+    models.SubjectContext.findOne.mockResolvedValue({
+      subjectDescription: 'Mathematics curriculum overview.',
+      wordLimit: null
+    });
+
+    openai.responses.parse
+      .mockResolvedValueOnce({ output_parsed: { flagged: [] } })
+      .mockResolvedValueOnce({ output_parsed: { paragraphs: ['p1', 'p2', 'p3', 'p4'] } });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        name: 'Alex Morgan',
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        strengthFocus: [{ topic: 'Alex excels at fractions', level: 'confident' }]
+      });
+
+    expect(response.status).toBe(200);
+    expect(openai.responses.parse).toHaveBeenCalledTimes(2);
+
+    const relevancePrompt = openai.responses.parse.mock.calls[0][0].input[0].content;
+    expect(relevancePrompt).toContain('PUPIL_NAME excels at fractions');
+    expect(relevancePrompt).not.toMatch(/Alex/i);
+    expect(relevancePrompt).not.toMatch(/Morgan/i);
+  });
+
   it('rejects too many strength focus items', async () => {
     models.Prompt.findOne.mockResolvedValue(null);
     models.SubjectContext.findOne.mockResolvedValue(null);

@@ -59,6 +59,27 @@ const cleanAndLimit = (value, maxLength) => {
   return cleaned.length > maxLength ? cleaned.slice(0, maxLength) : cleaned;
 };
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const PUPIL_NAME_PLACEHOLDER = 'PUPIL_NAME';
+// Route free-text fields through the same placeholder pass as report import so
+// a pupil's name can never reach the model verbatim. Redacts the full name and
+// each of its whitespace-separated parts (case-insensitively), longest first.
+const redactPupilName = (text, name) => {
+  const cleaned = cleanText(text);
+  const cleanedName = cleanText(name);
+  if (!cleaned || !cleanedName) {
+    return cleaned;
+  }
+  const targets = [...new Set([cleanedName, ...cleanedName.split(' ')])]
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2)
+    .sort((a, b) => b.length - a.length);
+  let result = cleaned;
+  targets.forEach((target) => {
+    const regex = new RegExp(`(^|[^\\w])${escapeRegex(target)}([^\\w]|$)`, 'gi');
+    result = result.replace(regex, (match, prefix, suffix) => `${prefix || ''}${PUPIL_NAME_PLACEHOLDER}${suffix || ''}`);
+  });
+  return result;
+};
 const parseWordLimit = (value) => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -1151,11 +1172,11 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
             return null;
           }
           if (typeof item === 'string') {
-            const topic = cleanAndLimit(item, LIMITS.strengthFocusTopic);
+            const topic = redactPupilName(cleanAndLimit(item, LIMITS.strengthFocusTopic), safeName);
             return topic ? { topic, level: 'strong' } : null;
           }
-          const topic = cleanAndLimit(item.topic, LIMITS.strengthFocusTopic);
-          const level = cleanAndLimit(item.level, LIMITS.strengthFocusLevel);
+          const topic = redactPupilName(cleanAndLimit(item.topic, LIMITS.strengthFocusTopic), safeName);
+          const level = redactPupilName(cleanAndLimit(item.level, LIMITS.strengthFocusLevel), safeName);
           if (!topic || !level) {
             return null;
           }
@@ -1174,7 +1195,8 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
       }
 
       if (cleanedAdditionalComments) {
-        prompt += `The following additional comments should be woven into the whole report: ${cleanedAdditionalComments}\n`;
+        const redactedAdditionalComments = redactPupilName(cleanedAdditionalComments, safeName);
+        prompt += `The following additional comments should be woven into the whole report: ${redactedAdditionalComments}\n`;
       }
 
       if (subjectDescription && selectedItems.length > 0 && !allowIrrelevant) {
