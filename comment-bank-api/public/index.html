@@ -100,6 +100,8 @@
                         <div class="strength-focus-header">
                             <h3>Subject strengths focus (optional)</h3>
                             <p>Pick a topic or aspect and how strong the pupil is. Paragraph 3 will include at least one.</p>
+                            <p class="privacy-guidance">This is free text and is sent to the AI. This pupil's own name is removed
+                                automatically before sending — but please do not name <strong>other</strong> pupils here.</p>
                         </div>
                         <div id="strength-focus-list" class="strength-focus-list"></div>
                         <button type="button" class="button inline-button" onclick="addStrengthFocusRow()">Add strength focus</button>
@@ -108,6 +110,23 @@
                     <div class="form-section" id="additional-comments-wrapper">
                         <label for="additional-comments">Additional Comments:</label>
                         <textarea id="additional-comments" rows="4" maxlength="1000" class="textarea" placeholder="Add any additional comments about the pupil here..."></textarea>
+                        <p class="privacy-guidance">This is free text and is sent to the AI. This pupil's own name is removed
+                            automatically before sending — but please do not name <strong>other</strong> pupils here. You will
+                            see exactly what is sent and be asked to confirm.</p>
+                    </div>
+
+                    <div id="send-preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="send-preview-title">
+                        <div class="modal-content send-preview">
+                            <h3 id="send-preview-title">Check before sending</h3>
+                            <p>This is exactly the free text that will be sent to the AI. This pupil's name has already been
+                                replaced with <code>PUPIL_NAME</code> and is not sent.</p>
+                            <div id="send-preview-suspects" class="privacy-warning hidden"></div>
+                            <div id="send-preview-body" class="send-preview-body"></div>
+                            <div class="warning-actions">
+                                <button type="button" class="button inline-button" id="send-preview-confirm">Confirm and send</button>
+                                <button type="button" class="button inline-button" id="send-preview-cancel">Go back and edit</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="result-container" class="result-section">
@@ -1086,6 +1105,7 @@
         }
 
         function clearGenerateFormAfterSuccessfulReport() {
+            confirmedFreeTextSignature = null;
             document.getElementById('pupil-name').value = '';
             document.getElementById('pupil-pronouns').value = '';
             document.getElementById('additional-comments').value = '';
@@ -1100,6 +1120,97 @@
             updateSelectionSummary();
             applyFilters();
             updateReadyChecklist();
+        }
+
+        // Signature of the free text the teacher last confirmed, so an unchanged
+        // retry does not re-prompt but an edit does. Not persisted anywhere —
+        // decision 2(A): the confirmation is interaction-only, nothing is stored.
+        let confirmedFreeTextSignature = null;
+
+        // Renders text into a container as DOM nodes (never innerHTML), underlining
+        // any word flagged as a possible pupil name. Warn-only: the text shown is
+        // exactly what gets sent, highlights change nothing.
+        function renderPreviewText(container, text, suspects) {
+            const flagged = new Set(suspects.map(word => word.toLowerCase()));
+            container.textContent = '';
+            text.split(/(\s+)/).forEach(token => {
+                const bare = token.replace(/^[^\p{L}']+|[^\p{L}']+$/gu, '');
+                if (bare && flagged.has(bare.toLowerCase())) {
+                    const lead = token.slice(0, token.indexOf(bare));
+                    const trail = token.slice(token.indexOf(bare) + bare.length);
+                    if (lead) container.appendChild(document.createTextNode(lead));
+                    const mark = document.createElement('span');
+                    mark.className = 'suspect-name';
+                    mark.textContent = bare;
+                    container.appendChild(mark);
+                    if (trail) container.appendChild(document.createTextNode(trail));
+                } else {
+                    container.appendChild(document.createTextNode(token));
+                }
+            });
+        }
+
+        // Decision 1(A): only shown when there is free-text to review. With both
+        // free-text fields empty there is nothing un-vetted to look at, and a
+        // dialog that is usually empty just trains people to click through it.
+        // Decision 2(A): the confirmation is the accountability trail — informed
+        // sign-off on the exact payload. Nothing is stored.
+        function confirmFreeTextSend(fields, pupilName) {
+            const modal = document.getElementById('send-preview-modal');
+            const body = document.getElementById('send-preview-body');
+            const suspectBox = document.getElementById('send-preview-suspects');
+            const confirmBtn = document.getElementById('send-preview-confirm');
+            const cancelBtn = document.getElementById('send-preview-cancel');
+
+            body.textContent = '';
+            const allSuspects = new Set();
+
+            fields.forEach(field => {
+                const suspects = window.ReportSelection.findSuspectNames(field.text, { ignore: [pupilName] });
+                suspects.forEach(word => allSuspects.add(word));
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'send-preview-field';
+                const heading = document.createElement('h4');
+                heading.textContent = field.label;
+                const textBox = document.createElement('div');
+                textBox.className = 'send-preview-text';
+                renderPreviewText(textBox, field.text, suspects);
+                wrapper.appendChild(heading);
+                wrapper.appendChild(textBox);
+                body.appendChild(wrapper);
+            });
+
+            if (allSuspects.size > 0) {
+                suspectBox.textContent = `Please check these words before sending — if any is another pupil's name, go back and remove it: ${[...allSuspects].join(', ')}. (Subject topics and place names are fine.)`;
+                suspectBox.classList.remove('hidden');
+            } else {
+                suspectBox.textContent = '';
+                suspectBox.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+            confirmBtn.focus();
+
+            return new Promise(resolve => {
+                const finish = (result) => {
+                    modal.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    document.removeEventListener('keydown', onKeydown);
+                    resolve(result);
+                };
+                const onConfirm = () => finish(true);
+                const onCancel = () => finish(false);
+                const onKeydown = (event) => {
+                    if (event.key === 'Escape') {
+                        finish(false);
+                    }
+                };
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+                document.addEventListener('keydown', onKeydown);
+            });
         }
 
         async function generateReport(options = {}) {
@@ -1135,8 +1246,15 @@
             }
 
             const selectionHelper = window.ReportSelection;
-            if (!selectionHelper || typeof selectionHelper.collectSelections !== 'function') {
-                showGenerateStatus('Unable to validate category selections. Please refresh the page.', 'error');
+            // Also guard the redaction helpers: a stale cached copy of
+            // report-selection.js without them would otherwise send the name.
+            // Fail closed rather than fall back to transmitting it.
+            if (!selectionHelper
+                || typeof selectionHelper.collectSelections !== 'function'
+                || typeof selectionHelper.redactPupilName !== 'function'
+                || typeof selectionHelper.restorePupilName !== 'function'
+                || typeof selectionHelper.findSuspectNames !== 'function') {
+                showGenerateStatus('Unable to prepare the report safely. Please reload the page (Ctrl+F5) and try again.', 'error');
                 return;
             }
 
@@ -1163,15 +1281,48 @@
                 return;
             }
 
+            // Redact this pupil's name in the browser so it is never transmitted.
+            // The server is not told the name, so it cannot do this for us — which
+            // is why report-selection.js's helpers are unit-tested directly.
+            const redactedAdditionalComments = selectionHelper.redactPupilName(additionalComments, pupilName);
+            const redactedStrengthFocus = strengthFocus.items.map(item => ({
+                topic: selectionHelper.redactPupilName(item.topic, pupilName),
+                level: selectionHelper.redactPupilName(item.level, pupilName)
+            }));
+
+            const previewFields = [];
+            if (redactedAdditionalComments) {
+                previewFields.push({ label: 'Additional comments', text: redactedAdditionalComments });
+            }
+            redactedStrengthFocus.forEach((item, index) => {
+                previewFields.push({
+                    label: `Strength focus ${index + 1}`,
+                    text: `${item.topic} (${item.level})`
+                });
+            });
+
+            // Gate on the *content* rather than a flag, so a retry or "generate
+            // anyway" with unchanged text does not re-prompt, but any edit to the
+            // free text does.
+            const previewSignature = JSON.stringify(previewFields);
+            if (previewFields.length > 0 && confirmedFreeTextSignature !== previewSignature) {
+                const confirmed = await confirmFreeTextSend(previewFields, pupilName);
+                if (!confirmed) {
+                    showGenerateStatus('Sending cancelled. Edit the free-text fields, then generate again.', 'warning');
+                    document.getElementById('additional-comments').focus();
+                    return;
+                }
+                confirmedFreeTextSignature = previewSignature;
+            }
+
             const pupil = {
-                name: pupilName,
                 pronouns: pupilPronouns,
                 subjectId: subjectId,
                 yearGroupId: yearGroupId,
-                additionalComments: additionalComments,
+                additionalComments: redactedAdditionalComments,
                 wordLimit: wordLimit,
                 overrideIrrelevant: options.override === true,
-                strengthFocus: strengthFocus.items
+                strengthFocus: redactedStrengthFocus
             };
 
             Object.entries(selections).forEach(([categoryName, selectedComments]) => {
@@ -1205,7 +1356,10 @@
                     throw new Error(errorPayload.message || 'There was an error generating the report.');
                 }
                 const data = await response.json();
-                const paragraphs = getCompleteReportParagraphs(data);
+                // The server never saw the name, so the placeholder comes back
+                // intact and is swapped here.
+                const paragraphs = getCompleteReportParagraphs(data)
+                    .map(paragraph => selectionHelper.restorePupilName(paragraph, pupilName));
                 if (paragraphs.length !== 4) {
                     throw new Error('The AI returned an incomplete report. Your entries have been kept so you can try again.');
                 }

@@ -32,19 +32,7 @@ describe('generate-report', () => {
     app = createTestApp({ models, openai });
   });
 
-  it('rejects missing name or pronouns', async () => {
-    const missingName = await request(app)
-      .post('/generate-report')
-      .send({
-        name: '',
-        pronouns: 'they/them',
-        subjectId: 1,
-        yearGroupId: 2
-      });
-
-    expect(missingName.status).toBe(400);
-    expect(missingName.body.message).toMatch(/Name and pronouns are required/i);
-
+  it('rejects missing pronouns', async () => {
     const missingPronouns = await request(app)
       .post('/generate-report')
       .send({
@@ -55,7 +43,37 @@ describe('generate-report', () => {
       });
 
     expect(missingPronouns.status).toBe(400);
-    expect(missingPronouns.body.message).toMatch(/Name and pronouns are required/i);
+    expect(missingPronouns.body.message).toMatch(/Pronouns are required/i);
+  });
+
+  it('accepts a name-free request and leaves the placeholder for the client', async () => {
+    // The current browser redacts the pupil name itself and never sends it, so
+    // the server must not require a name and must not attempt a swap-back.
+    models.Prompt.findOne.mockResolvedValue(null);
+    models.SubjectContext.findOne.mockResolvedValue(null);
+    openai.responses.parse.mockResolvedValueOnce({
+      output_parsed: {
+        paragraphs: [
+          'PUPIL_NAME has studied algebra.',
+          'PUPIL_NAME shows consistent effort.',
+          'PUPIL_NAME demonstrates problem-solving.',
+          'PUPIL_NAME should focus on revision.'
+        ]
+      }
+    });
+
+    const response = await request(app)
+      .post('/generate-report')
+      .send({
+        pronouns: 'they/them',
+        subjectId: 1,
+        yearGroupId: 2,
+        additionalComments: 'PUPIL_NAME worked hard.'
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.paragraphs).toHaveLength(4);
+    expect(response.body.report).toContain('PUPIL_NAME has studied algebra');
   });
 
   it('builds a 4-paragraph report and replaces placeholders', async () => {

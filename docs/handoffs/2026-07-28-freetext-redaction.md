@@ -1,4 +1,9 @@
 # Handoff: free-text pupil-name redaction — 2026-07-28
+
+> **RESOLVED 2026-07-29.** The three decisions were settled (1(A), 2(A), 3(A))
+> and the plan was implemented. See `docs/REDACTION-DECISIONS.md` → *Outcome* and
+> `docs/PROJECT_STATE.md` §6.3.1. Kept as the record of the thread; do not treat
+> the *Next actions* below as outstanding.
 **Goal:** stop pupil names reaching the AI model via the two free-text fields
 ("additional comments", "strength focus"). **Done looks like:** agreed layered
 mitigation + client-side current-pupil redaction implemented, tests green, docs

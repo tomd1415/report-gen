@@ -508,6 +508,53 @@ nav ul li a:hover {
     display: none;
 }
 
+/* Free-text privacy guidance and the confirm-before-send preview */
+.privacy-guidance {
+    margin: 8px 0 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.send-preview {
+    max-width: 640px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.send-preview-body {
+    margin: 12px 0;
+}
+
+.send-preview-field {
+    margin-bottom: 12px;
+}
+
+.send-preview-field h4 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+}
+
+.send-preview-text {
+    padding: 8px 10px;
+    border: 1px solid var(--border, #ccc);
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.privacy-warning {
+    padding: 8px 10px;
+    border: 2px solid #8a5300;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+/* Warn-only: marks words that might be another pupil's name. Never redacts. */
+.suspect-name {
+    border-bottom: 2px solid #8a5300;
+    font-weight: 700;
+}
+
 /* Category and Comment Category Styles */
 .comment-categories-container {
     display: flex;

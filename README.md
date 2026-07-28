@@ -171,8 +171,43 @@ details and selected comments remain on the page so you can retry. Once a valid
 - Additional comments should be woven throughout the report, not clustered.
 
 ### Placeholders
-- Pupil names are replaced with `PUPIL_NAME` before any OpenAI call.
-- The placeholder is swapped back at the end.
+- The pupil's name is replaced with `PUPIL_NAME` **in the browser**, before the
+  request leaves the machine, so the name itself is not transmitted to this
+  server or to OpenAI. The browser swaps the placeholder back when the report
+  comes back.
+- Comments imported into the bank are redacted against the pupil names supplied
+  at import time, so bank comments are already placeholder-only.
+
+### Free-text fields: what is and is not guaranteed
+The "additional comments" and "strength focus" boxes are free text and are sent
+to OpenAI. Treat what follows as **a mitigation with an accountability trail —
+not a guarantee that names never reach the model.**
+
+What is actually enforced:
+- **The current pupil's name is removed automatically** (browser-side, as above).
+  This part is reliable: it is an exact, case-insensitive, word-bounded match on
+  a name the app knows.
+- **Any *other* pupil's name is not, and cannot be, removed automatically.** The
+  app holds no roster of other pupils' names to match against — deliberately, on
+  data-protection grounds — so it has nothing to compare the text to.
+
+What is done instead, for that residual risk:
+1. **Guidance** on-screen next to both boxes, asking staff not to name other
+   pupils.
+2. **A warn-only highlighter** that flags capitalised words which *might* be a
+   name. It only warns and never edits the text: a subject topic and a pupil can
+   look identical (*Newton*, *the Tudors*), so automatic redaction here would
+   corrupt legitimate reports.
+3. **A confirm-before-send preview** showing the exact free text that will be
+   sent, which the teacher must actively approve. That informed sign-off is the
+   accountability trail; it is an interaction, **not a stored audit log** —
+   nothing about the confirmation is written to the database.
+
+**The basis for accepting the residual risk is the explicit assumption that
+teachers are expected not to enter another pupil's name into a report.** The
+three layers above make that expectation visible and checkable at the moment of
+sending; they do not make it impossible to ignore. If that assumption stops
+holding, this mitigation is no longer sufficient and the control needs revisiting.
 
 ### Target placeholder comment
 The comment:

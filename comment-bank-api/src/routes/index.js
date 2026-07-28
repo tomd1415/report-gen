@@ -1084,10 +1084,19 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const allowIrrelevant = overrideIrrelevant === true || overrideIrrelevant === 'true';
     const strengthFocusItems = Array.isArray(strengthFocus) ? strengthFocus : [];
 
-    if (!safeName || !safePronouns) {
-      return res.status(400).json({ message: 'Name and pronouns are required.' });
+    // Two supported paths (migration stage — see docs/REDACTION-DECISIONS.md §3):
+    //  - name present (legacy): the server redacts free-text against it and
+    //    swaps the placeholder back before responding, exactly as before.
+    //  - name absent (current client): the browser has already redacted on the
+    //    way in and restores the placeholder itself on the way out, so the name
+    //    is never transmitted. The server returns paragraphs still containing
+    //    PUPIL_NAME.
+    const nameProvided = Boolean(safeName);
+
+    if (!safePronouns) {
+      return res.status(400).json({ message: 'Pronouns are required.' });
     }
-    if (safeName.length > LIMITS.name) {
+    if (nameProvided && safeName.length > LIMITS.name) {
       return res.status(400).json({ message: `Name must be ${LIMITS.name} characters or fewer.` });
     }
     if (safePronouns.length > LIMITS.pronouns) {
@@ -1251,9 +1260,11 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         return res.status(502).json({ message: INCOMPLETE_REPORT_MESSAGE });
       }
 
-      const finalParagraphs = paragraphs.map((paragraph) =>
-        paragraph.replace(new RegExp(placeholder, 'g'), safeName)
-      );
+      // On the name-free path there is nothing to swap back — the browser holds
+      // the name and restores the placeholder itself.
+      const finalParagraphs = nameProvided
+        ? paragraphs.map((paragraph) => paragraph.replace(new RegExp(placeholder, 'g'), safeName))
+        : paragraphs;
       const report = finalParagraphs.join('\n\n');
 
       res.json({ report, paragraphs: finalParagraphs });

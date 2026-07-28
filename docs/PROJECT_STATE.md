@@ -194,9 +194,43 @@ either field reaches a prompt verbatim.
 remove names the app *knows about* — here, the current pupil's `name`. If a
 teacher types a **different** pupil's name into a free-text box, the generation
 form has no list of other names to match against, so it cannot be auto-redacted.
-Closing that fully would need either a UI warning or a shared per-class name
-list; it is the same boundary the import flow has (it redacts only the supplied
-`pupilNames`).
+A shared per-class name list was **rejected on data-protection grounds** (no
+pupil-name roster may be held server-side, and an in-browser *persisted* list
+falls to the same objection), so the layered mitigation below is what closes this
+instead.
+
+#### 6.3.1 Redaction moved client-side + layered free-text mitigation (2026-07-29)
+The three decisions parked in `docs/REDACTION-DECISIONS.md` were settled (1(A),
+2(A), 3(A)) and implemented; see that document's *Outcome* section for the full
+detail. In summary:
+
+- **The name is no longer transmitted at all.** `public/report-selection.js` now
+  exports `redactPupilName` / `restorePupilName` (mirroring the server helper),
+  and the browser redacts before sending and restores after receiving. 21 unit
+  tests in `tests/ui-redaction.test.js`.
+- **`POST /generate-report` accepts a name-free request** as well as the legacy
+  name-present one (decision 3(A), a deliberate migration stage). `pronouns` is
+  still required; `name` is now optional. **Follow-up owed:** retire the legacy
+  name-present branch once the new client is confirmed in real use.
+- **Free-text mitigation is three layers:** on-screen guidance, a **warn-only**
+  suspect-name highlighter (`findSuspectNames` — never auto-redacts, because
+  *Newton* and a pupil named *Newton* are indistinguishable), and a
+  confirm-before-send preview of the exact payload, shown only when free text is
+  present (decision 1(A)).
+- **The accountability trail is the confirmation interaction only** — decision
+  2(A). Nothing is stored; a stored metadata row remains a separate decision to
+  take alongside the ImportJobs audit-table question.
+
+**How this must be described (agreed framing, do not soften):** this is *"a
+mitigation with an accountability trail"*, **not** *"names never reach the
+model"*. The explicit basis for accepting the residual risk is the assumption
+that **teachers are expected not to enter another pupil's name**. If that
+assumption stops holding, the mitigation is no longer sufficient.
+
+**Consequence to keep in mind:** because the server deliberately never sees the
+name on the new path, it can no longer independently verify that the current
+pupil's name is absent from free text. Correctness now rests entirely on the
+browser helpers — which is why their unit tests are load-bearing.
 
 ### 6.4 Content Security Policy is deliberately disabled
 Helmet is active but CSP is off because the static pages still contain large
@@ -239,7 +273,11 @@ review before a non-technical admin can trigger it.
 1. `npm install` and run `npm run check:deploy` to establish a green baseline in
    this environment.
 2. ~~Redact pupil names from the additional-comments / strength-focus free-text
-   before the OpenAI call (§6.3).~~ **Done 2026-07-28** — see §6.3.
+   before the OpenAI call (§6.3).~~ **Done 2026-07-28** — see §6.3. Extended
+   2026-07-29 (§6.3.1): redaction moved client-side so the name is never
+   transmitted, plus the layered free-text mitigation. **Follow-up owed:** retire
+   the legacy name-present branch in `/generate-report` once the new client is
+   confirmed in real use.
 3. **Quick win:** fail-closed on insecure `SESSION_SECRET` in production (§6.5).
 4. Begin the route-file de-duplication with a shared `src/lib/text.js` (§6.1),
    then tackle the split following the domains listed in

@@ -1,8 +1,8 @@
 # Redaction plan — the three parked decisions
 
-_Explanation only. No implementation. This records three open decisions in the
-free-text redaction plan so they can be reviewed and settled before any code is
-written._
+> **Status: all three settled on 2026-07-29, each in favour of the lean below,
+> and implemented.** See the *Outcome* section at the foot of this document for
+> what was built and where. The analysis is kept as the record of why.
 
 ## Context (so each decision stands on its own)
 
@@ -195,5 +195,52 @@ never sends one.
   retire it later.
 
 All three leans favour proportionality and low-risk, reversible change over
-maximum strictness, which matches the basis set for this work. Nothing has been
-built or changed.
+maximum strictness, which matches the basis set for this work.
+
+---
+
+## Outcome (2026-07-29)
+
+All three decisions were taken as leaned — **1(A)**, **2(A)**, **3(A)** — and the
+plan was implemented.
+
+**Client-side redaction (`comment-bank-api/public/report-selection.js`)**
+- `redactPupilName(text, name)` — mirrors the server helper of the same name;
+  replaces the full name and each part, case-insensitively and word-bounded.
+- `restorePupilName(text, name)` — swaps `PUPIL_NAME` back after the response.
+- `findSuspectNames(text, { ignore })` — **warn-only** heuristic returning
+  capitalised mid-sentence words that might be another pupil's name. It never
+  drives redaction: *Newton* and a pupil called *Newton* are indistinguishable.
+- 21 unit tests in `comment-bank-api/tests/ui-redaction.test.js`. These matter
+  more than usual, because moving redaction into the browser means the server
+  can no longer double-check it (see §3 above).
+
+**UI (`comment-bank-api/public/index.html`, `public/styles.css`)**
+- Guidance text under both free-text fields.
+- Confirm-before-send preview (`#send-preview-modal`) showing the exact redacted
+  free text, with suspect words underlined and listed. Per **1(A)** it appears
+  only when at least one free-text field has content.
+- The gate keys on a signature of the confirmed text, so a retry or "generate
+  anyway" with unchanged text does not re-prompt, but any edit does.
+- Per **2(A)** nothing is written to the database; the signature is in-memory
+  only and is cleared after a successful report.
+
+**Server (`comment-bank-api/src/routes/index.js`)**
+- Per **3(A)** `POST /generate-report` now accepts both paths. `pronouns`
+  remains required; `name` is now optional. With a name it behaves exactly as
+  before (redact, swap back). Without one it returns paragraphs still containing
+  `PUPIL_NAME` for the browser to restore.
+- One existing test changed meaning and was updated: `rejects missing name or
+  pronouns` became `rejects missing pronouns`, plus a new test covering the
+  name-free path. (The §3 analysis anticipated *all* existing tests passing
+  untouched; that was not quite right — a test asserting the old rejection had
+  to change, because 3(A) deliberately changes that contract.)
+
+**Retiring the legacy path** is the deliberate follow-up 3(A) leaves open: once
+the name-free client is confirmed working in real use, remove the name-present
+branch and its swap-back. Until then the server *can* still accept a name, which
+is acceptable precisely because the shipped client never sends one.
+
+**Not done, deliberately:** decision 2(B)'s stored metadata row. It remains a
+separate decision to take alongside the unresolved ImportJobs audit-table
+question in the backlog.
