@@ -70,6 +70,12 @@ const mockApis = async (page, {
   isAdmin = false,
   username = 'teacher'
 } = {}) => {
+  // footer.html embeds Creative Commons licence icons from an external host.
+  // This sandbox cannot reach it, so those requests hang, the page 'load' event
+  // never fires and every page.goto times out. Abort off-origin requests so the
+  // tests exercise the app rather than the network.
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, (route) => route.abort());
+
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -212,6 +218,8 @@ test('Generate Report keeps entered data when the returned report is incomplete'
   await selectCommentForStep(page, 'Paragraph 4', 'Should practise checking calculations.');
 
   await page.getByRole('button', { name: 'Generate Report' }).click();
+  // Free text is present, so the confirm-before-send preview gates the request.
+  await page.getByRole('button', { name: 'Confirm and send' }).click();
 
   await expect(page.locator('#generate-status')).toContainText('incomplete report');
   await expect(page.locator('#pupil-name')).toHaveValue('Alex');
@@ -224,6 +232,99 @@ test('Generate Report keeps entered data when the returned report is incomplete'
   await expect(page.locator('#generate-status')).toContainText('Report generated');
   await expect(page.locator('#pupil-name')).toHaveValue('');
   await expect(page.locator('input[value="Understands fractions well."]')).not.toBeChecked();
+});
+
+const fillReportForm = async (page, { name = 'Alice', pronouns = 'she/her', additionalComments } = {}) => {
+  await chooseSubjectAndYear(page);
+  await page.fill('#pupil-name', name);
+  await page.fill('#pupil-pronouns', pronouns);
+  if (additionalComments !== undefined) {
+    await page.fill('#additional-comments', additionalComments);
+  }
+  await selectCommentForStep(page, 'Paragraph 1', 'Understands fractions well.');
+  await selectCommentForStep(page, 'Paragraph 2', 'Works hard in lessons.');
+  await selectCommentForStep(page, 'Paragraph 3', 'Explains mathematical ideas clearly.');
+  await selectCommentForStep(page, 'Paragraph 4', 'Should practise checking calculations.');
+};
+
+test('free-text preview redacts the pupil name, warns about other names, and never sends the name', async ({ page }) => {
+  let sentBody = null;
+  await mockApis(page, {
+    generateReportResponse: (route) => {
+      sentBody = JSON.parse(route.request().postData());
+      return fulfillJson(route, {
+        report: 'PUPIL_NAME has studied fractions.\n\nPUPIL_NAME works hard.\n\nPUPIL_NAME explains ideas clearly.\n\nPUPIL_NAME should check calculations.',
+        paragraphs: [
+          'PUPIL_NAME has studied fractions.',
+          'PUPIL_NAME works hard.',
+          'PUPIL_NAME explains ideas clearly.',
+          'PUPIL_NAME should check calculations.'
+        ]
+      });
+    }
+  });
+
+  await page.goto('/index.html');
+  await fillReportForm(page, {
+    name: 'Alice',
+    additionalComments: 'Alice works well alongside Jordan in lessons.'
+  });
+
+  await page.getByRole('button', { name: 'Generate Report' }).click();
+
+  // The preview shows exactly what will be sent: Alice redacted, Jordan flagged.
+  const preview = page.locator('#send-preview-modal');
+  await expect(preview).toBeVisible();
+  await expect(page.locator('#send-preview-body')).toContainText(
+    'PUPIL_NAME works well alongside Jordan in lessons.'
+  );
+  await expect(page.locator('#send-preview-body')).not.toContainText('Alice');
+  await expect(page.locator('.suspect-name')).toHaveText('Jordan');
+  await expect(page.locator('#send-preview-suspects')).toContainText('Jordan');
+
+  await page.getByRole('button', { name: 'Confirm and send' }).click();
+  await expect(preview).toBeHidden();
+  await expect(page.locator('#generate-status')).toContainText('Report generated');
+
+  // The name never left the browser...
+  expect(sentBody.name).toBeUndefined();
+  expect(JSON.stringify(sentBody)).not.toContain('Alice');
+  expect(sentBody.additionalComments).toBe('PUPIL_NAME works well alongside Jordan in lessons.');
+
+  // ...but the finished report reads with the real name restored.
+  await expect(page.locator('#the-report')).toContainText('Alice has studied fractions.');
+  await expect(page.locator('#the-report')).not.toContainText('PUPIL_NAME');
+});
+
+test('free-text preview can be cancelled, and is skipped when there is no free text', async ({ page }) => {
+  let requestCount = 0;
+  await mockApis(page, {
+    generateReportResponse: (route) => {
+      requestCount += 1;
+      return fulfillJson(route, {
+        report: 'One.\n\nTwo.\n\nThree.\n\nFour.',
+        paragraphs: ['One.', 'Two.', 'Three.', 'Four.']
+      });
+    }
+  });
+
+  await page.goto('/index.html');
+  await fillReportForm(page, { additionalComments: 'A note about the pupil.' });
+
+  await page.getByRole('button', { name: 'Generate Report' }).click();
+  await page.getByRole('button', { name: 'Go back and edit' }).click();
+
+  await expect(page.locator('#send-preview-modal')).toBeHidden();
+  await expect(page.locator('#generate-status')).toContainText('Sending cancelled');
+  expect(requestCount).toBe(0);
+  await expect(page.locator('#additional-comments')).toHaveValue('A note about the pupil.');
+
+  // Decision 1(A): with the free text cleared there is nothing to review, so
+  // the preview is skipped and the report sends straight away.
+  await page.fill('#additional-comments', '');
+  await page.getByRole('button', { name: 'Generate Report' }).click();
+  await expect(page.locator('#generate-status')).toContainText('Report generated');
+  expect(requestCount).toBe(1);
 });
 
 test('Generate Report shows an empty state when no comment bank exists', async ({ page }) => {

@@ -208,10 +208,14 @@ detail. In summary:
   exports `redactPupilName` / `restorePupilName` (mirroring the server helper),
   and the browser redacts before sending and restores after receiving. 21 unit
   tests in `tests/ui-redaction.test.js`.
-- **`POST /generate-report` accepts a name-free request** as well as the legacy
-  name-present one (decision 3(A), a deliberate migration stage). `pronouns` is
-  still required; `name` is now optional. **Follow-up owed:** retire the legacy
-  name-present branch once the new client is confirmed in real use.
+- **`POST /generate-report` no longer accepts a pupil name at all.** Decision
+  3(A) landed this in two stages: both paths supported (2026-07-29), then the
+  legacy name-present branch retired (2026-07-30) once the name-free client was
+  verified end to end in a real browser. The route now returns 400
+  ("reload the page") if a request carries a name, rather than ignoring it, so a
+  stale client fails loudly instead of silently transmitting one. The
+  server-side `redactPupilName` helper has been removed — with no name to match
+  against it could do nothing.
 - **Free-text mitigation is three layers:** on-screen guidance, a **warn-only**
   suspect-name highlighter (`findSuspectNames` — never auto-redacts, because
   *Newton* and a pupil named *Newton* are indistinguishable), and a
@@ -275,9 +279,9 @@ review before a non-technical admin can trigger it.
 2. ~~Redact pupil names from the additional-comments / strength-focus free-text
    before the OpenAI call (§6.3).~~ **Done 2026-07-28** — see §6.3. Extended
    2026-07-29 (§6.3.1): redaction moved client-side so the name is never
-   transmitted, plus the layered free-text mitigation. **Follow-up owed:** retire
-   the legacy name-present branch in `/generate-report` once the new client is
-   confirmed in real use.
+   transmitted, plus the layered free-text mitigation. ~~Follow-up: retire the
+   legacy name-present branch.~~ **Done 2026-07-30** — browser-verified, then
+   cut over; the server now refuses a transmitted name. This thread is closed.
 3. **Quick win:** fail-closed on insecure `SESSION_SECRET` in production (§6.5).
 4. Begin the route-file de-duplication with a shared `src/lib/text.js` (§6.1),
    then tackle the split following the domains listed in

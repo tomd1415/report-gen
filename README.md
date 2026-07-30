@@ -186,7 +186,8 @@ not a guarantee that names never reach the model.**
 What is actually enforced:
 - **The current pupil's name is removed automatically** (browser-side, as above).
   This part is reliable: it is an exact, case-insensitive, word-bounded match on
-  a name the app knows.
+  a name the app knows. The server refuses any request that carries a name at
+  all, so there is no code path left that can receive one.
 - **Any *other* pupil's name is not, and cannot be, removed automatically.** The
   app holds no roster of other pupils' names to match against — deliberately, on
   data-protection grounds — so it has nothing to compare the text to.

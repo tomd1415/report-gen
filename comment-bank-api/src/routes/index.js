@@ -58,28 +58,10 @@ const cleanAndLimit = (value, maxLength) => {
   }
   return cleaned.length > maxLength ? cleaned.slice(0, maxLength) : cleaned;
 };
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const PUPIL_NAME_PLACEHOLDER = 'PUPIL_NAME';
-// Route free-text fields through the same placeholder pass as report import so
-// a pupil's name can never reach the model verbatim. Redacts the full name and
-// each of its whitespace-separated parts (case-insensitively), longest first.
-const redactPupilName = (text, name) => {
-  const cleaned = cleanText(text);
-  const cleanedName = cleanText(name);
-  if (!cleaned || !cleanedName) {
-    return cleaned;
-  }
-  const targets = [...new Set([cleanedName, ...cleanedName.split(' ')])]
-    .map((part) => part.trim())
-    .filter((part) => part.length >= 2)
-    .sort((a, b) => b.length - a.length);
-  let result = cleaned;
-  targets.forEach((target) => {
-    const regex = new RegExp(`(^|[^\\w])${escapeRegex(target)}([^\\w]|$)`, 'gi');
-    result = result.replace(regex, (match, prefix, suffix) => `${prefix || ''}${PUPIL_NAME_PLACEHOLDER}${suffix || ''}`);
-  });
-  return result;
-};
+// Free-text redaction for /generate-report now lives in the browser
+// (public/report-selection.js), because the server deliberately never receives
+// the pupil's name and so has nothing to match against. See
+// docs/REDACTION-DECISIONS.md and docs/PROJECT_STATE.md §6.3.1.
 const parseWordLimit = (value) => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -1084,20 +1066,18 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const allowIrrelevant = overrideIrrelevant === true || overrideIrrelevant === 'true';
     const strengthFocusItems = Array.isArray(strengthFocus) ? strengthFocus : [];
 
-    // Two supported paths (migration stage — see docs/REDACTION-DECISIONS.md §3):
-    //  - name present (legacy): the server redacts free-text against it and
-    //    swaps the placeholder back before responding, exactly as before.
-    //  - name absent (current client): the browser has already redacted on the
-    //    way in and restores the placeholder itself on the way out, so the name
-    //    is never transmitted. The server returns paragraphs still containing
-    //    PUPIL_NAME.
-    const nameProvided = Boolean(safeName);
-
+    // The pupil's name is redacted in the browser and must never be transmitted
+    // (docs/REDACTION-DECISIONS.md §3 — the legacy name-present path was retired
+    // on 2026-07-30, once the name-free client was verified end to end). Reject
+    // rather than ignore: a stale client then fails loudly and gets fixed,
+    // instead of silently transmitting a name this server would quietly discard.
+    if (safeName) {
+      return res.status(400).json({
+        message: 'This server no longer accepts a pupil name. Please reload the page (Ctrl+F5) to get the current version.'
+      });
+    }
     if (!safePronouns) {
       return res.status(400).json({ message: 'Pronouns are required.' });
-    }
-    if (nameProvided && safeName.length > LIMITS.name) {
-      return res.status(400).json({ message: `Name must be ${LIMITS.name} characters or fewer.` });
     }
     if (safePronouns.length > LIMITS.pronouns) {
       return res.status(400).json({ message: `Pronouns must be ${LIMITS.pronouns} characters or fewer.` });
@@ -1180,12 +1160,14 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
           if (!item) {
             return null;
           }
+          // No server-side redaction pass: the browser redacts before sending
+          // and the server has no name to match against.
           if (typeof item === 'string') {
-            const topic = redactPupilName(cleanAndLimit(item, LIMITS.strengthFocusTopic), safeName);
+            const topic = cleanAndLimit(item, LIMITS.strengthFocusTopic);
             return topic ? { topic, level: 'strong' } : null;
           }
-          const topic = redactPupilName(cleanAndLimit(item.topic, LIMITS.strengthFocusTopic), safeName);
-          const level = redactPupilName(cleanAndLimit(item.level, LIMITS.strengthFocusLevel), safeName);
+          const topic = cleanAndLimit(item.topic, LIMITS.strengthFocusTopic);
+          const level = cleanAndLimit(item.level, LIMITS.strengthFocusLevel);
           if (!topic || !level) {
             return null;
           }
@@ -1204,8 +1186,8 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
       }
 
       if (cleanedAdditionalComments) {
-        const redactedAdditionalComments = redactPupilName(cleanedAdditionalComments, safeName);
-        prompt += `The following additional comments should be woven into the whole report: ${redactedAdditionalComments}\n`;
+        // Already redacted in the browser; see the note on strength focus above.
+        prompt += `The following additional comments should be woven into the whole report: ${cleanedAdditionalComments}\n`;
       }
 
       if (subjectDescription && selectedItems.length > 0 && !allowIrrelevant) {
@@ -1260,11 +1242,9 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         return res.status(502).json({ message: INCOMPLETE_REPORT_MESSAGE });
       }
 
-      // On the name-free path there is nothing to swap back — the browser holds
-      // the name and restores the placeholder itself.
-      const finalParagraphs = nameProvided
-        ? paragraphs.map((paragraph) => paragraph.replace(new RegExp(placeholder, 'g'), safeName))
-        : paragraphs;
+      // Nothing to swap back: the server never sees the name, so paragraphs are
+      // returned with PUPIL_NAME intact and the browser restores it.
+      const finalParagraphs = paragraphs;
       const report = finalParagraphs.join('\n\n');
 
       res.json({ report, paragraphs: finalParagraphs });

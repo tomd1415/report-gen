@@ -225,21 +225,30 @@ plan was implemented.
 - Per **2(A)** nothing is written to the database; the signature is in-memory
   only and is cleared after a successful report.
 
-**Server (`comment-bank-api/src/routes/index.js`)**
-- Per **3(A)** `POST /generate-report` now accepts both paths. `pronouns`
-  remains required; `name` is now optional. With a name it behaves exactly as
-  before (redact, swap back). Without one it returns paragraphs still containing
-  `PUPIL_NAME` for the browser to restore.
-- One existing test changed meaning and was updated: `rejects missing name or
-  pronouns` became `rejects missing pronouns`, plus a new test covering the
-  name-free path. (The §3 analysis anticipated *all* existing tests passing
-  untouched; that was not quite right — a test asserting the old rejection had
-  to change, because 3(A) deliberately changes that contract.)
+**Server (`comment-bank-api/src/routes/index.js`)** — migration completed
+- Stage 1 (3(A), 2026-07-29): the route accepted both a name-present and a
+  name-free request, so the change landed without breaking stale clients.
+- Stage 2 (the follow-up 3(A) left open, **done 2026-07-30** once the name-free
+  client was verified end to end in a real browser): the legacy path is retired.
+  The route now **rejects** any request carrying a name with a 400 and
+  "reload the page", rather than ignoring it — a stale client then fails loudly
+  and gets fixed, instead of quietly transmitting a name the server discards.
+  The server-side `redactPupilName` helper is gone; with no name to match
+  against it could do nothing, and redaction now lives solely in the browser.
 
-**Retiring the legacy path** is the deliberate follow-up 3(A) leaves open: once
-the name-free client is confirmed working in real use, remove the name-present
-branch and its swap-back. Until then the server *can* still accept a name, which
-is acceptable precisely because the shipped client never sends one.
+This is effectively option **(B)** arrived at safely, exactly as 3(A) intended:
+one code path, no lingering branch that can receive a name.
+
+**What the migration actually cost**, recorded because the §3 analysis
+under-predicted it: 3(A) claimed existing server tests would pass untouched.
+They did not. Stage 1 broke one test (`rejects missing name or pronouns`, which
+asserted the contract being changed). Stage 2 broke twelve more, because nearly
+every `/generate-report` test sent `name: 'Alex'` — the "bigger, all-at-once
+edit with a larger blast radius" that §3 attributed to option (B) turned up in
+stage 2 regardless. Splitting the change into two stages made it *safer to
+land*, not *smaller overall*. The two server-side redaction tests were replaced
+by one asserting a transmitted name is refused, and one asserting
+browser-redacted free text reaches both prompts unchanged.
 
 **Not done, deliberately:** decision 2(B)'s stored metadata row. It remains a
 separate decision to take alongside the unresolved ImportJobs audit-table

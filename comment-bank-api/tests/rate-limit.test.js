@@ -67,8 +67,9 @@ describe('rate limiting', () => {
     const { app, restoreEnv } = await buildApp({ max: 2, windowMs: 60000 });
 
     try {
+      // No name: the browser redacts it and the server rejects any request
+      // that transmits one.
       const payload = {
-        name: 'Alex',
         pronouns: 'they/them',
         subjectId: 1,
         yearGroupId: 2
