@@ -1,5 +1,17 @@
 import { expect, test } from '@playwright/test';
 
+const OFF_ORIGIN = /^https?:\/\/(?!127\.0\.0\.1[:/]|localhost[:/])/;
+
+// Pages must load entirely from their own origin: a filtered school network
+// blocks CDNs, and a third-party request leaks referrer and IP. Anything listed
+// here is a KNOWN outstanding violation, not an approved exception — the goal is
+// an empty list. Never add to it to make a test pass; vendor the asset instead.
+const KNOWN_OFF_ORIGIN_VIOLATIONS = [
+  // styles.css line 1 imports Manrope and Space Grotesk from Google Fonts.
+  // Fixing it needs the font files vendored, which needs network access.
+  'https://fonts.googleapis.com/'
+];
+
 const subjects = [{ id: 1, name: 'Mathematics' }];
 const yearGroups = [{ id: 1, name: 'Year 7' }];
 const staffUsers = [
@@ -70,11 +82,12 @@ const mockApis = async (page, {
   isAdmin = false,
   username = 'teacher'
 } = {}) => {
-  // footer.html embeds Creative Commons licence icons from an external host.
-  // This sandbox cannot reach it, so those requests hang, the page 'load' event
-  // never fires and every page.goto times out. Abort off-origin requests so the
-  // tests exercise the app rather than the network.
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, (route) => route.abort());
+  // Abort off-origin requests. On a network that cannot reach the remote host
+  // they hang, the page 'load' event never fires and every page.goto times out
+  // — which is the normal case on a filtered school network. Aborting keeps the
+  // tests exercising the app rather than the network; the dedicated test below
+  // is what stops a new external asset slipping in behind this.
+  await page.route(OFF_ORIGIN, (route) => route.abort());
 
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -325,6 +338,41 @@ test('free-text preview can be cancelled, and is skipped when there is no free t
   await page.getByRole('button', { name: 'Generate Report' }).click();
   await expect(page.locator('#generate-status')).toContainText('Report generated');
   expect(requestCount).toBe(1);
+});
+
+test('no page loads an asset from another origin', async ({ page }) => {
+  const unexpected = new Set();
+  page.on('request', (request) => {
+    const url = request.url();
+    if (!OFF_ORIGIN.test(url)) {
+      return;
+    }
+    if (KNOWN_OFF_ORIGIN_VIOLATIONS.some((prefix) => url.startsWith(prefix))) {
+      return;
+    }
+    unexpected.add(url);
+  });
+
+  await mockApis(page);
+
+  const pages = [
+    '/index.html',
+    '/login.html',
+    '/register.html',
+    '/settings.html',
+    '/adminpage.html',
+    '/admin-login.html',
+    '/import_reports.html',
+    '/manage_categories_comments.html',
+    '/manage_export_import.html',
+    '/manage_subjects_years.html',
+    '/footer.html'
+  ];
+  for (const path of pages) {
+    await page.goto(path);
+  }
+
+  expect([...unexpected]).toEqual([]);
 });
 
 test('Generate Report shows an empty state when no comment bank exists', async ({ page }) => {
