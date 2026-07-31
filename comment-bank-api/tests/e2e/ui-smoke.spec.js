@@ -5,12 +5,9 @@ const OFF_ORIGIN = /^https?:\/\/(?!127\.0\.0\.1[:/]|localhost[:/])/;
 // Pages must load entirely from their own origin: a filtered school network
 // blocks CDNs, and a third-party request leaks referrer and IP. Anything listed
 // here is a KNOWN outstanding violation, not an approved exception — the goal is
-// an empty list. Never add to it to make a test pass; vendor the asset instead.
-const KNOWN_OFF_ORIGIN_VIOLATIONS = [
-  // styles.css line 1 imports Manrope and Space Grotesk from Google Fonts.
-  // Fixing it needs the font files vendored, which needs network access.
-  'https://fonts.googleapis.com/'
-];
+// an empty list, and it is currently empty. Never add to it to make a test
+// pass; vendor the asset instead.
+const KNOWN_OFF_ORIGIN_VIOLATIONS = [];
 
 const subjects = [{ id: 1, name: 'Mathematics' }];
 const yearGroups = [{ id: 1, name: 'Year 7' }];
@@ -369,7 +366,17 @@ test('no page loads an asset from another origin', async ({ page }) => {
     '/footer.html'
   ];
   for (const path of pages) {
-    await page.goto(path);
+    await page.goto(path).catch((error) => {
+      // The login pages redirect as soon as the mocked session reports it is
+      // authenticated, which aborts the in-flight navigation. Harmless here:
+      // this test cares which origins were requested, not that the navigation
+      // settled, and the requests are recorded either way.
+      if (!/ERR_ABORTED/.test(error.message)) {
+        throw error;
+      }
+    });
+    // Let any late asset request (image, font, stylesheet) be recorded.
+    await page.waitForTimeout(150);
   }
 
   expect([...unexpected]).toEqual([]);

@@ -1,4 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+/* No webfont import — deliberate, do not add one back.
+   This stylesheet previously pulled Manrope and Space Grotesk from Google
+   Fonts. An unreachable font host blocks the page's `load` event, so on a
+   filtered school network every page appeared to stall; it also leaked
+   referrer and IP to a third party from every page view. The families are
+   still named in the stacks below, so they are used if a device happens to
+   have them installed locally, and otherwise fall back.
+   If you want the original typography back, vendor the font files into this
+   repo and add a local @font-face block — do not re-add a remote import.
+   See public/icons/README.md and docs/PROJECT_STATE.md §6.8. */
 
 /* Theme tokens */
 :root {

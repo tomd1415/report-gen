@@ -270,6 +270,35 @@ review before a non-technical admin can trigger it.
 - **No prompt/category versioning** — edits overwrite; can't see what prompt
   produced a given bank (backlog item).
 
+### 6.8 No external assets — enforced (closed 2026-07-31)
+Every asset now loads from the app's own origin. This is a hard rule, not a
+preference: the target devices sit on a filtered school network, and an
+unreachable asset host does not degrade gracefully — **it blocks the page's
+`load` event, so the page appears to stall**. A third-party request from a
+school page also leaks referrer and IP to a company with no relationship to the
+school.
+
+Two violations existed and both are fixed:
+- **Creative Commons licence icons** in `footer.html`, loaded from
+  `mirrors.creativecommons.org`. Now served from `public/icons/`. Note those
+  SVGs are hand-drawn approximations, not the official artwork — see
+  `public/icons/README.md` before assuming otherwise.
+- **Google Fonts import** at the top of `styles.css` (Manrope + Space Grotesk).
+  Removed 2026-07-31. Typography now falls back to `'Noto Sans', sans-serif`;
+  the family names remain in the stacks so a device that has them installed
+  locally still uses them. **This was a deliberate, accepted visual change.** To
+  restore the original typography, vendor the font files into the repo and add a
+  local `@font-face` block — do not re-add a remote import.
+
+Measured effect: with both fixed, `index.html` fires `load` in ~144 ms with zero
+off-origin requests. Before the fonts fix it timed out at 25 s on a host that
+could not reach `fonts.googleapis.com`.
+
+**Guard:** `tests/e2e/ui-smoke.spec.js` → *"no page loads an asset from another
+origin"* visits all eleven pages and fails on any off-origin request. Its
+`KNOWN_OFF_ORIGIN_VIOLATIONS` list is currently empty and should stay that way;
+it is a list of outstanding bugs, not approved exceptions.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)
