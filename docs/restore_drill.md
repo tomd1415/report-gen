@@ -53,7 +53,23 @@ gunzip -c /path/to/comment_bank_backup.sql.gz | mysql -u reportgen_restore -p co
 ## 3. Point A Test App At The Restored Database
 
 Copy the existing `.env` to a temporary test version and change only the values
-needed for the restore test:
+needed for the restore test.
+
+> **Stop and read this first.** `.env.restore-test` is a **full copy of your
+> production secrets** — database password, `SESSION_SECRET`, and your
+> `OPENAI_API_KEY`. As of 2026-08-06 `.gitignore` covers `.env` but **not**
+> `.env.*`, so this file shows up as untracked in `git status` and a
+> `git add -A` on the live server would commit your API key. Exclude it locally
+> **before** you create it:
+>
+> ```bash
+> cd /path/to/report-gen
+> printf 'comment-bank-api/.env.restore-test\n' >> .git/info/exclude
+> ```
+>
+> `.git/info/exclude` is local to that checkout and is not itself a repo change.
+> Delete the file at the end of the drill (§7) rather than leaving it on the
+> server.
 
 ```bash
 cd /path/to/report-gen/comment-bank-api
@@ -112,7 +128,19 @@ SELECT COUNT(*) FROM Categories;
 SELECT COUNT(*) FROM Comments;
 SELECT COUNT(*) FROM Prompts;
 SELECT COUNT(*) FROM SubjectContexts;
+SELECT COUNT(*) FROM UserSubjects;
+SELECT COUNT(*) FROM UserYearGroups;
 ```
+
+`UserSubjects` and `UserYearGroups` were added to this list on 2026-08-06; the
+drill had been checking the seven content tables and not these two. They are the
+join tables recording **which subjects and year groups each staff member has
+selected**, and they fail quietly: restore them empty and every teacher logs in
+to a Settings page with nothing chosen and a Generate Report page that lists no
+subjects. Nothing errors, and the seven counts above all look healthy. §6's
+"Settings shows the expected subjects and year groups" would catch it, but only
+if the drill is run by hand and only for the one account tested — which is
+exactly the step people skip when the counts already look right.
 
 Record the counts here:
 
@@ -123,6 +151,8 @@ Record the counts here:
 - Comments:
 - Prompts:
 - SubjectContexts:
+- UserSubjects:
+- UserYearGroups:
 
 ## 6. Browser Smoke Test
 
@@ -139,6 +169,13 @@ Open `http://localhost:44345` and check:
 ## 7. Finish And Clean Up
 
 Stop the test app with `Ctrl+C`.
+
+Delete the secrets copy — it is a live `OPENAI_API_KEY` and `SESSION_SECRET`
+sitting on disk:
+
+```bash
+rm -f /path/to/report-gen/comment-bank-api/.env.restore-test
+```
 
 If the drill is complete and the test database is no longer needed:
 

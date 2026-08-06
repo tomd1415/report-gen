@@ -16,6 +16,27 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Security and Authorization
 
+- `2026-08-06`: **Four `/api/categories` routes have no auth guard** —
+  `POST /api/categories` and `GET`/`PUT`/`DELETE /api/categories/:id`. The
+  `app.use(prefix, isAuthenticated)` block in `src/routes/index.js` (~line 465)
+  covers `/api/comments` and `/api/categories-comments` but not
+  `/api/categories`. Logged-out requests get 500, not 401. Not a breach today
+  (the handlers throw on `req.session.user.id` before any query) but one
+  careless edit from being a silent unauthenticated write. One-line fix and a
+  gate test are described in `docs/PROJECT_STATE.md` §6.9 and
+  `docs/NEXT-MILESTONE.md` step 0.
+- `2026-08-06`: **`.gitignore` covers `.env` but not `.env.*`**, while
+  `docs/restore_drill.md` §3 instructs the operator to create
+  `.env.restore-test` as a full copy of production secrets. On the live server
+  that file is untracked-but-visible, so a `git add -A` commits the
+  `OPENAI_API_KEY`. The drill now warns and cleans up; the `.gitignore` fix is
+  in the working tree, uncommitted (it was found in a docs-only session).
+- `2026-08-06`: **40 Dependabot advisories** on the default branch (1 critical,
+  16 high, 21 moderate, 2 low), reported by GitHub on push. This supersedes the
+  2026-04-17 note below about a single moderate `umzug`/`@rushstack`/`ajv`
+  advisory. Needs triage of what is actually reachable from this app's code
+  paths before any upgrade — the advice below about avoiding broad
+  `npm audit fix` on the live branch still stands.
 - `2026-04-17`: Consider consolidating duplicate admin routes under one
   namespace. The code currently has both `/api/admin/*` and non-admin-looking
   admin-protected routes such as `/api/users`, `/api/subjects`, and
@@ -34,6 +55,13 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   broad `npm audit fix` changes on the live branch without a separate test pass.
 
 ## Reliability and Data Safety
+
+- `2026-08-06`: The restore drill was verifying seven content tables but **not**
+  `UserSubjects` / `UserYearGroups`. Those hold each staff member's selected
+  subjects and year groups, and they fail quietly — restore them empty and every
+  teacher sees a blank Settings page while all seven counts look healthy. Added
+  to `docs/restore_drill.md` §5. Worth a general look for other
+  restore-them-empty-and-nothing-errors tables as the schema grows.
 
 - `2026-04-17`: Extend the shared request timeout helper across the remaining
   lower-risk browser fetches when page scripts are moved into dedicated modules.
@@ -61,6 +89,19 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Testing
 
+- `2026-08-06`: Playwright now runs here and covers nine journeys (ready-check
+  through to a generated report, form retention on an incomplete report, both
+  free-text preview paths, the off-origin asset guard, the empty-state, Manage
+  Comments, import validation, admin staff workflow). The 2026-04-17 note below
+  is therefore partly done: **login, settings persistence and admin user
+  management are still the gaps.** Settings persistence is the one worth doing
+  first — see the untested-behaviour note in `docs/LESSONS-LEARNT.md` §3 about
+  guards and lists drifting apart.
+- `2026-08-06`: The e2e login-page navigation race produces *two different*
+  Playwright error strings depending on timing (`net::ERR_ABORTED` and
+  `interrupted by another navigation`). Any new test that navigates to
+  `login.html` or `admin-login.html` under `mockApis` needs to tolerate both, or
+  it will pass locally and fail on a loaded machine.
 - `2026-04-17`: Add a small integration-style test around staff settings:
   selecting subjects/year groups, then confirming dropdown options use those
   settings.

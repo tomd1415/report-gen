@@ -53,6 +53,16 @@ instead of the currently logged-in admin user.
 
 ## API Surface
 
+> **Verified 2026-08-06** by enumerating the live Express router and diffing it
+> against this list. All 68 registered endpoints are now accounted for, and
+> **nothing listed here is missing from the code** — there are no phantom
+> endpoints. The eight `/api/admin/staff/*` routes had been absent from this
+> section and were added; the `/api/admin/*` legacy duplicates are now named
+> rather than summarised.
+>
+> To re-run the check, walk `app.router.stack` after `registerRoutes` and compare
+> — the method is the same one `tests/route-auth-matrix.test.js` uses.
+
 ### Auth/session
 
 - `GET /api/health`
@@ -74,7 +84,36 @@ instead of the currently logged-in admin user.
 - `PUT /api/admin/user/:username/password`
 - `GET /api/export-database`
 - `POST /api/backup-database`
-- Duplicate legacy admin routes also exist under `/api/admin/*`.
+Duplicate legacy admin routes also exist under `/api/admin/*`, keyed by **name**
+rather than id. See `docs/PROJECT_STATE.md` §6.2 — picking a canonical family is
+an open item.
+
+- `POST /api/admin/subject`
+- `DELETE /api/admin/subject/:name`
+- `POST /api/admin/year-group`
+- `DELETE /api/admin/year-group/:name`
+- `POST /api/admin/user`
+- `DELETE /api/admin/user/:username`
+- `GET /api/admin/export`
+- `POST /api/admin/backup`
+
+### Admin acting on another staff user's data
+
+These are **not** duplicates of anything above; they are the Staff Comment Banks
+feature, and they are the most privileged surface in the app — an admin reading
+and writing a different user's comment bank. All are guarded by
+`app.use('/api/admin/staff', isAuthenticated, isAdmin)`, and each handler
+additionally resolves `:userId` through `findTargetUser` and 404s on an unknown
+target.
+
+- `GET /api/admin/staff/:userId/comment-bank`
+- `POST /api/admin/staff/:userId/import-reports` (rate limited)
+- `GET /api/admin/staff/:userId/export-categories-comments`
+- `POST /api/admin/staff/:userId/import-categories-comments`
+- `GET /api/admin/staff/:userId/subject-context`
+- `POST /api/admin/staff/:userId/subject-context`
+- `GET /api/admin/staff/:userId/prompts/:subjectId/:yearGroupId`
+- `POST /api/admin/staff/:userId/prompts`
 
 ### Subjects/year groups
 
