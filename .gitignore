@@ -2,6 +2,13 @@ comment-bank-api/uploads/
 dbbackup/
 .env
 comment-bank-api/.env
+# Any .env variant is a secrets file (docs/restore_drill.md creates
+# .env.restore-test as a full copy of production secrets). Ignore them all, then
+# re-admit the placeholder template.
+.env.*
+comment-bank-api/.env.*
+!.env.example
+!comment-bank-api/.env.example
 comment-bank-api/*.pem
 comment-bank-api/cookies.*
 

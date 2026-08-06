@@ -371,7 +371,21 @@ test('no page loads an asset from another origin', async ({ page }) => {
       // authenticated, which aborts the in-flight navigation. Harmless here:
       // this test cares which origins were requested, not that the navigation
       // settled, and the requests are recorded either way.
-      if (!/ERR_ABORTED/.test(error.message)) {
+      //
+      // The same race surfaces as *two different* messages depending on how far
+      // the navigation got before the redirect won — 'net::ERR_ABORTED' from the
+      // network layer, or 'interrupted by another navigation' from the
+      // navigation layer. Which one you see is timing-dependent, so on a loaded
+      // machine the second appears and the first does not. Tolerating only one
+      // of them made this test fail intermittently (seen 2026-08-06 at load
+      // average ~31 on 4 cores).
+      //
+      // Neither tolerance weakens the guard: the `page.on('request')` listener
+      // above has already recorded every request that was issued, whether or
+      // not the navigation itself resolved.
+      const isRedirectRace = /ERR_ABORTED/.test(error.message)
+        || /interrupted by another navigation/.test(error.message);
+      if (!isRedirectRace) {
         throw error;
       }
     });
