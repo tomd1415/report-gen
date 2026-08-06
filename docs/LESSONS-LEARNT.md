@@ -71,6 +71,17 @@ directions where the gate has two:
 The second direction is the one usually skipped, and it is the one that decides
 whether the list is a bug list or an excuse list.
 
+**But the exactness rule is stakes-dependent, and applying it everywhere gets the
+gate switched off.** An *exact* known-failures list is right for a
+security-shaped invariant, where every entry is a live hole and someone must
+notice when one closes. It is too strict for something like docs↔endpoints, where
+a stale README line would start failing builds for a cosmetic reason — and a gate
+that fails for cosmetic reasons gets disabled within a fortnight, taking the real
+coverage with it. Match the strictness to what a false alarm costs: exact for
+security, "no new entries" for documentation. (This distinction came from the
+devil's advocate review on 2026-08-06; the original write-up taught one rule for
+both and would have taught one of them wrongly.)
+
 **Applied again 2026-08-06** to `tests/route-auth-matrix.test.js`: removing
 `app.use('/api/comments', isAuthenticated)` turned it red naming all five
 affected routes; adding the missing `/api/categories` guard turned the
@@ -105,6 +116,22 @@ believing they match.
 
 **What would have told us sooner:** 40 lines that walk `app.router.stack` and
 assert every route rejects a logged-out request. Now `tests/route-auth-matrix.test.js`.
+
+**The follow-on lesson, which is the sharper one.** The first write-up of this
+finding said the routes were "safe by accident of line ordering" and stopped
+there. That sentence is only true for a *logged-out* request. A logged-in user
+has `req.session.user.id`, so the throw never happens — and if any of those four
+had taken its scoping id from the request rather than the session, the missing
+guard would have been one teacher reading another's data, not a wrong status
+code. Same missing guard, two completely different severities, and the summary
+sentence hid the difference.
+
+They were checked and all four scope by the session, so there is no disclosure
+here. The lesson is not about the outcome: **when you explain why a bug is
+harmless, name the case your explanation covers, then check the other one.** A
+reassuring sentence is where an investigation stops, so it needs to be the most
+carefully bounded thing in the write-up. This one was found by asking for an
+outside review rather than by any test.
 
 ---
 

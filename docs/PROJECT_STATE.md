@@ -433,6 +433,18 @@ unauthenticated write — anything that makes the `userId` lookup tolerant
 converts a crash into a silent success. It is exactly the shape that looks fine
 in review because the *reason* it is safe is an accident of line ordering.
 
+**Checked, because "safe by accident of line ordering" only covers the
+logged-OUT case.** A *logged-in* user has `req.session.user.id`, so the throw
+never happens and the ordering argument gives no protection at all. If any of the
+four took its scoping id from the request — params, query or body — the missing
+guard would be a disclosure between teachers, not a wrong status code. All four
+were checked: each reads `req.session.user.id`, and the three `:id` routes go
+through `findOwnedCategory`, which filters `where: { id, userId }`. **There is no
+IDOR here.** Four tests in `tests/ownership.test.js` now assert this directly,
+including that a `userId` supplied in the body or query is ignored. (Prompted by
+the devil's advocate review, `.mc-critique.md`, 2026-08-06 — the distinction was
+not one this write-up had drawn.)
+
 **Fix (one line, not applied — this was an unattended session):** add
 `app.use('/api/categories', isAuthenticated);` alongside the existing guards.
 `/api/categories-comments` keeps its own entry; an `app.use('/api/categories')`
