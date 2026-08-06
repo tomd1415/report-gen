@@ -20,7 +20,6 @@ const LIMITS = {
   commentText: 300,
   selectedComment: 1000,
   categoryName: 120,
-  pupilNames: 2000,
   reports: 60000,
   maxSelectedComments: 8,
   maxCategories: 50,
@@ -1255,7 +1254,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
   });
 
   app.post('/api/import-reports', async (req, res) => {
-    const { subjectId, yearGroupId, pupilNames, reports } = req.body;
+    const { subjectId, yearGroupId, reports } = req.body;
     const userId = req.session.user.id;
 
     try {
@@ -1276,7 +1275,6 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         actorUserId: userId,
         subjectId,
         yearGroupId,
-        pupilNames,
         reports,
         mode: 'merge',
         subjectDescription
@@ -1380,7 +1378,6 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const {
       subjectId,
       yearGroupId,
-      pupilNames,
       reports,
       mode = 'merge',
       confirmReplace
@@ -1414,7 +1411,6 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         actorUserId: req.session.user.id,
         subjectId,
         yearGroupId,
-        pupilNames,
         reports,
         mode: normalizedMode,
         subjectDescription

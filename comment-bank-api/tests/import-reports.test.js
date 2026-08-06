@@ -53,16 +53,47 @@ describe('import-reports', () => {
     app = createTestApp({ models, openai });
   });
 
-  it('replaces pupil names with placeholder in import prompt', async () => {
+  // The pupil-name list was REMOVED on 2026-08-06 (owner decision). Teachers are
+  // told on the import page not to paste names; the app holds no roster, so there
+  // is nothing to redact against and the pasted text is sent as-is.
+  //
+  // These tests pin that contract in both directions: the payload no longer
+  // carries names, and nothing silently mangles the reports on the way through.
+  const promptFor = () => openai.responses.parse.mock.calls[0][0].input[0].content;
+
+  const importReports = async ({ reports }) => {
     openai.responses.parse.mockResolvedValue({
-      output_parsed: {
-        categories: [
-          {
-            name: 'Strengths / achievements',
-            comments: ['Works hard']
-          }
-        ]
-      }
+      output_parsed: { categories: [{ name: 'Effort / motivation / attendance', comments: ['Works hard'] }] }
+    });
+    models.Category.findAll.mockResolvedValue([]);
+    models.Category.create.mockResolvedValue({ id: 10 });
+    models.Comment.create.mockResolvedValue({});
+    const response = await request(app)
+      .post('/api/import-reports')
+      .send({ subjectId: 1, yearGroupId: 2, reports });
+    expect(response.status).toBe(200);
+    return promptFor();
+  };
+
+  it('sends the pasted reports through unmodified', async () => {
+    // No redaction pass means no corruption either: text a teacher pastes must
+    // reach the prompt exactly as typed, so what they proof-read is what is sent.
+    const reports = 'Confident with fractions. Will improve next term. 3D modelling covered.';
+    expect(await importReports({ reports })).toContain(reports);
+  });
+
+  it('preserves a PUPIL_NAME placeholder a teacher typed themselves', async () => {
+    // The guidance tells teachers to write PUPIL_NAME in place of a name, so the
+    // placeholder must survive to the prompt.
+    expect(await importReports({ reports: 'PUPIL_NAME has worked hard.' }))
+      .toContain('PUPIL_NAME has worked hard.');
+  });
+
+  it('ignores a pupilNames field if a stale client still sends one', async () => {
+    // The field is gone from both import pages, but a cached page could still
+    // post it. It must be dropped, not stored, and not echoed into the prompt.
+    openai.responses.parse.mockResolvedValue({
+      output_parsed: { categories: [{ name: 'Effort / motivation / attendance', comments: ['Works hard'] }] }
     });
     models.Category.findAll.mockResolvedValue([]);
     models.Category.create.mockResolvedValue({ id: 10 });
@@ -70,18 +101,31 @@ describe('import-reports', () => {
 
     const response = await request(app)
       .post('/api/import-reports')
-      .send({
-        subjectId: 1,
-        yearGroupId: 2,
-        pupilNames: 'A.B., Jane*',
-        reports: 'A.B. is a joy. Jane* works hard in class.'
-      });
+      .send({ subjectId: 1, yearGroupId: 2, reports: 'Worked hard.', pupilNames: 'Alex, Sam' });
 
     expect(response.status).toBe(200);
-    const prompt = openai.responses.parse.mock.calls[0][0].input[0].content;
-    expect(prompt).toContain('PUPIL_NAME');
-    expect(prompt).not.toContain('A.B.');
-    expect(prompt).not.toContain('Jane*');
+    const prompt = promptFor();
+    expect(prompt).not.toContain('Alex');
+    expect(prompt).not.toContain('Sam');
+  });
+
+  it('returns 502 and leaves the bank alone when the AI returns nothing usable', async () => {
+    // The service throws ReportImportEmptyResultError; this asserts the route
+    // actually surfaces it as a 502 with a message a teacher can act on, rather
+    // than collapsing it into a generic 500.
+    models.Category.findAll.mockResolvedValue([]);
+    openai.responses.parse
+      .mockResolvedValueOnce({ output_parsed: { categories: [] } })
+      .mockResolvedValueOnce({ output_parsed: { flagged: [] } });
+
+    const response = await request(app)
+      .post('/api/import-reports')
+      .send({ subjectId: 1, yearGroupId: 2, reports: 'Nothing useful here.' });
+
+    expect(response.status).toBe(502);
+    expect(response.body.message).toMatch(/comment bank is unchanged/i);
+    expect(models.Category.destroy).not.toHaveBeenCalled();
+    expect(models.Comment.create).not.toHaveBeenCalled();
   });
 
   it('rejects overly long report imports', async () => {
@@ -90,7 +134,6 @@ describe('import-reports', () => {
       .send({
         subjectId: 1,
         yearGroupId: 2,
-        pupilNames: 'Alex',
         reports: 'a'.repeat(60001)
       });
 
@@ -139,7 +182,6 @@ describe('import-reports', () => {
       .send({
         subjectId: 1,
         yearGroupId: 2,
-        pupilNames: 'Alex',
         reports: 'Alex is confident in fractions. Alex models 3D shapes.'
       });
 

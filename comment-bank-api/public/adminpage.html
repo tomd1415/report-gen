@@ -110,14 +110,20 @@
                 </div>
                 <div id="staff-bank-context-summary" class="context-summary" hidden></div>
 
-                <label for="staff-bank-pupil-names">Pupil names to redact (comma separated):</label>
-                <input type="text" id="staff-bank-pupil-names" maxlength="2000" placeholder="Enter pupil names separated by commas">
+                <p class="privacy-guidance" id="staff-bank-privacy-guidance">
+                    <strong>Do not paste pupils' names.</strong> Remove or replace them before
+                    pasting &mdash; write <code>PUPIL_NAME</code> in their place if you need a
+                    placeholder. Everything pasted here is sent to the AI service and the
+                    resulting comments are stored in the staff member's comment bank, so a name
+                    pasted here can be re-sent every time they generate a report. The app
+                    deliberately keeps no list of pupils' names, so it cannot remove them for you.
+                </p>
 
                 <label for="staff-bank-report-file">Optional plain text report file:</label>
                 <input type="file" id="staff-bank-report-file" accept=".txt,text/plain" onchange="loadStaffReportFile()">
 
                 <label for="staff-bank-reports">Previous reports:</label>
-                <textarea id="staff-bank-reports" rows="10" maxlength="60000" placeholder="Paste previous reports here"></textarea>
+                <textarea id="staff-bank-reports" rows="10" maxlength="60000" aria-describedby="staff-bank-privacy-guidance" placeholder="Paste previous reports here, with pupils' names removed"></textarea>
 
                 <label for="staff-bank-import-mode">Import mode:</label>
                 <select id="staff-bank-import-mode" onchange="toggleStaffReplaceConfirm()">
@@ -593,13 +599,12 @@
 
         async function importStaffReports() {
             const { userId, subjectId, yearGroupId } = getStaffBankSelection();
-            const pupilNames = document.getElementById('staff-bank-pupil-names').value;
             const reports = document.getElementById('staff-bank-reports').value;
             const mode = document.getElementById('staff-bank-import-mode').value;
             const confirmReplace = document.getElementById('staff-bank-confirm-replace').checked;
 
-            if (!userId || !subjectId || !yearGroupId || !pupilNames || !reports) {
-                setStaffBankResult('Please select staff, subject, year group, pupil names, and reports.', 'warning');
+            if (!userId || !subjectId || !yearGroupId || !reports) {
+                setStaffBankResult('Please select staff, subject, year group, and paste the reports.', 'warning');
                 return;
             }
 
@@ -624,7 +629,6 @@
                     body: JSON.stringify({
                         subjectId,
                         yearGroupId,
-                        pupilNames,
                         reports,
                         mode,
                         confirmReplace

@@ -1,6 +1,4 @@
 const LIMITS = {
-  name: 80,
-  pupilNames: 2000,
   reports: 60000
 };
 
@@ -8,7 +6,9 @@ export const TARGET_PLACEHOLDER_COMMENT = '***Generate a target for this pupil a
 const TARGET_PLACEHOLDER_PATTERN = /generate a target for this pupil/i;
 
 const cleanText = (text) => (text ? String(text).replace(/\s+/g, ' ').trim() : '');
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// escapeRegex was removed on 2026-08-06 with replacePupilNames — it had no other
+// caller. docs/NEXT-MILESTONE.md step 2 lists it as one to move into
+// src/lib/text.js; it no longer exists anywhere and that line is now moot.
 const isTargetPlaceholderComment = (value) => TARGET_PLACEHOLDER_PATTERN.test(String(value || ''));
 
 const normalizeKey = (category, comment) =>
@@ -21,6 +21,22 @@ export class ReportImportValidationError extends Error {
     this.statusCode = statusCode;
   }
 }
+
+// Thrown when the pipeline ends up with nothing to store. It extends the
+// validation error so existing route handlers map it to its statusCode without
+// change, but it is 502 rather than 400: the request was fine, the model's
+// answer was not.
+export class ReportImportEmptyResultError extends ReportImportValidationError {
+  constructor(message) {
+    super(message, 502);
+    this.name = 'ReportImportEmptyResultError';
+  }
+}
+
+export const EMPTY_IMPORT_MESSAGE =
+  'The AI returned nothing usable from these reports, so nothing was imported. '
+  + 'Your comment bank is unchanged. Please try again, or check that the pasted '
+  + 'reports contain the material you expected.';
 
 const categorySchema = {
   type: 'object',
@@ -150,25 +166,6 @@ Rules:
 Comments to review (category + comment):
 ${JSON.stringify(commentItems, null, 2)}
 `;
-
-const replacePupilNames = (reports, pupilNames) => {
-  const placeholder = 'PUPIL_NAME';
-  const namesArray = pupilNames
-    .split(',')
-    .map((name) => cleanText(name))
-    .filter((name) => name && name.length <= LIMITS.name);
-
-  let reportsWithPlaceholder = reports;
-  namesArray.forEach((name) => {
-    const escapedName = escapeRegex(name);
-    const regex = new RegExp(`(^|[^\\w])${escapedName}([^\\w]|$)`, 'g');
-    reportsWithPlaceholder = reportsWithPlaceholder.replace(regex, (match, prefix, suffix) => {
-      return `${prefix || ''}${placeholder}${suffix || ''}`;
-    });
-  });
-
-  return reportsWithPlaceholder;
-};
 
 const buildExtractionPrompt = ({ subjectDescription, reportsWithPlaceholder }) => `
 Please analyze the following school reports and extract relevant categories and comments that can be used to generate future student reports.
@@ -322,13 +319,11 @@ export async function importReportsToCommentBank({
   actorUserId,
   subjectId,
   yearGroupId,
-  pupilNames,
   reports,
   mode = 'merge',
   subjectDescription = ''
 }) {
   const { Category, Comment } = models;
-  const safePupilNames = typeof pupilNames === 'string' ? pupilNames.trim() : '';
   const safeReports = typeof reports === 'string' ? reports.trim() : '';
   const normalizedMode = mode === 'replace' ? 'replace' : 'merge';
 
@@ -344,14 +339,21 @@ export async function importReportsToCommentBank({
   if (!safeReports) {
     throw new ReportImportValidationError('Reports are required.');
   }
-  if (safePupilNames.length > LIMITS.pupilNames) {
-    throw new ReportImportValidationError(`Pupil names must be ${LIMITS.pupilNames} characters or fewer.`);
-  }
   if (safeReports.length > LIMITS.reports) {
     throw new ReportImportValidationError(`Reports must be ${LIMITS.reports} characters or fewer.`);
   }
 
-  const reportsWithPlaceholder = replacePupilNames(safeReports, safePupilNames);
+  // The pupil-name list was removed on 2026-08-06 (owner decision). Teachers are
+  // told on the import page not to paste names at all, and the app deliberately
+  // holds no roster to match against, so there is nothing to redact against here
+  // and the reports are sent as pasted.
+  //
+  // RESIDUAL RISK, stated plainly: this reduces the surface, it does not
+  // guarantee no name reaches the model. If a teacher pastes a report that still
+  // contains a name, that name goes to OpenAI and can end up in the stored
+  // comment bank. The control is the instruction on the page, not a mechanism.
+  // See docs/PROJECT_STATE.md §6.3.2.
+  const reportsWithPlaceholder = safeReports;
 
   const extractResponse = await openai.responses.parse({
     ...openAIParams,
@@ -435,6 +437,18 @@ export async function importReportsToCommentBank({
     });
     finalCategories = filteredMerged.categoryMap;
     filteredCount += filteredMerged.filteredCount;
+  }
+
+  // persistCategoryMap DELETES the existing bank before writing the new one, so
+  // an empty map here would destroy a term's comments and report success. Treat
+  // it as a failed import and leave the existing bank untouched. Owner decision,
+  // 2026-08-06; see docs/PROJECT_STATE.md §6.3.3. Three routes reach this:
+  // extraction returning nothing usable, the relevance filter flagging
+  // everything, and the merge call returning no categories.
+  const hasSomethingToStore = Object.values(finalCategories)
+    .some((comments) => Array.from(comments).length > 0);
+  if (!hasSomethingToStore) {
+    throw new ReportImportEmptyResultError(EMPTY_IMPORT_MESSAGE);
   }
 
   await persistCategoryMap({

@@ -55,6 +55,48 @@ describe('client-side redactPupilName', () => {
   });
 });
 
+describe('client-side redactPupilName — adjacent occurrences (regression, 2026-08-06)', () => {
+  // These all leaked before the fix. The trailing word boundary used to be a
+  // captured group, which /g consumes, so the delimiter that should have opened
+  // the *next* match had already been eaten. The symptom is the worst kind:
+  // redaction silently half-works and the output still looks redacted.
+  const leaks = (text, name) => {
+    const out = redactPupilName(text, name);
+    return name.split(' ').some((part) => new RegExp(`\\b${part}\\b`, 'i').test(out));
+  };
+
+  it('redacts a name repeated with a single space between', () => {
+    expect(redactPupilName('Alex Alex worked hard.', 'Alex'))
+      .toBe('PUPIL_NAME PUPIL_NAME worked hard.');
+  });
+
+  it('redacts three adjacent repeats, not just the first and last', () => {
+    expect(redactPupilName('Alex Alex Alex.', 'Alex'))
+      .toBe('PUPIL_NAME PUPIL_NAME PUPIL_NAME.');
+  });
+
+  it('redacts a name repeated across a hyphen', () => {
+    expect(redactPupilName('Alex-Alex', 'Alex')).toBe('PUPIL_NAME-PUPIL_NAME');
+  });
+
+  it('redacts a name repeated across a newline (collapsed to a space first)', () => {
+    expect(redactPupilName('Alex\nAlex', 'Alex')).toBe('PUPIL_NAME PUPIL_NAME');
+  });
+
+  it('leaks nothing for any adjacent-delimiter combination', () => {
+    for (const delimiter of [' ', '-', '\t', '\n', ',', '.', '/', '(', ')']) {
+      expect(leaks(`Alex${delimiter}Alex`, 'Alex')).toBe(false);
+    }
+  });
+
+  it('still leaves non-matching words alone', () => {
+    // The fix must not make the match greedier: 'Alexandra' is a different name
+    // and must not be partially redacted.
+    expect(redactPupilName('Alexandra and Alex are different.', 'Alex'))
+      .toBe('Alexandra and PUPIL_NAME are different.');
+  });
+});
+
 describe('restorePupilName', () => {
   it('swaps every placeholder back to the real name', () => {
     const redacted = `${PUPIL_NAME_PLACEHOLDER} has worked hard. ${PUPIL_NAME_PLACEHOLDER} should keep going.`;

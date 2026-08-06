@@ -100,8 +100,15 @@ export const redactPupilName = (text, name) => {
     .sort((a, b) => b.length - a.length);
   let result = cleaned;
   targets.forEach((target) => {
-    const regex = new RegExp(`(^|[^\\w])${escapeRegex(target)}([^\\w]|$)`, 'gi');
-    result = result.replace(regex, (match, prefix, suffix) => `${prefix || ''}${PUPIL_NAME_PLACEHOLDER}${suffix || ''}`);
+    // The trailing boundary is a LOOKAHEAD, not a captured group. A captured
+    // `([^\w]|$)` is consumed by the match, so with the /g flag the scan resumes
+    // *after* the delimiter and the next occurrence has no preceding boundary
+    // left to match against — "Alex Alex" redacted only the first one. A
+    // lookahead matches the boundary without consuming it, so the delimiter is
+    // still there to open the following match. (Found 2026-08-06; the same shape
+    // exists in replacePupilNames in src/services/reportImport.js.)
+    const regex = new RegExp(`(^|[^\\w])${escapeRegex(target)}(?=[^\\w]|$)`, 'gi');
+    result = result.replace(regex, (match, prefix) => `${prefix || ''}${PUPIL_NAME_PLACEHOLDER}`);
   });
   return result;
 };

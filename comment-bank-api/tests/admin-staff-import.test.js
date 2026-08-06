@@ -74,7 +74,6 @@ describe('admin staff report imports', () => {
       .send({
         subjectId: 3,
         yearGroupId: 4,
-        pupilNames: 'Alex',
         reports: 'Alex works independently in lessons.'
       });
 
@@ -102,7 +101,6 @@ describe('admin staff report imports', () => {
       .send({
         subjectId: 3,
         yearGroupId: 4,
-        pupilNames: 'Alex',
         reports: 'Alex works independently in lessons.'
       });
 
@@ -119,7 +117,6 @@ describe('admin staff report imports', () => {
       .send({
         subjectId: 3,
         yearGroupId: 4,
-        pupilNames: 'Alex',
         reports: 'Alex works independently in lessons.',
         mode: 'replace'
       });

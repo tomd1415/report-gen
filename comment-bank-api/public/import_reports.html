@@ -42,13 +42,16 @@
             <div id="import-context" class="context-summary" hidden></div>
 
             <div class="form-section">
-                <label for="pupil-names">Pupil Names (comma separated):</label>
-                <input type="text" id="pupil-names" placeholder="Enter pupil names separated by commas...">
-            </div>
-
-            <div class="form-section">
                 <label for="reports">Reports:</label>
-                <textarea id="reports" rows="10" placeholder="Paste the reports here..."></textarea>
+                <p class="privacy-guidance" id="reports-privacy-guidance">
+                    <strong>Do not paste pupils' names.</strong> Remove or replace them before
+                    pasting &mdash; write <code>PUPIL_NAME</code> in their place if you need a
+                    placeholder. Everything you paste here is sent to the AI service and the
+                    comments it produces are stored in your comment bank, so a name pasted here
+                    can be re-sent every time you generate a report. The app deliberately keeps
+                    no list of pupils' names, so it cannot remove them for you.
+                </p>
+                <textarea id="reports" rows="10" aria-describedby="reports-privacy-guidance" placeholder="Paste the reports here, with pupils' names removed..."></textarea>
             </div>
 
             <button class="button savePrompt" id="genReportButton" onclick="importReports()">Import Reports</button>
@@ -177,11 +180,11 @@
         }
 
         function clearImportValidation() {
-            ['subject-select', 'year-group-select', 'pupil-names', 'reports'].forEach(clearImportFieldState);
+            ['subject-select', 'year-group-select', 'reports'].forEach(clearImportFieldState);
         }
 
         function setupImportValidationListeners() {
-            ['pupil-names', 'reports'].forEach((id) => {
+            ['reports'].forEach((id) => {
                 document.getElementById(id)?.addEventListener('input', () => clearImportFieldState(id));
             });
         }
@@ -198,7 +201,6 @@
         async function importReports() {
             const subjectId = document.getElementById('subject-select').value;
             const yearGroupId = document.getElementById('year-group-select').value;
-            const pupilNames = document.getElementById('pupil-names').value;
             const reports = document.getElementById('reports').value;
             const genReportButton = document.getElementById('genReportButton');
 
@@ -211,11 +213,6 @@
             if (!yearGroupId) {
                 markImportFieldInvalid('year-group-select');
                 window.ReportGenUI?.showStatus('#result-container', 'Please choose a year group before importing reports.', { tone: 'warning' });
-                return;
-            }
-            if (!pupilNames.trim()) {
-                markImportFieldInvalid('pupil-names');
-                window.ReportGenUI?.showStatus('#result-container', 'Please add the pupil names to redact before importing reports.', { tone: 'warning' });
                 return;
             }
             if (!reports.trim()) {
@@ -236,7 +233,6 @@
                     body: JSON.stringify({
                         subjectId,
                         yearGroupId,
-                        pupilNames,
                         reports
                     })
                 }, 180000);

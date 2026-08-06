@@ -25,15 +25,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   careless edit from being a silent unauthenticated write. One-line fix and a
   gate test are described in `docs/PROJECT_STATE.md` §6.9 and
   `docs/NEXT-MILESTONE.md` step 0.
-- `2026-08-06`: **Pupil names can survive redaction on the import path.**
-  `replacePupilNames` (`src/services/reportImport.js`) is case-sensitive, so
-  `ALEX` is not matched by a supplied name of `Alex` — common in MIS exports with
-  all-caps headers — and the name then reaches OpenAI *and* the stored comment
-  bank. Adding `/i` is not obviously safe (a pupil called Will would corrupt
-  every "will" in the bank), so it is **awaiting a decision** — see
-  `docs/PROJECT_STATE.md` §6.3.2 and `.mc-outbox.md`. A second defect in the same
-  family — adjacent repeats leaving the second occurrence unredacted, in both the
-  import and browser paths — is fixed in the working tree with regression tests.
+- `2026-08-06`: ~~Pupil names can survive redaction on the import path.~~
+  **Resolved — the mechanism was removed rather than the regex improved.** The
+  owner overruled all the match-improvement options: teachers should not be
+  entering names at all, and no pupil-name list should be held server-side. The
+  `pupilNames` field is gone from both import pages, the payloads, the routes and
+  `reportImport.js`, replaced by on-page guidance. Residual risk recorded honestly
+  in `docs/PROJECT_STATE.md` §6.3.2 — this reduces the surface, it does not
+  guarantee no name reaches the model.
 - `2026-08-06`: **`.gitignore` covers `.env` but not `.env.*`**, while
   `docs/restore_drill.md` §3 instructs the operator to create
   `.env.restore-test` as a full copy of production secrets. On the live server
@@ -65,13 +64,11 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Reliability and Data Safety
 
-- `2026-08-06`: **An empty import silently wipes a teacher's comment bank.**
-  `persistCategoryMap` always deletes the existing categories/comments before
-  writing the new set, and never checks the new set is non-empty — so a model
-  call that returns nothing usable destroys the bank and returns 200 "imported
-  successfully". Reproduced on three routes, worst of which is the **default
-  merge mode**. No undo. **Awaiting a decision** on what an empty result should
-  do — see `docs/PROJECT_STATE.md` §6.3.3 and `.mc-outbox.md`.
+- `2026-08-06`: ~~An empty import silently wipes a teacher's comment bank.~~
+  **Fixed** — the owner chose abort-before-deleting. An empty final category map
+  now throws `ReportImportEmptyResultError`, the route returns 502 saying the
+  comment bank is unchanged, and the existing bank is left untouched. See
+  `docs/PROJECT_STATE.md` §6.3.3.
 - `2026-08-06`: **Saving on `manage_subjects_years.html` is two independent
   writes with no atomicity, and one all-or-nothing error message.** The handler
   POSTs/PUTs `/api/prompts` and then POSTs `/api/subject-context`, and reports

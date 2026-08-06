@@ -53,17 +53,17 @@ comment-bank-api/
     db/
       sequelize.js        # Sequelize connection (MariaDB/MySQL)
       migrate.js          # Umzug migration runner (called by server.mjs)
-    routes/index.js       # ALL routes — 2073 lines, 68 endpoints (see §6)
+    routes/index.js       # ALL routes — 2069 lines, 68 endpoints (see §6)
     services/
       openai.js           # thin OpenAI client wrapper (6 lines)
-      reportImport.js      # import → comment-bank extraction (464 lines)
+      reportImport.js      # import → comment-bank extraction (478 lines)
       dbBackup.js          # mysqldump-based backup
     models/index.js        # Sequelize models + associations
     middleware/auth.js     # isAuthenticated / isAdmin
   migrations/             # 3 Umzug migrations
   public/                 # static frontend: 10 pages + header.html/footer.html
                           #   partials, 5 shared JS helpers, no build step
-  tests/                  # 16 Vitest files + Playwright e2e (tests/e2e/)
+  tests/                  # 18 Vitest files + Playwright e2e (tests/e2e/)
 ```
 
 ---
@@ -82,7 +82,9 @@ Implemented and covered by tests / docs:
 - **Report generation**: 4-paragraph enforcement via strict JSON schema, optional
   per-subject word limit, strength-focus for paragraph 3, and a relevance check
   that warns on out-of-scope comments (with override).
-- **Privacy**: `PUPIL_NAME` placeholder redaction in both import and generation,
+- **Privacy**: `PUPIL_NAME` redaction in the browser on the generation path (the
+  name is never transmitted); on the **import** path the app no longer collects a
+  pupil-name list at all and relies on on-page guidance instead — see §6.3.2.
   `store: false`, hashed `safety_identifier` per user, OpenAI request-ID logging.
 - **Multi-user**: all comment-bank data is scoped by `userId` + `subjectId` +
   `yearGroupId`; ownership is enforced via `findOwned*` helpers.
@@ -97,14 +99,14 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-16 Vitest files + Playwright smoke tests. Coverage is genuinely broad for a
+18 Vitest files + Playwright smoke tests. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
 incomplete-output rejection, import caps, ownership checks, rate limiting,
 security headers, password-change consistency, browser-side redaction helpers,
 and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31 and 2026-08-06:**
-> `npm install` + `npm test` run green here — **16 files, 91 tests passing** —
+> `npm install` + `npm test` run green here — **18 files, 111 tests passing** —
 > plus `npm run check:inline-scripts` (10 scripts) and `git diff --check` clean.
 > The Vitest suite mocks the models and OpenAI client (injected into
 > `registerRoutes`), so it needs **no database**. A live MariaDB 10.11 was also
@@ -286,7 +288,8 @@ is one token, in `public/report-selection.js` and in `replacePupilNames` in
 fail and all 22 pre-existing assertions still pass, so the fix changes no
 previously-specified behaviour.
 
-**(b) The import path is case-SENSITIVE. Not fixed — needs a decision.**
+**(b) The import path was case-SENSITIVE. Resolved 2026-08-06 by removing the
+mechanism, not by fixing the regex.**
 `replacePupilNames` builds its regex with `/g` but **no `/i`**, so a name
 supplied as `Alex` does not match `ALEX` or `alex` in the pasted reports. MIS
 exports routinely carry an all-caps header line:
@@ -298,12 +301,37 @@ The unredacted name goes to OpenAI **and** into the stored comment bank, where i
 is re-sent on every future generation. The browser helper *does* use `/i`, so the
 two paths disagree about what redaction means.
 
-This was deliberately left alone because the obvious fix is not obviously safe:
-adding `/i` also redacts ordinary words that happen to be names, and the import
-path has no confirm-preview to catch it. A pupil called **Will** would turn every
-*"will improve"* in the bank into *"PUPIL_NAME improve"* — permanently, across
-every comment. Leak versus corruption is a data-protection judgement for the
-owner, so it was raised via `.mc-outbox.md` rather than guessed at.
+The options offered to the owner were all variations on improving the match
+(`/i`, a common-word allow-list, case-insensitive-but-not-all-lowercase). **The
+owner overruled all of them with something stronger:** teachers should not be
+entering pupils' names at all, and the server should not hold a list of pupils'
+names even transiently. So the `pupilNames` field was **removed** — from both
+import pages, from the request payloads, from the route handlers, and from
+`reportImport.js` (`replacePupilNames`, `LIMITS.pupilNames`, and the now-orphaned
+`escapeRegex` are all gone). Reports are sent as pasted.
+
+In its place both import pages carry a prominent instruction not to paste names,
+with `PUPIL_NAME` offered as the placeholder to type instead, wired to the
+textarea via `aria-describedby`.
+
+**Persistence sweep (2026-08-06).** Checked whether a name list was ever stored
+anywhere before removal: no request-body logging, no `morgan`/`winston`/`pino`,
+no `ImportJobs` or audit table, no model field, and nothing written to disk — the
+CSV `uploads/` path is a different endpoint and unlinks after processing. The
+list only ever existed in the request body, in memory, for the life of the
+request. Nothing needed purging.
+
+**RESIDUAL RISK, stated plainly.** This *reduces the surface; it does not
+guarantee no name reaches the model.* If a teacher pastes a report that still
+contains a name, that name goes to OpenAI and can end up stored in the comment
+bank, where it is re-sent on every later generation. The control is now an
+instruction on the page, not a mechanism — and unlike the generation path there
+is no confirm-preview and no highlighter on the import page. What the change buys
+is that the app no longer *asks for* a list of pupils' names, no longer holds one
+even briefly, and no longer implies to the teacher that redaction is being done
+for them. That last implication was arguably the worst part of the old design:
+the field was labelled "Pupil names to redact", which invited teachers to paste
+names *and* to trust a mechanism that was case-sensitive and leaky.
 
 **Framing note:** (b) does not change §6.3.1's agreed wording, but it does narrow
 what "reliable" means there. The *generation* path's guarantee about the current
@@ -338,10 +366,17 @@ There is no undo. The "replace mode requires confirmation" guard does not help:
 the teacher is confirming a *replace*, not a deletion, and routes 1 and 2 occur
 in merge mode regardless.
 
-**Not fixed** — what an import should do to existing pupil comment data is an
-owner decision, not a judgement to make unattended. Raised in `.mc-outbox.md`
-with four options; the lean is to abort before deleting and return 502, matching
-how `/generate-report` already treats an incomplete model response.
+**Fixed 2026-08-06 (owner chose option (a), abort before deleting).**
+`importReportsToCommentBank` now checks the final map has at least one comment
+before calling `persistCategoryMap`, and throws `ReportImportEmptyResultError`
+otherwise. That extends `ReportImportValidationError`, so existing route handlers
+map it without change — but with status **502**, because the request was fine and
+the model's answer was not. The existing bank is left untouched and the teacher
+is told the comment bank is unchanged.
+
+The tests assert the two things together — that the call fails **and** that
+nothing was destroyed. Asserting only the failure would still pass if the delete
+happened first, which is the whole bug.
 
 ### 6.3.4 A browser error-path sweep, and what it found (2026-08-06)
 Swept every `fetch` and `catch` in `public/` for the shape where a failure is
