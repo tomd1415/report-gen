@@ -264,6 +264,53 @@ name on the new path, it can no longer independently verify that the current
 pupil's name is absent from free text. Correctness now rests entirely on the
 browser helpers — which is why their unit tests are load-bearing.
 
+#### 6.3.2 Two redaction defects found 2026-08-06
+Reviewing `redactPupilName` with fresh eyes — precisely because §6.3.1 makes it
+load-bearing — turned up two ways a name survives redaction. Both were measured,
+not inferred.
+
+**(a) Adjacent repeats — affects both paths. Fixed in the working tree.**
+The regex captured its trailing word boundary as a group, and `/g` *consumes*
+what it captures. So the delimiter that should have opened the following match
+had already been eaten, and a name repeated with exactly one character between
+occurrences was only redacted the first time:
+
+    redactPupilName('Alex Alex worked hard.', 'Alex')
+      -> 'PUPIL_NAME Alex worked hard.'      // before
+      -> 'PUPIL_NAME PUPIL_NAME worked hard.' // after
+
+The fix is to make the trailing boundary a lookahead so it is not consumed. It
+is one token, in `public/report-selection.js` and in `replacePupilNames` in
+`src/services/reportImport.js`, with six regression tests in
+`tests/ui-redaction.test.js`. Meta-tested: with the old regex exactly those six
+fail and all 22 pre-existing assertions still pass, so the fix changes no
+previously-specified behaviour.
+
+**(b) The import path is case-SENSITIVE. Not fixed — needs a decision.**
+`replacePupilNames` builds its regex with `/g` but **no `/i`**, so a name
+supplied as `Alex` does not match `ALEX` or `alex` in the pasted reports. MIS
+exports routinely carry an all-caps header line:
+
+    input : "REPORT FOR ALEX\nAlex has done well."
+    output: "REPORT FOR ALEX\nPUPIL_NAME has done well."
+
+The unredacted name goes to OpenAI **and** into the stored comment bank, where it
+is re-sent on every future generation. The browser helper *does* use `/i`, so the
+two paths disagree about what redaction means.
+
+This was deliberately left alone because the obvious fix is not obviously safe:
+adding `/i` also redacts ordinary words that happen to be names, and the import
+path has no confirm-preview to catch it. A pupil called **Will** would turn every
+*"will improve"* in the bank into *"PUPIL_NAME improve"* — permanently, across
+every comment. Leak versus corruption is a data-protection judgement for the
+owner, so it was raised via `.mc-outbox.md` rather than guessed at.
+
+**Framing note:** (b) does not change §6.3.1's agreed wording, but it does narrow
+what "reliable" means there. The *generation* path's guarantee about the current
+pupil's name is unaffected — that name is never transmitted at all. It is the
+*import* path, which handles a list of several real pupils' names, where the
+guarantee is weaker than the README implied.
+
 ### 6.4 Content Security Policy is deliberately disabled
 Helmet is active but CSP is off because the static pages still contain large
 inline `<script>` blocks. This is a conscious, documented trade-off. The unlock

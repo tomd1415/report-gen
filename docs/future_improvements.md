@@ -25,6 +25,15 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   careless edit from being a silent unauthenticated write. One-line fix and a
   gate test are described in `docs/PROJECT_STATE.md` §6.9 and
   `docs/NEXT-MILESTONE.md` step 0.
+- `2026-08-06`: **Pupil names can survive redaction on the import path.**
+  `replacePupilNames` (`src/services/reportImport.js`) is case-sensitive, so
+  `ALEX` is not matched by a supplied name of `Alex` — common in MIS exports with
+  all-caps headers — and the name then reaches OpenAI *and* the stored comment
+  bank. Adding `/i` is not obviously safe (a pupil called Will would corrupt
+  every "will" in the bank), so it is **awaiting a decision** — see
+  `docs/PROJECT_STATE.md` §6.3.2 and `.mc-outbox.md`. A second defect in the same
+  family — adjacent repeats leaving the second occurrence unredacted, in both the
+  import and browser paths — is fixed in the working tree with regression tests.
 - `2026-08-06`: **`.gitignore` covers `.env` but not `.env.*`**, while
   `docs/restore_drill.md` §3 instructs the operator to create
   `.env.restore-test` as a full copy of production secrets. On the live server
