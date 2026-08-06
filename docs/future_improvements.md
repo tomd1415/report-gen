@@ -72,6 +72,20 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   successfully". Reproduced on three routes, worst of which is the **default
   merge mode**. No undo. **Awaiting a decision** on what an empty result should
   do — see `docs/PROJECT_STATE.md` §6.3.3 and `.mc-outbox.md`.
+- `2026-08-06`: **Saving on `manage_subjects_years.html` is two independent
+  writes with no atomicity, and one all-or-nothing error message.** The handler
+  POSTs/PUTs `/api/prompts` and then POSTs `/api/subject-context`, and reports
+  success only if `responseSave.ok && contextSave.ok`. If the first succeeds and
+  the second fails, the teacher is told *"Error saving prompt"* — while the
+  prompt has in fact already changed. They then either retry (harmless) or give
+  up believing nothing was saved (not harmless: the prompt driving their report
+  generation is now different from what they think it is, and nothing on the page
+  says so). Options: report per-field outcomes, make it one endpoint with a
+  transaction, or re-read and re-render after any partial failure.
+  **This is currently untestable**, which is the point worth noting: the handler
+  is an inline `<script>` in the HTML, so it cannot be imported by a test. That
+  is a concrete, named cost of the inline-script debt in §6.4 — the CSP unlock
+  and the testability unlock are the same piece of work.
 - `2026-08-06`: The restore drill was verifying seven content tables but **not**
   `UserSubjects` / `UserYearGroups`. Those hold each staff member's selected
   subjects and year groups, and they fail quietly — restore them empty and every

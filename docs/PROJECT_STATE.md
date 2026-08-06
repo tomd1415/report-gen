@@ -343,6 +343,25 @@ owner decision, not a judgement to make unattended. Raised in `.mc-outbox.md`
 with four options; the lean is to abort before deleting and return 502, matching
 how `/generate-report` already treats an incomplete model response.
 
+### 6.3.4 A browser error-path sweep, and what it found (2026-08-06)
+Swept every `fetch` and `catch` in `public/` for the shape where a failure is
+swallowed or misreported. **Most of it is in good order** — the pages check
+`response.ok`, surface the server's message through `parseResponseMessage`, and
+log the error object before showing a friendly one. Recorded because that is a
+real result, and it means the next person need not repeat the sweep.
+
+One genuine finding, on `manage_subjects_years.html`: **saving is two independent
+writes with no atomicity and a single all-or-nothing message.** `/api/prompts`
+is written first, then `/api/subject-context`; success is reported only when both
+succeed. When the first succeeds and the second fails, the teacher sees *"Error
+saving prompt"* although the prompt did change. The visible state and the stored
+state then disagree, silently, on the configuration that drives report generation.
+
+**It cannot be tested as it stands** — the handler is an inline `<script>` in the
+HTML, so no test can import it. That is worth stating plainly as a cost of §6.4:
+the work that unlocks CSP is the same work that makes this page testable, which
+strengthens the case for doing it.
+
 ### 6.4 Content Security Policy is deliberately disabled
 Helmet is active but CSP is off because the static pages still contain large
 inline `<script>` blocks. This is a conscious, documented trade-off. The unlock
