@@ -311,6 +311,38 @@ pupil's name is unaffected — that name is never transmitted at all. It is the
 *import* path, which handles a list of several real pupils' names, where the
 guarantee is weaker than the README implied.
 
+### 6.3.3 An empty import silently wipes the comment bank (found 2026-08-06)
+`persistCategoryMap` in `src/services/reportImport.js` **always** deletes the
+target user's existing categories and comments for that subject + year group,
+then writes the new `categoryMap`. Nothing checks that the new map is non-empty.
+
+An import whose model call returns nothing usable therefore **succeeds**, having
+destroyed the comment bank and replaced it with nothing, and responds 200 with
+*"Reports imported successfully and categories/comments generated."*
+
+Three routes to an empty map, all reproduced in
+`tests/import-empty-result.test.js` (with a control test proving the harness
+does write when there is something to write):
+
+1. **The merge call returns no categories.** The worst of the three: **merge is
+   the default mode**, and merge only runs when an existing bank is present —
+   that is its precondition.
+2. **The relevance filter flags every comment**, so
+   `filterCategoryMapByRelevance` returns `{}`.
+3. **Extraction returns no `output_parsed`.** Not hypothetical — the generation
+   path carries an explicit `output_text` fallback for exactly this case
+   (§5), so the codebase already treats it as something that occurs. The import
+   path has no equivalent.
+
+There is no undo. The "replace mode requires confirmation" guard does not help:
+the teacher is confirming a *replace*, not a deletion, and routes 1 and 2 occur
+in merge mode regardless.
+
+**Not fixed** — what an import should do to existing pupil comment data is an
+owner decision, not a judgement to make unattended. Raised in `.mc-outbox.md`
+with four options; the lean is to abort before deleting and return 502, matching
+how `/generate-report` already treats an incomplete model response.
+
 ### 6.4 Content Security Policy is deliberately disabled
 Helmet is active but CSP is off because the static pages still contain large
 inline `<script>` blocks. This is a conscious, documented trade-off. The unlock

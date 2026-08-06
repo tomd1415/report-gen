@@ -65,6 +65,13 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Reliability and Data Safety
 
+- `2026-08-06`: **An empty import silently wipes a teacher's comment bank.**
+  `persistCategoryMap` always deletes the existing categories/comments before
+  writing the new set, and never checks the new set is non-empty — so a model
+  call that returns nothing usable destroys the bank and returns 200 "imported
+  successfully". Reproduced on three routes, worst of which is the **default
+  merge mode**. No undo. **Awaiting a decision** on what an empty result should
+  do — see `docs/PROJECT_STATE.md` §6.3.3 and `.mc-outbox.md`.
 - `2026-08-06`: The restore drill was verifying seven content tables but **not**
   `UserSubjects` / `UserYearGroups`. Those hold each staff member's selected
   subjects and year groups, and they fail quietly — restore them empty and every
