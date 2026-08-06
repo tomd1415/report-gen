@@ -13,8 +13,11 @@ acting on._
 A **school report generator** for staff. Teachers build a *comment bank* (grouped
 into categories), select comments, and the system uses the OpenAI Responses API
 to weave them into a fixed **4-paragraph** pupil report. A key design constraint
-is privacy: **pupil names are never sent to OpenAI** — they are replaced with a
-`PUPIL_NAME` placeholder and swapped back after generation.
+is privacy: **the current pupil's name is replaced with a `PUPIL_NAME`
+placeholder in the browser and never transmitted**, and the browser swaps it back
+when the report returns. Free text typed into the additional-comments and
+strength-focus boxes is a weaker, separate case — see §6.3.1 for the agreed
+framing, which this sentence must not be allowed to drift back away from.
 
 Deployed context: Debian server, MariaDB, run under systemd behind an optional
 Nginx reverse proxy. Live at `reportgen.org.uk` (per README footer).
@@ -50,7 +53,7 @@ comment-bank-api/
     db/
       sequelize.js        # Sequelize connection (MariaDB/MySQL)
       migrate.js          # Umzug migration runner (called by server.mjs)
-    routes/index.js       # ALL routes — 2060 lines, 68 endpoints (see §6)
+    routes/index.js       # ALL routes — 2073 lines, 68 endpoints (see §6)
     services/
       openai.js           # thin OpenAI client wrapper (6 lines)
       reportImport.js      # import → comment-bank extraction (464 lines)
@@ -58,8 +61,9 @@ comment-bank-api/
     models/index.js        # Sequelize models + associations
     middleware/auth.js     # isAuthenticated / isAdmin
   migrations/             # 3 Umzug migrations
-  public/                 # static frontend (~8 HTML pages + shared JS helpers)
-  tests/                  # 15 test files + Playwright e2e
+  public/                 # static frontend: 10 pages + header.html/footer.html
+                          #   partials, 5 shared JS helpers, no build step
+  tests/                  # 16 Vitest files + Playwright e2e (tests/e2e/)
 ```
 
 ---
@@ -68,9 +72,7 @@ comment-bank-api/
 
 The project is **mature and functional**, not a prototype. Recent commit history
 (`improved security`, `improved robustness`, `more UI updates`, `added playwright
-tests`) shows steady hardening rather than feature churn. Working tree is clean
-apart from two untracked items not yet committed: `.devcontainer/` (new
-dev-container config) and this `docs/PROJECT_STATE.md`.
+tests`) shows steady hardening rather than feature churn.
 
 Implemented and covered by tests / docs:
 
@@ -95,20 +97,34 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-15 Vitest files + Playwright smoke tests. Coverage is genuinely broad for a
+16 Vitest files + Playwright smoke tests. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
 incomplete-output rejection, import caps, ownership checks, rate limiting,
-security headers, password-change consistency, and UI helpers.
+security headers, password-change consistency, browser-side redaction helpers,
+and UI helpers.
 
-> **Verified 2026-07-21, re-checked 2026-07-27:** `npm install` + `npm test` run
-> green here — **15 files, 67 tests passing** — plus `npm run check:inline-scripts` (10 scripts) and
-> `git diff --check` clean. The Vitest suite mocks the models and OpenAI client
-> (injected into `registerRoutes`), so it needs **no database**. A live MariaDB
-> 10.11 was also installed, migrated, and the server booted: `/api/health`,
-> `/api/version`, register/login, and admin subject/year-group creation all work
-> end-to-end against the real DB. **Still not run here:** the Playwright browser
-> e2e — its browser-binary CDN (`playwright.download.prss.microsoft.com`) is
-> firewalled in this sandbox, so the 8 UI smoke tests are the one untested slice.
+> **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31 and 2026-08-06:**
+> `npm install` + `npm test` run green here — **16 files, 91 tests passing** —
+> plus `npm run check:inline-scripts` (10 scripts) and `git diff --check` clean.
+> The Vitest suite mocks the models and OpenAI client (injected into
+> `registerRoutes`), so it needs **no database**. A live MariaDB 10.11 was also
+> installed, migrated, and the server booted: `/api/health`, `/api/version`,
+> register/login, and admin subject/year-group creation all work end-to-end
+> against the real DB.
+>
+> **The Playwright e2e now runs here too — 9/9 green** (first run 2026-07-30).
+> Chromium was already present in this sandbox; the earlier note that the
+> browser-binary CDN was firewalled was about `npx playwright install`, not about
+> running the tests. What had actually been blocking every e2e test was the
+> footer's off-origin Creative Commons icons stalling `page.goto`'s `load` event
+> — see §6.8. That is fixed, so this slice is no longer untested.
+>
+> **Timing caveat for this box:** the host is shared and its load average
+> intermittently reaches ~20–30 on 4 cores, which pushes tests past Vitest's
+> 5000 ms default and produces 2–3 *different* failures per run. That is
+> environmental, not a repo defect. When it happens use
+> `npx vitest run --testTimeout=30000` and `npx playwright test --workers=1`;
+> do **not** raise the committed defaults to paper over it.
 
 ---
 
@@ -157,10 +173,16 @@ functions. It's the single biggest drag on testability and the reason CSP is
 still off (see below). It's already the top item in the internal backlog. When
 touching this file, prefer extracting a cohesive slice (e.g. report generation,
 or admin-staff) into `src/routes/<domain>.js` + a `src/services/` module rather
-than adding to the monolith. Shared helpers (`cleanText`, `escapeRegex`,
-`isTargetPlaceholderComment`, `TARGET_PLACEHOLDER_COMMENT`) are **duplicated**
-between `routes/index.js` and `reportImport.js` — extracting a `src/lib/text.js`
-would be a low-risk first step that de-duplicates and creates the pattern.
+than adding to the monolith. Shared helpers are **duplicated** between
+`routes/index.js` and `reportImport.js` — extracting a `src/lib/text.js` would be
+a low-risk first step that de-duplicates and creates the pattern.
+
+Re-checked 2026-08-06, the duplicated set is now exactly three:
+`cleanText`, `isTargetPlaceholderComment`, `TARGET_PLACEHOLDER_COMMENT`.
+`escapeRegex` is **no longer** duplicated — it was deleted from
+`routes/index.js` with the server-side redaction helper in the 2026-07-30
+cut-over (§6.3.1) and now lives only in `reportImport.js`. See
+`docs/NEXT-MILESTONE.md` for this broken into verifiable steps.
 
 ### 6.2 Duplicate / overlapping route surface
 There are two parallel families of admin endpoints:
@@ -176,6 +198,12 @@ aliases during a transition, and delete once the frontend is migrated. (Already
 noted in the backlog.)
 
 ### 6.3 Privacy: free-text fields in generation — now redacted (fixed 2026-07-28)
+> **Superseded by §6.3.1 — read that first.** This section describes the
+> *server-side* redaction that was retired on 2026-07-30. It is kept because it
+> records why the change was made, but the mechanism it describes no longer
+> exists: `routes/index.js` has no `redactPupilName` and does no post-call
+> swap-back. Do not cite this section for current behaviour.
+
 The core promise holds — in `/generate-report` the prompt uses `PUPIL_NAME` and
 the real name is only substituted back **after** the OpenAI call
 (`routes/index.js` → post-call), and selected comments come from the
@@ -298,6 +326,44 @@ could not reach `fonts.googleapis.com`.
 origin"* visits all eleven pages and fails on any off-origin request. Its
 `KNOWN_OFF_ORIGIN_VIOLATIONS` list is currently empty and should stay that way;
 it is a list of outstanding bugs, not approved exceptions.
+
+### 6.9 Four `/api/categories` routes have no auth guard (found 2026-08-06)
+Authentication is applied by a block of `app.use(...)` prefix guards near the top
+of `registerRoutes` (`routes/index.js` ~line 465). That block covers
+`/api/comments` and `/api/categories-comments` but **not** `/api/categories`.
+So these four routes run with no guard:
+
+| Route | Guard | Logged-out response |
+|---|---|---|
+| `POST /api/categories` | none | **500** |
+| `GET /api/categories/:id` | none | **500** |
+| `PUT /api/categories/:id` | none | **500** |
+| `DELETE /api/categories/:id` | none | **500** |
+
+Every one of the other 64 endpoints correctly answers `401` or `403` when logged
+out — this was measured, not assumed.
+
+**How bad is it, honestly:** not a data breach today. Each handler reads
+`req.session.user.id` on its *first* line, before any query, so an
+unauthenticated request throws `TypeError` and Express 5 turns it into a 500. No
+row is read or written. The problems are that (a) the status is wrong, so a
+monitoring rule keyed on 5xx sees a spurious server error and one keyed on 401
+never fires, and (b) the code is one careless edit away from being a real
+unauthenticated write — anything that makes the `userId` lookup tolerant
+(`req.session?.user?.id`, a default, a reorder that moves it below a query)
+converts a crash into a silent success. It is exactly the shape that looks fine
+in review because the *reason* it is safe is an accident of line ordering.
+
+**Fix (one line, not applied — this was an unattended session):** add
+`app.use('/api/categories', isAuthenticated);` alongside the existing guards.
+`/api/categories-comments` keeps its own entry; an `app.use('/api/categories')`
+prefix does not match it, so both are needed.
+
+**Guard:** `tests/route-auth-matrix.test.js` enumerates the live Express router
+and asserts every route answers 401/403 when logged out. The four above are
+listed in `KNOWN_UNGUARDED`, which the test asserts is *exact* — fixing a route
+without shrinking the list fails, and adding a new unguarded route fails. Like
+`KNOWN_OFF_ORIGIN_VIOLATIONS`, it is a bug list, not an exceptions list.
 
 ---
 

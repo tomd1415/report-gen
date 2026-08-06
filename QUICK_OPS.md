@@ -62,10 +62,20 @@ npm run check:deploy
 
 ### Backup (admin API, if enabled)
 
-Set `ENABLE_DB_BACKUP=true` in `.env`, then:
+Both endpoints are **admin-only** (`isAdmin`), so a bare `curl` returns
+`403 Forbidden` — you must send the session cookie of a logged-in admin. Set
+`ENABLE_DB_BACKUP=true` in `.env`, then:
 ```
-curl -X POST http://localhost:44344/api/backup-database
-curl -O http://localhost:44344/api/export-database
+# 1. Log in as an admin and keep the session cookie.
+curl -c /tmp/rg.cookies -X POST http://localhost:44344/api/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"ADMIN","password":"PASSWORD"}'
+
+# 2. Reuse that cookie jar for the admin calls.
+curl -b /tmp/rg.cookies -X POST http://localhost:44344/api/backup-database
+curl -b /tmp/rg.cookies -OJ http://localhost:44344/api/export-database
+
+rm -f /tmp/rg.cookies
 ```
 
 ### Manual backup (MariaDB)
@@ -140,8 +150,12 @@ UPDATE Users SET isAdmin = 1 WHERE username = 'yourname';
 
 ### Reset user password (admin API)
 
+Admin-only, so this needs the admin session cookie too (see *Backup* above for
+how to obtain one); without it the call returns `403 Forbidden`.
+
 ```
-curl -X PUT http://localhost:44344/api/admin/user/USERNAME/password \
+curl -b /tmp/rg.cookies -X PUT \
+  http://localhost:44344/api/admin/user/USERNAME/password \
   -H "Content-Type: application/json" \
   -d '{"newPassword":"NEW_PASSWORD"}'
 ```

@@ -1,6 +1,11 @@
 # Report Generator (Update1)
 
-This project generates school reports from a curated comment bank. Pupil names are never sent to OpenAI: they are replaced with a placeholder before any OpenAI call and swapped back after the report is generated.
+This project generates school reports from a curated comment bank. The pupil's
+name is replaced with a `PUPIL_NAME` placeholder **in the browser**, before the
+request is sent, and swapped back in the browser when the report comes back — so
+the name reaches neither this server nor OpenAI. Free-text boxes are a separate,
+weaker case: see *Free-text fields: what is and is not guaranteed* below, and do
+not summarise the whole system as "names never reach the model".
 
 The workflow is:
 1) Import old reports to build a comment bank.
@@ -245,6 +250,7 @@ values locally.
 - `OPENAI_API_KEY`: your API key
 - `OPENAI_MODEL`: Responses API model (default `gpt-5.2`)
 - `OPENAI_REASONING_EFFORT`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`
+  (default `none`)
 
 ### Database
 - `DB_HOST`: database host (example `127.0.0.1`)
@@ -256,7 +262,10 @@ values locally.
 - `DB_LOGGING`: `true` or `false`
 
 ### Sessions
-- `SESSION_SECRET`: secret used to sign cookies
+- `SESSION_SECRET`: secret used to sign cookies. If unset, `SECRET_KEY` is used
+  as a fallback; if neither is set the app falls back to `dev-insecure-secret`
+  and only logs a warning — it does **not** refuse to start. See
+  `docs/PROJECT_STATE.md` §6.5.
 - `SESSION_SECURE`: `true` if HTTPS, otherwise `false`
 - `SESSION_SAMESITE`: `lax`, `strict`, `none`
 - `SESSION_NAME`: cookie name (default `reportgen.sid`)
@@ -306,8 +315,9 @@ values locally.
 - `GET /api/health`
 - Returns `{ "ok": true, "status": "ok" }` when Express is responding.
 - `GET /api/version`
-- Returns the app name, package version, environment, and deployed commit when
-  a supported commit environment variable is set.
+- Returns the app name, package version, environment, and deployed commit.
+  The commit is read from the first of `GIT_COMMIT`, `SOURCE_VERSION`,
+  `RENDER_GIT_COMMIT`, `COMMIT_SHA` that is set, and is `null` if none are.
 - `GET /api/health/db` (admin only)
 - Checks the Sequelize database connection and returns a JSON status.
 
@@ -468,10 +478,17 @@ Use this when upgrading from the old project:
 
 ## Notes on Privacy
 
-- Pupil names are never sent to OpenAI.
-- The only context sent is comments and the subject description.
+- **The current pupil's name is redacted in the browser and never transmitted.**
+  `POST /generate-report` rejects any request that carries a `name` at all, so no
+  server code path can receive one.
+- **What *is* sent to OpenAI:** the selected comments (already placeholder-only),
+  the subject description, the pronouns, the per-subject prompt, and the two
+  free-text boxes (additional comments, strength focus) as the teacher typed them
+  minus the current pupil's name. The free-text boxes are the residual risk — see
+  *Free-text fields: what is and is not guaranteed* for what is and is not
+  guaranteed there, and do not shorten it to "names never reach the model".
 - `store: false` is enforced for Responses API calls.
-- A hashed `safety_identifier` is used per user.
+- A hashed (SHA-256) `safety_identifier` is used per user.
 
 ---
 
