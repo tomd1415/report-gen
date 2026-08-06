@@ -1,0 +1,166 @@
+# Testing: what each suite is for, and the rules the gates follow
+
+_Written 2026-08-06. `README.md` lists the commands; this explains **why** the
+suites are shaped the way they are, and the conventions the gates follow — which
+until now lived only in commit messages, where nobody reads them._
+
+---
+
+## The suites
+
+| Command | What it is | Needs |
+|---|---|---|
+| `npm test` | Vitest — 18 files, 112 tests | nothing |
+| `npm run test:e2e` | Playwright — 9 browser journeys | Chromium |
+| `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
+| `npm run check:deploy` | all three, then `git diff --check` | Chromium |
+
+**The Vitest suite needs no database and no API key.** Models and the OpenAI
+client are injected into `registerRoutes(app, { models, openai })`, so every test
+supplies mocks. This is the single most important property of the suite: it means
+a contributor can run it on a clean checkout, and it is why the tests are worth
+running on every change rather than only before a deploy.
+
+The consequence to remember: **a passing Vitest run says nothing about the SQL
+Sequelize actually generates**, because no query ever executes. Ownership tests
+assert the `where` clause that was *passed*, not the rows that came back. For
+anything schema-shaped, the real check is booting against a live MariaDB, or
+`docs/restore_drill.md`.
+
+`tests/e2e/` runs against a static server (`tests/e2e/static-server.mjs`) with
+API responses mocked by `page.route`. So the e2e suite tests **the browser code**,
+not the server — the two never talk to each other in CI.
+
+UI-helper tests opt into jsdom per file with `// @vitest-environment jsdom` on
+line 1. The project default is `node` (`vitest.config.js`), so a new DOM test
+that omits that comment fails with confusing `document is not defined` errors.
+
+---
+
+## Running them on this box
+
+Two traps, both of which have cost time:
+
+**1. `npx vitest` may pick up a globally installed Vitest**, which cannot resolve
+`jsdom` from the project's `node_modules`. The symptom is misleading: five test
+files vanish from the run and the rest pass, so the summary reads `12 passed`
+instead of `18 passed` and looks fine at a glance. Use the project's own binary:
+
+```bash
+cd /workspace/comment-bank-api
+./node_modules/.bin/vitest run
+```
+
+**2. The host is shared and its load average intermittently reaches 20–38 on 4
+cores.** Above roughly 20 the suite starts failing 2–3 tests per run, *different
+ones each time*, all 5000 ms timeouts, with the total duration swinging from 15 s
+to 186 s. That is environmental. The tell is non-determinism **plus** duration
+variance — a real race usually fails in a consistent place, and a real
+performance regression is consistently slow. Check `uptime` before debugging.
+
+```bash
+./node_modules/.bin/vitest run --testTimeout=30000
+./node_modules/.bin/playwright test --workers=1
+```
+
+**Do not raise the committed defaults to make this go away.** That permanently
+weakens the suite for everyone, to compensate for a condition that is not in the
+repo and is not always present.
+
+---
+
+## The gates, and the rules they follow
+
+Four checks exist to catch a class of problem that ordinary tests do not: a rule
+that is *stated* somewhere and enforced nowhere.
+
+| Gate | Where | Guards |
+|---|---|---|
+| Route auth matrix | `tests/route-auth-matrix.test.js` | every route rejects a logged-out request |
+| Off-origin assets | `tests/e2e/ui-smoke.spec.js` | no page loads anything from another origin |
+| Inline script syntax | `scripts/check-inline-scripts.mjs` | inline `<script>` blocks parse |
+| Import redaction | `tests/import-reports.test.js` | pupil names do not reach the prompt |
+
+### Rule 1 — a known-failures list is a bug list, not an exceptions list
+
+Two gates carry a list of things that currently fail: `KNOWN_UNGUARDED` and
+`KNOWN_OFF_ORIGIN_VIOLATIONS`. Both are **outstanding bugs awaiting a fix**, not
+approved carve-outs. When you fix one, delete its entry. Never add an entry to
+make a build green.
+
+### Rule 2 — assert the list is *exact*, where the stakes justify it
+
+`route-auth-matrix` asserts the set of unguarded routes equals `KNOWN_UNGUARDED`
+exactly. That means it fails in **both** directions: a newly unguarded route
+fails, and so does fixing a route without shrinking the list. Without the second
+half, a known-failures list quietly becomes permanent.
+
+**But match the strictness to what a false alarm costs.** Exactness is right for
+a security-shaped invariant, where every entry is a live hole and someone must
+notice when one closes. It is wrong for something like docs-versus-endpoints,
+where a stale line would start failing builds for a cosmetic reason — and a gate
+that fails for cosmetic reasons gets switched off within a fortnight, taking the
+real coverage with it. For those, assert "no *new* entries" instead.
+
+### Rule 3 — meta-test every gate, in both directions, before trusting it
+
+A gate nobody has watched fail is decoration. Before relying on a new one:
+
+1. **Break the thing it guards.** It must go red *and name what broke*.
+2. **Fix an entry it records as a known bug.** It must *also* go red, so the list
+   cannot go stale.
+
+Then revert and confirm with `git diff --quiet`, not by eye. Every gate above has
+been through this; the results are in `docs/LESSONS-LEARNT.md` §2.
+
+### Rule 4 — a gate must not be able to pass without checking anything
+
+The commonest way a gate becomes decoration is not being wrong — it is finding
+nothing and reporting success. `check-inline-scripts.mjs` used to print
+`Checked 0 inline scripts` and exit **0**, so `check:deploy` went green whether or
+not the check had run. It now fails if it finds no HTML files, and fails if it
+finds HTML but zero inline scripts.
+
+So every gate needs a floor:
+
+- `route-auth-matrix` asserts it enumerated more than 50 routes, so an empty or
+  broken router cannot pass it.
+- `check-inline-scripts` asserts it checked at least one script in at least one
+  file.
+- The off-origin guard visits an explicit list of eleven pages rather than
+  whatever it happens to find.
+
+**Prefer "more than zero" to an exact count** unless the number is meant to be
+stable. The inline-script count is *meant to fall* as scripts move into
+`public/*.js` (see `PROJECT_STATE.md` §6.4), so pinning it would make legitimate
+progress fail the build.
+
+### Rule 5 — pin a known leak rather than leaving it undocumented
+
+`tests/import-reports.test.js` contains a test named `KNOWN LEAK: import
+redaction is case-sensitive, so ALEX survives`. It asserts a **bug**, deliberately,
+because the fix needs an owner decision (see `PROJECT_STATE.md` §6.3.2). Pinning
+it means the leak cannot widen unnoticed, and the test goes red the moment the
+decision lands — at which point it should be replaced with the positive
+assertion, not relaxed.
+
+---
+
+## Adding a test — what is worth writing
+
+Prefer, in this order:
+
+1. **Silent failures** — a wrong number, a skipped step, an empty result. These
+   outrank anything that crashes loudly, because a crash gets noticed.
+   `tests/import-empty-result.test.js` is the model: it proves an import that
+   returns nothing *destroys* the comment bank and reports success.
+2. **A control alongside the failure.** Every "this goes wrong" test should sit
+   next to one proving the harness does the right thing when the input is good —
+   otherwise the failing assertion may be passing for the wrong reason.
+3. **Provenance of authority.** Where does the scoping `userId` come from? If the
+   answer is "the session", assert that a `userId` in the body or query is
+   ignored. `tests/ownership.test.js` does this for the four `/api/categories`
+   routes.
+
+Avoid asserting an outcome from an exit code alone, and avoid any check whose
+output is discarded when the command exits non-zero.

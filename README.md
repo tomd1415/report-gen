@@ -442,6 +442,12 @@ npm run check:deploy
 `check:deploy` runs the unit tests, Playwright smoke tests, inline script
 syntax check, and `git diff --check`.
 
+See **`docs/TESTING.md`** for what each suite actually covers (the Vitest suite
+needs no database; the e2e suite never talks to the server), the two traps when
+running them on a loaded or globally-installed-Vitest machine, and the rules the
+gates follow — including why a gate must not be able to pass without checking
+anything.
+
 Watch mode:
 ```
 cd comment-bank-api

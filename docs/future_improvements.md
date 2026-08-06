@@ -105,6 +105,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Testing
 
+- `2026-08-06`: **`check:inline-scripts` passed vacuously.** With nothing to
+  check it printed `Checked 0 inline scripts` and exited **0**, so
+  `npm run check:deploy` — the documented pre-deploy gate — went green whether or
+  not the check had run. Verified by pointing it at a directory containing HTML
+  but no inline scripts. Now fails on zero HTML files and on zero inline scripts,
+  with a floor of "more than zero" rather than an exact count, because the count
+  is *meant* to fall as scripts move out of the pages (§6.4). Fix is in the
+  working tree, uncommitted; the general rule is written up in `docs/TESTING.md`.
 - `2026-08-06`: Playwright now runs here and covers nine journeys (ready-check
   through to a generated report, form retention on an incomplete report, both
   free-text preview paths, the off-origin asset guard, the empty-state, Manage
@@ -126,6 +134,19 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   management. The first browser smoke tests now cover the recent UI regressions.
 
 ## Code Organization
+
+- `2026-08-06`: **`axios` is a declared dependency and is imported nowhere** —
+  zero references across `src/`, `public/`, `tests/`, `scripts/` and
+  `server.mjs`. It is dead weight that still counts toward the Dependabot
+  advisory surface. Removing it is a one-line `package.json` change plus a
+  lockfile update, left undone in a docs-only session. (`mariadb` and `mysql2`
+  *look* unused by the same test but are not — Sequelize loads the dialect driver
+  by name from `DB_DIALECT`, so both must stay.)
+- `2026-08-06`: A stale-code sweep found **nothing else**: no `TODO`/`FIXME`/
+  `HACK`/`XXX`/`@deprecated` markers anywhere in the source, no orphaned modules
+  under `src/`, and every file in `public/*.js` referenced by at least one page.
+  Recorded because "swept and found nothing" is a useful result that saves the
+  next person repeating it.
 
 - `2026-04-17`: `src/routes/index.js` is large. Extracting services for report
   import, report generation prompt assembly, category/comment persistence, and
