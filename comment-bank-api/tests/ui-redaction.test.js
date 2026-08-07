@@ -4,6 +4,7 @@ import {
   redactPupilName,
   restorePupilName,
   findSuspectNames,
+  summariseSuspectNames,
   PUPIL_NAME_PLACEHOLDER
 } from '../public/report-selection.js';
 
@@ -156,5 +157,66 @@ describe('findSuspectNames (warn-only)', () => {
   it('returns nothing for empty or lowercase text', () => {
     expect(findSuspectNames('')).toEqual([]);
     expect(findSuspectNames('all lowercase text here')).toEqual([]);
+  });
+});
+
+describe('summariseSuspectNames (warn-only, for the import page)', () => {
+  it('returns each suspect once with a count and a snippet', () => {
+    const text = 'Worked well with Jordan. Later Jordan helped again. Also Priya joined.';
+    const result = summariseSuspectNames(text);
+
+    expect(result.map((entry) => entry.name)).toEqual(['Jordan', 'Priya']);
+    expect(result[0].count).toBe(2);
+    expect(result[1].count).toBe(1);
+    expect(result[0].snippet).toContain('Jordan');
+  });
+
+  it('orders by frequency, because a name repeated through a batch is the likelier pupil', () => {
+    const text = 'She studied Newton. Then Sam spoke. Sam listened. Sam improved. Sam finished.';
+    const result = summariseSuspectNames(text);
+
+    expect(result[0].name).toBe('Sam');
+    expect(result[0].count).toBe(4);
+    expect(result.map((entry) => entry.name)).toContain('Newton');
+  });
+
+  it('takes the snippet from the FIRST occurrence, so a repeated name cannot bury the others', () => {
+    const text = 'Opening line about Kai here. ' + 'Kai again. '.repeat(30) + 'And Priya once.';
+    const result = summariseSuspectNames(text);
+
+    expect(result.filter((entry) => entry.name === 'Kai')).toHaveLength(1);
+    expect(result[0].snippet).toContain('Opening line about Kai here');
+    expect(result.map((entry) => entry.name)).toContain('Priya');
+  });
+
+  it('honours the ignore list', () => {
+    const text = 'Worked with Jordan and Priya today.';
+    expect(summariseSuspectNames(text, { ignore: ['Jordan'] }).map((e) => e.name)).toEqual(['Priya']);
+  });
+
+  it('returns nothing for empty or clean text', () => {
+    expect(summariseSuspectNames('')).toEqual([]);
+    expect(summariseSuspectNames(null)).toEqual([]);
+    expect(summariseSuspectNames('all lowercase text with no names')).toEqual([]);
+  });
+
+  it('agrees with findSuspectNames about WHICH words are suspect', () => {
+    // The two must not drift: the summary is the thing the teacher acts on, and
+    // the inline warning is driven by the same set.
+    const text = 'A note about Jordan, Newton and Priya in the lesson.';
+    expect(summariseSuspectNames(text).map((e) => e.name).sort())
+      .toEqual(findSuspectNames(text).sort());
+  });
+
+  it('stays fast on a realistic 60k-character paste', () => {
+    // LIMITS.reports caps the paste at 60000 characters; the highlighter runs on
+    // every keystroke, so this must not be quadratic.
+    const text = 'PUPIL_NAME worked hard with Jordan this term. '.repeat(1300);
+    expect(text.length).toBeGreaterThan(55000);
+
+    const started = Date.now();
+    const result = summariseSuspectNames(text);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result.map((entry) => entry.name)).toEqual(['Jordan']);
   });
 });

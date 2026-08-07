@@ -196,6 +196,54 @@ export const findSuspectNames = (text, { ignore = [] } = {}) => {
   return suspects;
 };
 
+// WARN-ONLY, like findSuspectNames, and built on it. Pasted reports run to tens
+// of thousands of characters, so showing the whole payload for review — as the
+// generation page does with its two short free-text boxes — would be unreadable
+// and would train people to click straight through it. This returns each
+// suspected name once, with a count and a short surrounding snippet, so the
+// teacher reviews a handful of lines instead of a wall of text.
+//
+// contextWords is the number of words kept either side of the match.
+export const summariseSuspectNames = (text, { ignore = [], contextWords = 6 } = {}) => {
+  const cleaned = cleanText(text);
+  if (!cleaned) {
+    return [];
+  }
+  const suspects = findSuspectNames(cleaned, { ignore });
+  if (suspects.length === 0) {
+    return [];
+  }
+
+  const tokens = cleaned.split(' ');
+  const bareWord = (token) => token.replace(/^[^\p{L}']+|[^\p{L}']+$/gu, '');
+  const wanted = new Map(suspects.map((word) => [word.toLowerCase(), word]));
+  const found = new Map();
+
+  tokens.forEach((token, index) => {
+    const key = bareWord(token).toLowerCase();
+    if (!key || !wanted.has(key)) {
+      return;
+    }
+    if (!found.has(key)) {
+      found.set(key, {
+        name: wanted.get(key),
+        count: 0,
+        // Snippet is taken at the FIRST occurrence only. Showing every one of a
+        // name repeated forty times through a batch of reports would bury the
+        // other suspects, which is the opposite of what this is for.
+        snippet: tokens
+          .slice(Math.max(0, index - contextWords), index + contextWords + 1)
+          .join(' ')
+      });
+    }
+    found.get(key).count += 1;
+  });
+
+  // Most-frequent first: a word appearing repeatedly through a batch of reports
+  // is more likely to be a pupil than a one-off proper noun.
+  return [...found.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+};
+
 if (typeof window !== 'undefined') {
   window.ReportSelection = {
     categoryGroups,
@@ -204,6 +252,7 @@ if (typeof window !== 'undefined') {
     redactPupilName,
     restorePupilName,
     findSuspectNames,
+    summariseSuspectNames,
     PUPIL_NAME_PLACEHOLDER
   };
 }

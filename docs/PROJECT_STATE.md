@@ -321,17 +321,49 @@ CSV `uploads/` path is a different endpoint and unlinks after processing. The
 list only ever existed in the request body, in memory, for the life of the
 request. Nothing needed purging.
 
-**RESIDUAL RISK, stated plainly.** This *reduces the surface; it does not
-guarantee no name reaches the model.* If a teacher pastes a report that still
-contains a name, that name goes to OpenAI and can end up stored in the comment
-bank, where it is re-sent on every later generation. The control is now an
-instruction on the page, not a mechanism — and unlike the generation path there
-is no confirm-preview and no highlighter on the import page. What the change buys
-is that the app no longer *asks for* a list of pupils' names, no longer holds one
-even briefly, and no longer implies to the teacher that redaction is being done
-for them. That last implication was arguably the worst part of the old design:
-the field was labelled "Pupil names to redact", which invited teachers to paste
-names *and* to trust a mechanism that was case-sensitive and leaky.
+**Backed by a warn-only highlighter and a confirm-before-send preview (added
+2026-08-07),** so the instruction is no longer the only control. Both import
+pages now:
+
+- run `summariseSuspectNames` over the pasted text on every keystroke and show a
+  live, non-blocking list of words that might be names, with a count each. It
+  **never edits the text**, for the same reason as the generation page: *Newton*
+  and a pupil named *Newton* are indistinguishable.
+- require an explicit confirmation before sending **when something is flagged**,
+  showing each suspect with a snippet of its first occurrence.
+- **fail closed.** If `report-selection.js` does not load, the import is refused
+  rather than sent unchecked — a check that silently finds nothing is
+  indistinguishable from one that never ran.
+
+**Why snippets rather than the whole payload**, unlike the generation page: the
+paste can run to 60,000 characters. Rendering all of it for review would be
+unreadable and would train people to click straight through, which is the
+failure the generation page's decision 1(A) was avoiding in the first place.
+
+**Why the dialog is suspect-triggered rather than always-on:** this page *always*
+has free text — the reports are the point — so a dialog on every import becomes
+muscle memory within a week and stops being read.
+
+**RESIDUAL RISK, stated plainly, and it is not eliminated.** This reduces the
+surface; it does not guarantee no name reaches the model.
+
+- The highlighter is a **heuristic**. It only flags capitalised, non-sentence-
+  initial, non-ALL-CAPS words outside a small stop-word list. A lowercase name, a
+  name in an all-caps header, or a name at the start of a sentence is **not**
+  flagged — so **no dialog appearing does not mean no name is present.**
+- If a teacher confirms past the warning, or the name was never flagged, that
+  name goes to OpenAI and can end up stored in the comment bank, where it is
+  re-sent on every later generation.
+- Nothing about the confirmation is stored; the accountability trail is the
+  interaction only, matching decision 2(A) on the generation path.
+
+What the whole change buys is that the app no longer *asks for* a list of pupils'
+names, no longer holds one even briefly, no longer implies redaction is being
+done for the teacher, and now shows them the specific words worth a second look
+at the moment of sending. That "implies redaction" point was arguably the worst
+part of the old design: the field was labelled "Pupil names to redact", which
+invited teachers to paste names *and* to trust a mechanism that was
+case-sensitive and leaky.
 
 **Framing note:** (b) does not change §6.3.1's agreed wording, but it does narrow
 what "reliable" means there. The *generation* path's guarantee about the current

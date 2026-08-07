@@ -9,6 +9,7 @@
     <script type="module" src="page-layout.js"></script>
     <script type="module" src="app-ui.js"></script>
     <script type="module" src="import-summary.js"></script>
+    <script type="module" src="report-selection.js"></script>
 </head>
 <body class="bg-light-blue text-dark-gray">
     <div id="header-placeholder"></div>
@@ -124,6 +125,23 @@
 
                 <label for="staff-bank-reports">Previous reports:</label>
                 <textarea id="staff-bank-reports" rows="10" maxlength="60000" aria-describedby="staff-bank-privacy-guidance" placeholder="Paste previous reports here, with pupils' names removed"></textarea>
+
+                <div id="staff-bank-suspects" class="privacy-warning hidden" role="status" aria-live="polite"></div>
+
+                <div id="staff-bank-preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="staff-bank-preview-title">
+                    <div class="modal-content send-preview">
+                        <h3 id="staff-bank-preview-title">Check before sending</h3>
+                        <p>These words in the pasted reports look like they might be people's names. Everything pasted
+                            is sent to the AI and the comments it produces are stored in the staff member's comment bank.</p>
+                        <p><strong>If any of these is a pupil, go back and remove it.</strong> Subject topics, authors and
+                            place names are fine &mdash; the check cannot tell them apart, so it only ever warns.</p>
+                        <div id="staff-bank-preview-body" class="send-preview-body"></div>
+                        <div class="warning-actions">
+                            <button type="button" class="button inline-button" id="staff-bank-preview-confirm">Confirm and import</button>
+                            <button type="button" class="button inline-button" id="staff-bank-preview-cancel">Go back and edit</button>
+                        </div>
+                    </div>
+                </div>
 
                 <label for="staff-bank-import-mode">Import mode:</label>
                 <select id="staff-bank-import-mode" onchange="toggleStaffReplaceConfirm()">
@@ -585,6 +603,10 @@
             }
             const text = await file.text();
             document.getElementById('staff-bank-reports').value = text;
+            // A file drop bypasses the textarea's input event, so the live
+            // possible-name warning would go stale — and stale-clean reads as
+            // "nothing found" rather than "not checked".
+            refreshStaffImportSuspects();
         }
 
         function toggleStaffReplaceConfirm() {
@@ -595,6 +617,100 @@
                 document.getElementById('staff-bank-confirm-replace').checked = false;
             }
             updateStaffReplaceSummary();
+        }
+
+        // WARN-ONLY suspect-name support for the staff comment-bank import.
+        // Same shape as import_reports.html; see the comments there and
+        // docs/PROJECT_STATE.md §6.3.2 for why this warns rather than redacts.
+        let confirmedStaffImportSignature = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('staff-bank-reports')?.addEventListener('input', refreshStaffImportSuspects);
+        });
+
+        function staffImportSuspects() {
+            const helper = window.ReportSelection;
+            if (!helper || typeof helper.summariseSuspectNames !== 'function') {
+                return null;   // fail closed
+            }
+            return helper.summariseSuspectNames(document.getElementById('staff-bank-reports').value);
+        }
+
+        function refreshStaffImportSuspects() {
+            const box = document.getElementById('staff-bank-suspects');
+            if (!box) {
+                return;
+            }
+            const suspects = staffImportSuspects();
+            if (suspects === null) {
+                box.textContent = 'Could not run the possible-name check on this page. Please reload before importing.';
+                box.classList.remove('hidden');
+                return;
+            }
+            if (suspects.length === 0) {
+                box.textContent = '';
+                box.classList.add('hidden');
+                return;
+            }
+            const names = suspects.map(entry => entry.count > 1 ? `${entry.name} (${entry.count})` : entry.name);
+            box.textContent = `${suspects.length} word${suspects.length === 1 ? '' : 's'} here might be a person's name: ${names.join(', ')}. `
+                + 'Remove any that are pupils before importing. Subject topics and place names are fine.';
+            box.classList.remove('hidden');
+        }
+
+        function confirmStaffImportSend(suspects) {
+            const modal = document.getElementById('staff-bank-preview-modal');
+            const body = document.getElementById('staff-bank-preview-body');
+            const confirmBtn = document.getElementById('staff-bank-preview-confirm');
+            const cancelBtn = document.getElementById('staff-bank-preview-cancel');
+
+            body.textContent = '';
+            suspects.forEach(entry => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'send-preview-field';
+                const heading = document.createElement('h4');
+                heading.textContent = entry.count > 1 ? `${entry.name} — appears ${entry.count} times` : entry.name;
+                const snippet = document.createElement('div');
+                snippet.className = 'send-preview-text';
+                const parts = entry.snippet.split(entry.name);
+                parts.forEach((part, index) => {
+                    if (index > 0) {
+                        const mark = document.createElement('span');
+                        mark.className = 'suspect-name';
+                        mark.textContent = entry.name;
+                        snippet.appendChild(mark);
+                    }
+                    if (part) {
+                        snippet.appendChild(document.createTextNode(part));
+                    }
+                });
+                wrapper.appendChild(heading);
+                wrapper.appendChild(snippet);
+                body.appendChild(wrapper);
+            });
+
+            modal.classList.remove('hidden');
+            cancelBtn.focus();
+
+            return new Promise(resolve => {
+                const finish = (result) => {
+                    modal.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    document.removeEventListener('keydown', onKeydown);
+                    resolve(result);
+                };
+                const onConfirm = () => finish(true);
+                const onCancel = () => finish(false);
+                const onKeydown = (event) => {
+                    if (event.key === 'Escape') {
+                        finish(false);
+                    }
+                };
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+                document.addEventListener('keydown', onKeydown);
+            });
         }
 
         async function importStaffReports() {
@@ -611,6 +727,21 @@
             if (mode === 'replace' && !confirmReplace) {
                 setStaffBankResult('Please confirm replace mode before importing.', 'warning');
                 return;
+            }
+
+            const suspects = staffImportSuspects();
+            if (suspects === null) {
+                setStaffBankResult('Could not run the possible-name check. Please reload the page (Ctrl+F5) before importing.', 'error');
+                return;
+            }
+            if (suspects.length > 0 && confirmedStaffImportSignature !== reports) {
+                const confirmed = await confirmStaffImportSend(suspects);
+                if (!confirmed) {
+                    setStaffBankResult('Import cancelled. Remove any pupils\' names from the reports, then import again.', 'warning');
+                    document.getElementById('staff-bank-reports').focus();
+                    return;
+                }
+                confirmedStaffImportSignature = reports;
             }
 
             const saved = await saveStaffBankContextAndPrompt();

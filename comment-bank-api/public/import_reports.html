@@ -13,6 +13,7 @@
     <script type="module" src="page-layout.js"></script>
     <script type="module" src="app-ui.js"></script>
     <script type="module" src="import-summary.js"></script>
+    <script type="module" src="report-selection.js"></script>
 </head>
 <body>
     <!-- Include header -->
@@ -52,6 +53,23 @@
                     no list of pupils' names, so it cannot remove them for you.
                 </p>
                 <textarea id="reports" rows="10" aria-describedby="reports-privacy-guidance" placeholder="Paste the reports here, with pupils' names removed..."></textarea>
+            </div>
+
+            <div id="import-suspects" class="privacy-warning hidden" role="status" aria-live="polite"></div>
+
+            <div id="import-preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="import-preview-title">
+                <div class="modal-content send-preview">
+                    <h3 id="import-preview-title">Check before sending</h3>
+                    <p>These words in the pasted reports look like they might be people's names. Everything you
+                        paste is sent to the AI and the comments it produces are stored in your comment bank.</p>
+                    <p><strong>If any of these is a pupil, go back and remove it.</strong> Subject topics, authors and
+                        place names are fine &mdash; the check cannot tell them apart, so it only ever warns.</p>
+                    <div id="import-preview-body" class="send-preview-body"></div>
+                    <div class="warning-actions">
+                        <button type="button" class="button inline-button" id="import-preview-confirm">Confirm and import</button>
+                        <button type="button" class="button inline-button" id="import-preview-cancel">Go back and edit</button>
+                    </div>
+                </div>
             </div>
 
             <button class="button savePrompt" id="genReportButton" onclick="importReports()">Import Reports</button>
@@ -187,6 +205,115 @@
             ['reports'].forEach((id) => {
                 document.getElementById(id)?.addEventListener('input', () => clearImportFieldState(id));
             });
+            document.getElementById('reports')?.addEventListener('input', refreshImportSuspects);
+            refreshImportSuspects();
+        }
+
+        // WARN-ONLY suspect-name support, mirroring the generation page
+        // (public/index.html) but adapted to this page's shape: the pasted text
+        // runs to tens of thousands of characters, so previewing the whole
+        // payload would be unreadable and would train people to click through
+        // it. We show the suspected names with a snippet each instead.
+        let confirmedImportSignature = null;
+
+        function importSuspects() {
+            const helper = window.ReportSelection;
+            if (!helper || typeof helper.summariseSuspectNames !== 'function') {
+                // Fail closed: if the helper did not load, say so rather than
+                // silently importing with no check at all.
+                return null;
+            }
+            return helper.summariseSuspectNames(document.getElementById('reports').value);
+        }
+
+        // Live, non-blocking warning under the textarea. Never edits the text.
+        function refreshImportSuspects() {
+            const box = document.getElementById('import-suspects');
+            if (!box) {
+                return;
+            }
+            const suspects = importSuspects();
+            if (suspects === null) {
+                box.textContent = 'Could not run the possible-name check on this page. Please reload before importing.';
+                box.classList.remove('hidden');
+                return;
+            }
+            if (suspects.length === 0) {
+                box.textContent = '';
+                box.classList.add('hidden');
+                return;
+            }
+            const names = suspects.map(entry => entry.count > 1 ? `${entry.name} (${entry.count})` : entry.name);
+            box.textContent = `${suspects.length} word${suspects.length === 1 ? '' : 's'} here might be a person's name: ${names.join(', ')}. `
+                + 'Remove any that are pupils before importing. Subject topics and place names are fine.';
+            box.classList.remove('hidden');
+        }
+
+        function renderImportSuspects(container, suspects) {
+            container.textContent = '';
+            suspects.forEach(entry => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'send-preview-field';
+
+                const heading = document.createElement('h4');
+                heading.textContent = entry.count > 1 ? `${entry.name} — appears ${entry.count} times` : entry.name;
+
+                const snippet = document.createElement('div');
+                snippet.className = 'send-preview-text';
+                // DOM nodes only, never innerHTML: this text came from a paste.
+                const parts = entry.snippet.split(entry.name);
+                parts.forEach((part, index) => {
+                    if (index > 0) {
+                        const mark = document.createElement('span');
+                        mark.className = 'suspect-name';
+                        mark.textContent = entry.name;
+                        snippet.appendChild(mark);
+                    }
+                    if (part) {
+                        snippet.appendChild(document.createTextNode(part));
+                    }
+                });
+
+                wrapper.appendChild(heading);
+                wrapper.appendChild(snippet);
+                container.appendChild(wrapper);
+            });
+        }
+
+        // Shown only when something was flagged. A dialog that appears on every
+        // import — and this page always has free text, unlike the generation
+        // page — would become muscle memory within a week and stop being read.
+        // The trade-off is stated in docs/PROJECT_STATE.md §6.3.2: a clean pass
+        // is not a guarantee, because the highlighter is a heuristic.
+        function confirmImportSend(suspects) {
+            const modal = document.getElementById('import-preview-modal');
+            const body = document.getElementById('import-preview-body');
+            const confirmBtn = document.getElementById('import-preview-confirm');
+            const cancelBtn = document.getElementById('import-preview-cancel');
+
+            renderImportSuspects(body, suspects);
+            modal.classList.remove('hidden');
+            cancelBtn.focus();
+
+            return new Promise(resolve => {
+                const finish = (result) => {
+                    modal.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    document.removeEventListener('keydown', onKeydown);
+                    resolve(result);
+                };
+                const onConfirm = () => finish(true);
+                const onCancel = () => finish(false);
+                const onKeydown = (event) => {
+                    if (event.key === 'Escape') {
+                        finish(false);
+                    }
+                };
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+                document.addEventListener('keydown', onKeydown);
+            });
         }
 
         async function parseImportResponse(response) {
@@ -219,6 +346,22 @@
                 markImportFieldInvalid('reports');
                 window.ReportGenUI?.showStatus('#result-container', 'Please paste the reports before starting the import.', { tone: 'warning' });
                 return;
+            }
+
+            const suspects = importSuspects();
+            if (suspects === null) {
+                window.ReportGenUI?.showStatus('#result-container', 'Could not run the possible-name check. Please reload the page (Ctrl+F5) before importing.', { tone: 'error' });
+                return;
+            }
+            const importSignature = reports;
+            if (suspects.length > 0 && confirmedImportSignature !== importSignature) {
+                const confirmed = await confirmImportSend(suspects);
+                if (!confirmed) {
+                    window.ReportGenUI?.showStatus('#result-container', 'Import cancelled. Remove any pupils\' names from the reports, then import again.', { tone: 'warning' });
+                    document.getElementById('reports').focus();
+                    return;
+                }
+                confirmedImportSignature = importSignature;
             }
 
             window.ReportGenUI?.setButtonLoading(genReportButton, true, 'Importing...');

@@ -30,9 +30,11 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   owner overruled all the match-improvement options: teachers should not be
   entering names at all, and no pupil-name list should be held server-side. The
   `pupilNames` field is gone from both import pages, the payloads, the routes and
-  `reportImport.js`, replaced by on-page guidance. Residual risk recorded honestly
-  in `docs/PROJECT_STATE.md` §6.3.2 — this reduces the surface, it does not
-  guarantee no name reaches the model.
+  `reportImport.js`, replaced by on-page guidance. **Extended 2026-08-07** with a
+  warn-only suspect-name highlighter and a confirm-before-send preview on both
+  import pages, plus fail-closed behaviour if the helper does not load. Residual
+  risk recorded honestly in `docs/PROJECT_STATE.md` §6.3.2 — the highlighter is a
+  heuristic, so **no dialog appearing does not mean no name is present**.
 - `2026-08-06`: **`.gitignore` covers `.env` but not `.env.*`**, while
   `docs/restore_drill.md` §3 instructs the operator to create
   `.env.restore-test` as a full copy of production secrets. On the live server

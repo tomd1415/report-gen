@@ -77,7 +77,8 @@ const mockApis = async (page, {
     status: 200
   },
   isAdmin = false,
-  username = 'teacher'
+  username = 'teacher',
+  importReportsResponse = null
 } = {}) => {
   // Abort off-origin requests. On a network that cannot reach the remote host
   // they hang, the page 'load' event never fires and every page.goto times out
@@ -132,6 +133,12 @@ const mockApis = async (page, {
     }
     if (/^\/api\/admin\/staff\/[^/]+\/comment-bank$/.test(path)) {
       return fulfillJson(route, { totalCategories: 2, totalComments: 3 });
+    }
+    if (path === '/api/import-reports' || /^\/api\/admin\/staff\/[^/]+\/import-reports$/.test(path)) {
+      if (typeof importReportsResponse === 'function') {
+        return importReportsResponse(route);
+      }
+      return fulfillJson(route, { message: 'Reports imported successfully.', totalCategories: 1, totalComments: 2 });
     }
     if (path === '/api/logout') {
       return fulfillJson(route, { ok: true });
@@ -480,4 +487,110 @@ test('Admin staff comment bank workflow is presented as three clear steps', asyn
   await page.locator('#year-group-list').getByRole('button', { name: 'Delete' }).first().click();
   expect(yearGroupDialog).toContain('Delete year group "Year 7"?');
   expect(yearGroupDialog).toContain('global year group');
+});
+
+test('import page warns about possible names and requires confirmation before sending', async ({ page }) => {
+  let sentBody = null;
+  await mockApis(page, {
+    importReportsResponse: (route) => {
+      sentBody = JSON.parse(route.request().postData());
+      return fulfillJson(route, { message: 'Reports imported successfully.', totalCategories: 1, totalComments: 2 });
+    }
+  });
+
+  await page.goto('/import_reports.html');
+  await chooseSubjectAndYear(page);
+
+  // The field that used to collect a list of pupils' names is gone (removed
+  // 2026-08-06, owner decision) — nothing on this page should ask for one.
+  await expect(page.locator('#pupil-names')).toHaveCount(0);
+  await expect(page.locator('#reports-privacy-guidance')).toContainText("Do not paste pupils' names");
+
+  // Live, warn-only: appears as soon as something looks like a name, and never
+  // edits the pasted text.
+  await page.fill('#reports', 'Worked well with Jordan. Later Jordan helped Priya with fractions.');
+  const warning = page.locator('#import-suspects');
+  await expect(warning).toBeVisible();
+  await expect(warning).toContainText('Jordan (2)');
+  await expect(warning).toContainText('Priya');
+  await expect(page.locator('#reports')).toHaveValue(
+    'Worked well with Jordan. Later Jordan helped Priya with fractions.'
+  );
+
+  await page.getByRole('button', { name: 'Import Reports' }).click();
+
+  // Confirm-before-send: snippets, not the whole 60k paste.
+  const modal = page.locator('#import-preview-modal');
+  await expect(modal).toBeVisible();
+  await expect(page.locator('#import-preview-body')).toContainText('Jordan');
+  await expect(page.locator('#import-preview-body')).toContainText('appears 2 times');
+  await expect(page.locator('.suspect-name').first()).toHaveText('Jordan');
+  expect(sentBody).toBeNull();   // nothing sent while the dialog is open
+
+  await page.getByRole('button', { name: 'Confirm and import' }).click();
+  await expect(modal).toBeHidden();
+  await expect(page.locator('#result-container')).toContainText('Import completed');
+
+  // Warn-only means the text is sent exactly as pasted — nothing was redacted
+  // or mangled on the way through — and no name list is sent with it.
+  expect(sentBody.reports).toBe('Worked well with Jordan. Later Jordan helped Priya with fractions.');
+  expect(sentBody.pupilNames).toBeUndefined();
+});
+
+test('import can be cancelled, and is not gated when nothing looks like a name', async ({ page }) => {
+  let requestCount = 0;
+  await mockApis(page, {
+    importReportsResponse: (route) => {
+      requestCount += 1;
+      return fulfillJson(route, { message: 'Reports imported successfully.', totalCategories: 1, totalComments: 2 });
+    }
+  });
+
+  await page.goto('/import_reports.html');
+  await chooseSubjectAndYear(page);
+  await page.fill('#reports', 'Confident with fractions and worked with Jordan.');
+
+  await page.getByRole('button', { name: 'Import Reports' }).click();
+  await page.getByRole('button', { name: 'Go back and edit' }).click();
+
+  await expect(page.locator('#import-preview-modal')).toBeHidden();
+  await expect(page.locator('#result-container')).toContainText('Import cancelled');
+  expect(requestCount).toBe(0);
+  // Cancelling must not lose the teacher's paste.
+  await expect(page.locator('#reports')).toHaveValue('Confident with fractions and worked with Jordan.');
+
+  // With nothing flagged there is nothing to review, so the dialog is skipped.
+  // Stated plainly because it is the honest limit of this control: a clean pass
+  // means the heuristic found nothing, not that no name is present.
+  await page.fill('#reports', 'confident with fractions and improving steadily.');
+  await expect(page.locator('#import-suspects')).toBeHidden();
+  await page.getByRole('button', { name: 'Import Reports' }).click();
+  await expect(page.locator('#import-preview-modal')).toBeHidden();
+  await expect(page.locator('#result-container')).toContainText('Import completed');
+  expect(requestCount).toBe(1);
+});
+
+test('import refuses to send if the possible-name check could not load', async ({ page }) => {
+  // Fail closed. If report-selection.js does not load, the check silently finds
+  // nothing — and "nothing found" is indistinguishable from "never ran". Without
+  // this branch a broken script would look exactly like a clean paste and the
+  // import would go through with no check at all.
+  let requestCount = 0;
+  await mockApis(page, {
+    importReportsResponse: (route) => {
+      requestCount += 1;
+      return fulfillJson(route, { message: 'Reports imported successfully.' });
+    }
+  });
+  await page.route('**/report-selection.js', (route) => route.abort());
+
+  await page.goto('/import_reports.html');
+  await chooseSubjectAndYear(page);
+  await page.fill('#reports', 'Worked well with Jordan this term.');
+
+  await expect(page.locator('#import-suspects')).toContainText('Could not run the possible-name check');
+
+  await page.getByRole('button', { name: 'Import Reports' }).click();
+  await expect(page.locator('#result-container')).toContainText('Could not run the possible-name check');
+  expect(requestCount).toBe(0);
 });

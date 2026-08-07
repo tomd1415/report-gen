@@ -1,6 +1,6 @@
 # Testing: what each suite is for, and the rules the gates follow
 
-_Written 2026-08-06. `README.md` lists the commands; this explains **why** the
+_Written 2026-08-06, updated 2026-08-07. `README.md` lists the commands; this explains **why** the
 suites are shaped the way they are, and the conventions the gates follow — which
 until now lived only in commit messages, where nobody reads them._
 
@@ -10,8 +10,8 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 18 files, 112 tests | nothing |
-| `npm run test:e2e` | Playwright — 9 browser journeys | Chromium |
+| `npm test` | Vitest — 18 files, 118 tests | nothing |
+| `npm run test:e2e` | Playwright — 12 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
 
@@ -79,7 +79,7 @@ that is *stated* somewhere and enforced nowhere.
 | Route auth matrix | `tests/route-auth-matrix.test.js` | every route rejects a logged-out request |
 | Off-origin assets | `tests/e2e/ui-smoke.spec.js` | no page loads anything from another origin |
 | Inline script syntax | `scripts/check-inline-scripts.mjs` | inline `<script>` blocks parse |
-| Import redaction | `tests/import-reports.test.js` | pupil names do not reach the prompt |
+| Import name warning | `tests/e2e/ui-smoke.spec.js` | the highlighter and confirm gate actually block a send |
 
 ### Rule 1 — a known-failures list is a bug list, not an exceptions list
 
@@ -135,14 +135,22 @@ stable. The inline-script count is *meant to fall* as scripts move into
 `public/*.js` (see `PROJECT_STATE.md` §6.4), so pinning it would make legitimate
 progress fail the build.
 
-### Rule 5 — pin a known leak rather than leaving it undocumented
+### Rule 5 — test the branch that fires when a check cannot run
 
-`tests/import-reports.test.js` contains a test named `KNOWN LEAK: import
-redaction is case-sensitive, so ALEX survives`. It asserts a **bug**, deliberately,
-because the fix needs an owner decision (see `PROJECT_STATE.md` §6.3.2). Pinning
-it means the leak cannot widen unnoticed, and the test goes red the moment the
-decision lands — at which point it should be replaced with the positive
-assertion, not relaxed.
+A check that silently finds nothing is indistinguishable from one that never
+ran, and in an interface where clean means safe, an unrendered warning reads as
+an endorsement. The import page's possible-name check therefore **fails closed**:
+if `report-selection.js` does not load, the import is refused rather than sent
+unchecked — and `tests/e2e/ui-smoke.spec.js` aborts that script's request to
+prove the refusal actually happens.
+
+Write that test whenever a control's absence looks the same as its success.
+
+> The earlier Rule 5 pinned a deliberate `KNOWN LEAK` test for the
+> case-sensitive import redaction. That mechanism was **removed** on 2026-08-06
+> rather than fixed (owner decision, `PROJECT_STATE.md` §6.3.2), so the test and
+> the leak are both gone. The convention it demonstrated still stands — see
+> Rule 1.
 
 ---
 
@@ -152,8 +160,11 @@ Prefer, in this order:
 
 1. **Silent failures** — a wrong number, a skipped step, an empty result. These
    outrank anything that crashes loudly, because a crash gets noticed.
-   `tests/import-empty-result.test.js` is the model: it proves an import that
-   returns nothing *destroys* the comment bank and reports success.
+   `tests/import-empty-result.test.js` is the model. It was written to prove an
+   import returning nothing *destroyed* the comment bank while reporting success;
+   it now asserts the fix, and still asserts both halves together — the call
+   fails **and** nothing was deleted. Asserting only the failure would pass even
+   if the delete happened first, which was the whole bug.
 2. **A control alongside the failure.** Every "this goes wrong" test should sit
    next to one proving the harness does the right thing when the input is good —
    otherwise the failing assertion may be passing for the wrong reason.
