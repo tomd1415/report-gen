@@ -121,12 +121,23 @@ and UI helpers.
 > footer's off-origin Creative Commons icons stalling `page.goto`'s `load` event
 > — see §6.8. That is fixed, so this slice is no longer untested.
 >
-> **Timing caveat for this box:** the host is shared and its load average
-> intermittently reaches ~20–30 on 4 cores, which pushes tests past Vitest's
-> 5000 ms default and produces 2–3 *different* failures per run. That is
-> environmental, not a repo defect. When it happens use
-> `npx vitest run --testTimeout=30000` and `npx playwright test --workers=1`;
-> do **not** raise the committed defaults to paper over it.
+> **Timing caveat for this box:** load average reaching ~20–30 on 4 cores pushes
+> tests past Vitest's 5000 ms default and produces 2–3 *different* failures per
+> run. When it happens use `npx vitest run --testTimeout=30000` and
+> `npx playwright test --workers=1`; do **not** raise the committed defaults to
+> paper over it.
+>
+> **Corrected 2026-08-08.** This paragraph used to assert the high load was
+> "environmental, not a repo defect". A measured `npm run check:deploy` on an
+> otherwise quiet box (load 2.7 before starting) took **90 s and drove the 1-minute
+> load average to 22.6 by itself** — and it was still climbing when the run ended,
+> so peak demand was higher than that. So **this project's own gate accounts for
+> the whole of that range**, and "load is 20–30, therefore something outside the
+> container is to blame" is not a safe inference. It may have been true on the
+> occasion it was written — the observation then was one node process in the
+> container — but it was stated with more confidence than the evidence carried,
+> which is exactly the failure `docs/LESSONS-LEARNT.md` §4 is about. Check what
+> *you* are running before blaming the box.
 
 ---
 
