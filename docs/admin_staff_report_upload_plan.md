@@ -1,5 +1,13 @@
 # Admin Staff Report Upload Feature Plan
 
+> **Status: shipped, and one step of it has since been removed.** This is the
+> original plan, kept for the reasoning behind the design. Step 5 of the workflow
+> and the `pupilNames` service option below **no longer exist**: the app stopped
+> collecting a pupil-name list on 2026-08-06 (owner decision — teachers are told
+> not to paste names, and no roster is held server-side). What replaced it is a
+> warn-only highlighter and a confirm-before-send preview. See
+> `docs/PROJECT_STATE.md` §6.3.2 for what the import path does today.
+
 ## Purpose
 
 Allow an admin user to upload or paste previous reports for a selected staff
@@ -90,7 +98,8 @@ No database migration was required for this implementation.
 3. Admin selects the subject and year group.
 4. Admin optionally edits that staff member's subject description, default word
    limit, and prompt for the selected subject/year group.
-5. Admin provides pupil names to redact.
+5. ~~Admin provides pupil names to redact.~~ **Removed 2026-08-06** — the app no
+   longer asks for pupil names. See the status note at the top.
 6. Admin pastes previous reports or uploads a plain text file.
 7. Admin chooses an import mode:
    - `merge`: default, combines generated comments with existing comments.
@@ -208,7 +217,7 @@ Tasks:
   - `actorUserId`
   - `subjectId`
   - `yearGroupId`
-  - `pupilNames`
+  - ~~`pupilNames`~~ (removed 2026-08-06)
   - `reports`
   - `mode`
   - `subjectDescription`

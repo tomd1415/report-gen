@@ -105,8 +105,10 @@ export const redactPupilName = (text, name) => {
     // *after* the delimiter and the next occurrence has no preceding boundary
     // left to match against — "Alex Alex" redacted only the first one. A
     // lookahead matches the boundary without consuming it, so the delimiter is
-    // still there to open the following match. (Found 2026-08-06; the same shape
-    // exists in replacePupilNames in src/services/reportImport.js.)
+    // still there to open the following match. (Found 2026-08-06. The import
+    // path carried the same bug in replacePupilNames; that whole function was
+    // removed later the same day with the pupil-name list, so this is now the
+    // only copy — do not go looking for the other one.)
     const regex = new RegExp(`(^|[^\\w])${escapeRegex(target)}(?=[^\\w]|$)`, 'gi');
     result = result.replace(regex, (match, prefix) => `${prefix || ''}${PUPIL_NAME_PLACEHOLDER}`);
   });

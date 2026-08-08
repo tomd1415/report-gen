@@ -11,7 +11,7 @@ until now lived only in commit messages, where nobody reads them._
 | Command | What it is | Needs |
 |---|---|---|
 | `npm test` | Vitest — 18 files, 118 tests | nothing |
-| `npm run test:e2e` | Playwright — 12 browser journeys | Chromium |
+| `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
 
@@ -146,11 +146,12 @@ prove the refusal actually happens.
 
 Write that test whenever a control's absence looks the same as its success.
 
-> The earlier Rule 5 pinned a deliberate `KNOWN LEAK` test for the
-> case-sensitive import redaction. That mechanism was **removed** on 2026-08-06
-> rather than fixed (owner decision, `PROJECT_STATE.md` §6.3.2), so the test and
-> the leak are both gone. The convention it demonstrated still stands — see
-> Rule 1.
+_(An earlier Rule 5 described a mechanism this project no longer has. It was
+replaced rather than amended, deliberately: `/claude-guidance/LESSONS.md` §3
+records that a correction which repeats the claim it retracts gets read as the
+claim — two careful readers quoted a retracted sentence back as current, having
+matched it and missed the correction beside it. `git log docs/TESTING.md` has the
+old text if it is ever needed.)_
 
 ---
 

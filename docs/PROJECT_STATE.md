@@ -293,9 +293,11 @@ occurrences was only redacted the first time:
       -> 'PUPIL_NAME PUPIL_NAME worked hard.' // after
 
 The fix is to make the trailing boundary a lookahead so it is not consumed. It
-is one token, in `public/report-selection.js` and in `replacePupilNames` in
-`src/services/reportImport.js`, with six regression tests in
-`tests/ui-redaction.test.js`. Meta-tested: with the old regex exactly those six
+was one token, applied in `public/report-selection.js` and — at the time — in
+`replacePupilNames`, with six regression tests in `tests/ui-redaction.test.js`.
+Only the browser copy survives: `replacePupilNames` was deleted hours later when
+the name list was removed (b, below), so `public/report-selection.js` is the sole
+place this logic now lives. Meta-tested: with the old regex exactly those six
 fail and all 22 pre-existing assertions still pass, so the fix changes no
 previously-specified behaviour.
 
@@ -345,6 +347,13 @@ pages now:
 - **fail closed.** If `report-selection.js` does not load, the import is refused
   rather than sent unchecked — a check that silently finds nothing is
   indistinguishable from one that never ran.
+
+Note the two pages carry **separate implementations** of the same control, so
+they are two things that must agree with nothing making them. Both fail-closed
+branches now have an e2e test (the admin one was added 2026-08-08, after a
+review noticed only the teacher-facing copy was covered), and each was
+mutation-tested: removing a branch turns *its own* test red and leaves the
+other green.
 
 **Why snippets rather than the whole payload**, unlike the generation page: the
 paste can run to 60,000 characters. Rendering all of it for review would be
