@@ -562,6 +562,51 @@ listed in `KNOWN_UNGUARDED`, which the test asserts is *exact* — fixing a rout
 without shrinking the list fails, and adding a new unguarded route fails. Like
 `KNOWN_OFF_ORIGIN_VIOLATIONS`, it is a bug list, not an exceptions list.
 
+### 6.10 A failed backup overwrites a good one (found 2026-08-08)
+`src/services/dbBackup.js` has **no test coverage at all** — nothing in `tests/`
+references it — and it is what `docs/restore_drill.md` depends on.
+
+**Measured against the live MariaDB here, not reasoned about:**
+
+| Case | mysqldump exit | file written |
+|---|---|---|
+| Normal dump of `comment_bank` | 0 | 11,386 bytes, 11 `CREATE TABLE` |
+| Dump of a database the user cannot reach | **2** | **871 bytes, 0 tables** |
+
+The failure is handled correctly *as a request*: `execFileAsync` rejects on the
+non-zero exit, so the admin gets a 500. The problem is what it leaves behind.
+
+**mysqldump writes its header to `--result-file` before it discovers the error**,
+so a failed dump leaves a well-formed, plausible-looking `.sql` file. Nothing
+removes it — `runDump` has no `try`/`finally`. And `exportDatabase` names its
+output by **date only** (`database-backup-YYYY-MM-DD.sql`), so a second export on
+the same day writes to the same path.
+
+Put together and reproduced end to end: a good 11,386-byte backup taken in the
+morning was **replaced by the 871-byte stub** by a failed export that afternoon.
+The stub opens with a correct `-- MariaDB dump 10.19` banner, so nothing about it
+looks wrong until you restore it and get an empty database. The restore drill's
+row counts (§5 of that document) would catch it — but only if the drill is run,
+and the whole point of a backup is the day nobody rehearsed.
+
+`backupDatabase` is not exposed to this: it uses a full timestamp, so each run
+gets its own filename. Only the download path collides.
+
+**Fix (not applied — this needs its own test, and both belong together):**
+1. Write to a temporary path and rename onto the final name only after a
+   successful dump, so a failure cannot replace a good file.
+2. On failure, unlink the partial file in a `finally`.
+3. Assert the artefact before reporting success — non-zero size and at least one
+   `CREATE TABLE` — rather than trusting the exit code. LESSONS §4: check for the
+   artefact, not the exit code.
+4. Give `exportDatabase` a full timestamp like `backupDatabase`, or write it
+   somewhere transient, since it is a download rather than an archive.
+
+**Separate, smaller note:** the dump runs without `--single-transaction`, so it
+takes mysqldump's default table locks. That gives a consistent dump but blocks
+writes for its duration — sub-second at this data size, but worth knowing before
+the comment banks grow.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)

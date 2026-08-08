@@ -38,6 +38,19 @@ EXIT;
 
 ## 2. Restore The Backup Into The Test Database
 
+> **Check the file is a real backup before you restore it.** A `mysqldump` that
+> fails still writes its header first, so a failed backup leaves a well-formed
+> ~870-byte file with a correct `-- MariaDB dump` banner and no data
+> (`docs/PROJECT_STATE.md` §6.10). One command tells them apart:
+>
+> ```bash
+> ls -l /path/to/comment_bank_backup.sql
+> grep -c 'CREATE TABLE' /path/to/comment_bank_backup.sql   # expect 11, not 0
+> ```
+>
+> If that count is 0, stop — the file is a failed dump, not a backup, and
+> restoring it will give you an empty database with no error at all.
+
 For a plain SQL dump:
 
 ```bash

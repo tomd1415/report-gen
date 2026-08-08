@@ -85,6 +85,15 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   is an inline `<script>` in the HTML, so it cannot be imported by a test. That
   is a concrete, named cost of the inline-script debt in §6.4 — the CSP unlock
   and the testability unlock are the same piece of work.
+- `2026-08-08`: **A failed backup overwrites a good one, and the backup service
+  has no tests.** Measured: `mysqldump` writes its header to `--result-file`
+  before it hits an error, so a failed dump leaves a well-formed 871-byte stub;
+  nothing unlinks it; and `exportDatabase` names files by date only, so a failed
+  afternoon export replaced a good 11,386-byte morning backup with the stub. The
+  stub carries a correct MariaDB banner and looks fine until you restore it. Fix
+  and the four steps it needs are in `docs/PROJECT_STATE.md` §6.10. This is the
+  first thing to fix in that file — it is also completely untested, and it is
+  what `docs/restore_drill.md` relies on.
 - `2026-08-06`: The restore drill was verifying seven content tables but **not**
   `UserSubjects` / `UserYearGroups`. Those hold each staff member's selected
   subjects and year groups, and they fail quietly — restore them empty and every

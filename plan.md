@@ -1,5 +1,26 @@
 # Update Plan (Update1)
 
+> **Status: complete. This is history, not a roadmap.** Every phase below has
+> shipped — verified 2026-08-08 by checking the claims rather than assuming:
+> there is no root `package.json` (Phase 1's dependency consolidation), no
+> leftover `server.mjs*` variants, `server.mjs` is a thin entrypoint over
+> `src/app.js` with Umzug migrations and a documented `.env.example` (Phase 3),
+> the OpenAI integration uses the Responses API with `gpt-5.2` and JSON-schema
+> structured outputs (Phase 4), `store: false` and a hashed `safety_identifier`
+> are enforced (Phase 7), and there are 18 Vitest files plus a Playwright suite
+> (Phase 8). The backup endpoints use `execFile` with an argument array rather
+> than `exec`, which is Phase 3's "lock them down more tightly".
+>
+> **The live roadmap is `docs/future_improvements.md` (backlog) and
+> `docs/future_improvements_plan.md` (prioritised).** Current state is described
+> in `docs/PROJECT_STATE.md`. This file is kept because it records *why* the
+> stack and the 4-paragraph structure were chosen; it is not work anyone should
+> pick up.
+>
+> One residue: Phase 2 asked for redundant dependencies to be removed.
+> `body-parser`, `fs` and `https` are gone, but `axios` is now declared and
+> imported nowhere — see `docs/future_improvements.md`.
+
 ## Goals
 - Modernize the codebase and dependencies while keeping the core workflow (comment bank -> report generation).
 - Migrate OpenAI usage to the latest SDK and Responses API using the GPT-5.2 model.
