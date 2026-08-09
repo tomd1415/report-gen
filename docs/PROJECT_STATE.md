@@ -650,6 +650,49 @@ would grow as the CSP work proceeds.
 lists what the tests import, and fails naming any module nothing imports.
 Mutation-tested — adding an untested module turns it red and names the file.
 
+### 6.13 The migration runner succeeds while running nothing (found 2026-08-09)
+`runMigrations()` (`src/db/migrate.js:9`) finds migrations with the glob
+`migrations/*.mjs`. **Measured 2026-08-09: umzug's `up()` resolves cleanly when
+that glob matches nothing** — `pending: 0, ran: 0`, no error, no warning. Probed
+directly by pointing a throwaway Umzug at `migrations/*.js`.
+
+`server.mjs` awaits that call at the top level, so the failure mode is not a
+crash. A migration renamed, or a deploy that does not copy `migrations/`, and the
+app boots against whatever schema is already in the database. On an empty
+database the first query fails loudly and you find out at once. The bad case is
+the *partial* one: an existing database missing only the newest migration's
+table. Everything works except the one feature, and nothing in the logs connects
+the two.
+
+Two more gaps sat next to it, both the same shape:
+
+- **Nothing compared the models against the migrations.** Add a
+  `sequelize.define` and forget the migration and the whole suite still passes:
+  the models are never synced (nor is the session store — `sessionStore.sync()`
+  is not called), so a missing table only shows up in production.
+- **The restore drill's table count was an unguarded constant.** §2 of
+  `docs/restore_drill.md` tells an operator to run `grep -c 'CREATE TABLE'` and
+  expect 11, which is how they tell a real backup from the 871-byte stub in
+  §6.10. The next migration that adds a table makes that number wrong, and a
+  wrong expected count on that page is worse than none — it is the only thing
+  standing between an operator and restoring an empty database.
+
+`tests/migration-coverage.test.js` now covers all three. It does not need a
+database: it runs the real migration files through umzug's real resolver against
+a recording stub, so the table list is what the code *does*, not what a regex
+found in the source. Four mutations, each verified red and naming the right
+thing: rename a migration to `.js`; add a model with no migration
+(`expected [ 'Orphans' ] to deeply equal []`); stop creating `Sessions`; change
+the number in the drill (`expected 12 to be 11`).
+
+**Not fixed, and worth a decision:** `migrations/20250106-002` wraps
+`describeTable('Sessions')` in `try { … } catch { return; }`. The intent is "skip
+if the table is not there yet", but it swallows *every* reason — and umzug then
+records the migration as executed, so it never runs again. A transient failure at
+that moment leaves `Sessions` permanently without its `createdAt`/`updatedAt`
+columns and the migration marked done. Narrow the catch to the table-missing
+case, or re-check `showAllTables()` instead of catching at all.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)

@@ -94,6 +94,15 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   and the four steps it needs are in `docs/PROJECT_STATE.md` §6.10. This is the
   first thing to fix in that file — it is also completely untested, and it is
   what `docs/restore_drill.md` relies on.
+- `2026-08-09`: **A migration that swallows its own error is then recorded as
+  done.** `migrations/20250106-002-add-session-timestamps.mjs` wraps
+  `describeTable('Sessions')` in `try { … } catch { return; }`. The intent is
+  "skip if the table does not exist yet", but it catches every reason — and umzug
+  writes the migration into `SequelizeMeta` on return, so it never runs again. A
+  transient failure at that moment leaves `Sessions` permanently without its
+  `createdAt`/`updatedAt` columns, with nothing logged. Narrow the catch to the
+  table-missing case, or check `showAllTables()` rather than catching. See
+  `docs/PROJECT_STATE.md` §6.13.
 - `2026-08-06`: The restore drill was verifying seven content tables but **not**
   `UserSubjects` / `UserYearGroups`. Those hold each staff member's selected
   subjects and year groups, and they fail quietly — restore them empty and every
@@ -143,6 +152,16 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   with a floor of "more than zero" rather than an exact count, because the count
   is *meant* to fall as scripts move out of the pages (§6.4). Fix is in the
   working tree, uncommitted; the general rule is written up in `docs/TESTING.md`.
+- `2026-08-09`: **The migration runner had nothing checking it ran anything.**
+  Measured: umzug's `up()` resolves with `pending: 0, ran: 0` and no error when
+  its glob matches nothing, and `server.mjs` awaits it at the top level — so a
+  renamed migration file starts the app against a stale schema without a word.
+  Nothing compared the models against the migrations either. Both are now gated
+  by `tests/migration-coverage.test.js` (no database needed — it runs the real
+  migrations against a recording stub), along with the `CREATE TABLE` count that
+  `docs/restore_drill.md` §2 tells the operator to expect. Gate is in the working
+  tree, uncommitted. Detail and the four verified mutations: `PROJECT_STATE.md`
+  §6.13.
 - `2026-08-06`: Playwright now runs here and covers nine journeys (ready-check
   through to a generated report, form retention on an incomplete report, both
   free-text preview paths, the off-origin asset guard, the empty-state, Manage
