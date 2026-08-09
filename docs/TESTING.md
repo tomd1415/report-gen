@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 21 files, 129 tests | nothing |
+| `npm test` | Vitest — 21 files, 133 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -80,7 +80,7 @@ that is *stated* somewhere and enforced nowhere.
 | Off-origin assets | `tests/e2e/ui-smoke.spec.js` | no page loads anything from another origin |
 | Inline script syntax | `scripts/check-inline-scripts.mjs` | inline `<script>` blocks parse |
 | Import name warning | `tests/e2e/ui-smoke.spec.js` | the highlighter and confirm gate actually block a send |
-| Browser-module coverage | `tests/public-module-coverage.test.js` | every `public/*.js` is imported by some test, so a syntax error fails something |
+| Browser-module coverage | `tests/public-module-coverage.test.js` | every `public/*.js` parses — the test imports each one itself |
 | Migration coverage | `tests/migration-coverage.test.js` | the glob matches every migration file, every model's table gets created, and the restore drill's table count is right |
 | OpenAI privacy params | `tests/openai-privacy-params.test.js` | every OpenAI request really sends `store: false` and a hashed `safety_identifier`, and no call site escapes the check |
 
@@ -169,6 +169,35 @@ records that a correction which repeats the claim it retracts gets read as the
 claim — two careful readers quoted a retracted sentence back as current, having
 matched it and missed the correction beside it. `git log docs/TESTING.md` has the
 old text if it is ever needed.)_
+
+### Rule 6 — a gate that reads source text can be satisfied by a comment
+
+If a check answers its question by searching for a *string*, then writing that
+string in a comment passes it. `/claude-guidance/LESSONS.md` §3 records this as a
+source-scanning test passing on the comment that explains the bug, and it is easy
+to reproduce accidentally in one's own work.
+
+`public-module-coverage` was written that way first: it scanned the test sources
+for `public/<name>` and passed if the string appeared anywhere, so a comment
+naming a file would have satisfied it while nothing imported the module — a false
+pass, in a gate whose whole purpose is to stop false passes. It was found on a
+deliberate re-read, not by anything going red, which is the point: this failure
+mode is invisible from the outside because the gate is green either way.
+
+So **enumerate or execute the real thing** wherever you can:
+
+- import the module rather than grepping for an import of it;
+- walk `app.router.stack` rather than reading route declarations;
+- run the migrations against a recording stub rather than matching
+  `createTable(` in the source;
+- drive the request and inspect what was sent rather than grepping for
+  `store: false`.
+
+When a source scan genuinely is the right tool, make it **count** rather than
+match, and check the direction it fails in. The census in
+`openai-privacy-params` counts `.responses.parse(` call sites; a stray mention in
+a comment inflates that count and turns the gate **red**. A false alarm someone
+reads is an acceptable cost. A false pass is not.
 
 ---
 

@@ -646,9 +646,29 @@ being checked, silently — and the stated direction (§6.4) is to move *more* c
 out of the inline scripts into exactly these files, so the unchecked fraction
 would grow as the CSP work proceeds.
 
-`tests/public-module-coverage.test.js` now pins it: it lists `public/*.js`,
-lists what the tests import, and fails naming any module nothing imports.
-Mutation-tested — adding an untested module turns it red and names the file.
+`tests/public-module-coverage.test.js` now pins it by **importing every
+`public/*.js` itself**, one test per file, so a parse error fails naming the
+file. Mutation-tested 2026-08-09: a syntax error in a module turns it red, and a
+brand-new module is picked up automatically with no list to update — added
+`orphan-probe.js`, watched the run go from 6 tests to 7, broke it, watched it go
+red.
+
+Its first version was weaker and is worth recording as a lesson, because it had
+the very flaw this file keeps warning about. It scanned the *test sources* for
+the string `public/<name>` and passed if it appeared anywhere — so a **comment**
+mentioning a filename would have satisfied it while nothing actually imported
+the module. A false pass, in a gate whose entire job is to stop false passes.
+Found on a fresh-eyes re-read of my own work (`SELF-DIRECTED-WORK.md` item 4),
+not by anything going red. Importing the modules directly removes the hole
+outright: there is nothing left to fool.
+
+Note the check cannot simply move into `check-inline-scripts.mjs`. That script
+parses with `new Function`, and these files carry real `export` statements
+alongside their `window.X = {…}` block, which `new Function` rejects.
+
+Scope, stated plainly: this proves each module parses and that its top level
+runs. It is not behaviour coverage — `app-ui.js` still has the 143 unverified
+call sites in §6.11. It is the floor beneath coverage, not coverage.
 
 ### 6.13 The migration runner succeeds while running nothing (found 2026-08-09)
 `runMigrations()` (`src/db/migrate.js:9`) finds migrations with the glob

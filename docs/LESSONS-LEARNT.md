@@ -133,6 +133,27 @@ reassuring sentence is where an investigation stops, so it needs to be the most
 carefully bounded thing in the write-up. This one was found by asking for an
 outside review rather than by any test.
 
+**A second follow-on, from writing these gates rather than from the bug.** The
+instruction above — *enumerate the real thing at runtime and compare* — is easy
+to agree with and easy to not quite do. `public-module-coverage` was written to
+guard "every browser module is syntax-checked by something", and its first
+version compared two *texts*: the filenames in `public/` against the strings
+appearing in the test sources. A comment mentioning a filename would have
+satisfied it. It was a source scan wearing the clothes of a runtime check, in a
+gate whose entire purpose was to stop exactly that.
+
+Nothing went red. Green is what a gate with a false pass looks like from the
+outside, so the only thing that finds one is deliberately re-reading your own
+work and asking *what would make this pass when it should not?* It was rewritten
+to import each module itself, which leaves nothing to fool: 2026-08-09, a
+planted syntax error goes red naming the file, and a brand-new module is picked
+up with no list to update.
+
+The habit worth keeping: after writing a gate, before trusting it, ask **what
+would satisfy this check without satisfying the thing it stands for.** Meta-
+testing catches a gate that cannot fail; only that question catches a gate that
+fails for the wrong reason.
+
 ---
 
 ## 4. The documentation drifted precisely where the code changed most
