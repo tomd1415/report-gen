@@ -607,6 +607,49 @@ takes mysqldump's default table locks. That gives a consistent dump but blocks
 writes for its duration — sub-second at this data size, but worth knowing before
 the comment banks grow.
 
+### 6.11 The user-feedback layer fails silently (found 2026-08-09)
+Every status message, loading state and field-validation highlight in the app
+goes through `window.ReportGenUI` from `public/app-ui.js`. Measured: **143
+call sites across six pages, every one written as `window.ReportGenUI?.…`, and
+no page checks the module loaded.** The helpers return `false` when they cannot
+find their target element, and **every call site discards that return value**.
+
+So there are two ways for user-facing feedback to disappear with no trace:
+
+1. **The module does not load.** All 143 calls become no-ops. Fetches still
+   fire, so a teacher clicking Generate Report sees literally nothing happen —
+   no error, no spinner, no success. **This case is caught**, though not where
+   you would expect: `check:inline-scripts` passes (it only reads inline
+   `<script>` blocks — verified by planting a syntax error in `app-ui.js`, which
+   it did not notice), but the unit and e2e suites both fail. See §6.12.
+2. **An element id is renamed or mistyped.** `showStatus('#typo', …)` returns
+   `false`, the caller ignores it, and that one message silently never appears
+   while everything around it keeps working. **This case is not caught by
+   anything**, and it is the more likely of the two in ordinary maintenance.
+
+Not fixed. The honest options are a one-line assertion at page load that
+`window.ReportGenUI` exists, and/or making the helpers `console.warn` when they
+cannot resolve a target so a missing element leaves a trace. Both are small; both
+are behaviour changes across six pages, so they want to be one deliberate change
+rather than a drive-by.
+
+### 6.12 `check:inline-scripts` does not cover `public/*.js` (found 2026-08-09)
+The gate parses inline `<script>` blocks in the HTML only. A syntax error in any
+of the five browser modules passes it cleanly — measured, exit 0, "Checked 10
+inline scripts".
+
+That turned out to matter less than it first appeared, and the reason is worth
+writing down because it is load-bearing and undocumented: **every `public/*.js`
+file happens to be imported by some test**, so a syntax error fails the unit
+suite. Nothing enforced that. Add a sixth helper with no test and it would stop
+being checked, silently — and the stated direction (§6.4) is to move *more* code
+out of the inline scripts into exactly these files, so the unchecked fraction
+would grow as the CSP work proceeds.
+
+`tests/public-module-coverage.test.js` now pins it: it lists `public/*.js`,
+lists what the tests import, and fails naming any module nothing imports.
+Mutation-tested — adding an untested module turns it red and names the file.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)

@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 18 files, 118 tests | nothing |
+| `npm test` | Vitest — 19 files, 120 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -71,7 +71,7 @@ repo and is not always present.
 
 ## The gates, and the rules they follow
 
-Four checks exist to catch a class of problem that ordinary tests do not: a rule
+Five checks exist to catch a class of problem that ordinary tests do not: a rule
 that is *stated* somewhere and enforced nowhere.
 
 | Gate | Where | Guards |
@@ -80,6 +80,7 @@ that is *stated* somewhere and enforced nowhere.
 | Off-origin assets | `tests/e2e/ui-smoke.spec.js` | no page loads anything from another origin |
 | Inline script syntax | `scripts/check-inline-scripts.mjs` | inline `<script>` blocks parse |
 | Import name warning | `tests/e2e/ui-smoke.spec.js` | the highlighter and confirm gate actually block a send |
+| Browser-module coverage | `tests/public-module-coverage.test.js` | every `public/*.js` is imported by some test, so a syntax error fails something |
 
 ### Rule 1 — a known-failures list is a bug list, not an exceptions list
 

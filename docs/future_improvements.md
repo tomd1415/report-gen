@@ -116,6 +116,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## UX and Admin Workflows
 
+- `2026-08-09`: **The user-feedback layer fails silently.** 143 `ReportGenUI?.`
+  call sites across six pages, no page verifies the module loaded, and every
+  call discards the `false` the helpers return when they cannot find their
+  target. A renamed element id makes one message vanish with nothing to show for
+  it. Two small fixes — assert `window.ReportGenUI` at page load, and
+  `console.warn` on an unresolved target — are described in
+  `docs/PROJECT_STATE.md` §6.11.
+
 - `2026-04-17`: Split large inline scripts out of HTML pages into dedicated JS
   modules. `adminpage.html`, `index.html`, and management pages would be easier
   to test and maintain.
