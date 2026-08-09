@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 20 files, 125 tests | nothing |
+| `npm test` | Vitest — 21 files, 129 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -71,7 +71,7 @@ repo and is not always present.
 
 ## The gates, and the rules they follow
 
-Five checks exist to catch a class of problem that ordinary tests do not: a rule
+Seven checks exist to catch a class of problem that ordinary tests do not: a rule
 that is *stated* somewhere and enforced nowhere.
 
 | Gate | Where | Guards |
@@ -82,6 +82,7 @@ that is *stated* somewhere and enforced nowhere.
 | Import name warning | `tests/e2e/ui-smoke.spec.js` | the highlighter and confirm gate actually block a send |
 | Browser-module coverage | `tests/public-module-coverage.test.js` | every `public/*.js` is imported by some test, so a syntax error fails something |
 | Migration coverage | `tests/migration-coverage.test.js` | the glob matches every migration file, every model's table gets created, and the restore drill's table count is right |
+| OpenAI privacy params | `tests/openai-privacy-params.test.js` | every OpenAI request really sends `store: false` and a hashed `safety_identifier`, and no call site escapes the check |
 
 ### Rule 1 — a known-failures list is a bug list, not an exceptions list
 
@@ -115,6 +116,13 @@ A gate nobody has watched fail is decoration. Before relying on a new one:
 Then revert and confirm with `git diff --quiet`, not by eye. Every gate above has
 been through this; the results are in `docs/LESSONS-LEARNT.md` §2.
 
+`openai-privacy-params` is the clearest illustration of *why* both directions,
+because it is built from two halves and the meta-test shows neither is redundant
+(`PROJECT_STATE.md` §6.14): dropping `store: false` reddens the runtime half and
+not the census, while adding a sixth call site reddens the census and not the
+runtime half. Had only one half been meta-tested, the other could have been
+decoration and nobody would have known.
+
 ### Rule 4 — a gate must not be able to pass without checking anything
 
 The commonest way a gate becomes decoration is not being wrong — it is finding
@@ -135,6 +143,9 @@ So every gate needs a floor:
   at least one table was created. Both matter: umzug's `up()` resolves happily
   with zero migrations (measured — see `PROJECT_STATE.md` §6.13), so without the
   floor the model comparison would pass by comparing against nothing.
+- `openai-privacy-params` asserts a minimum number of *captured* OpenAI calls per
+  path. Without it, a request that 400s before reaching OpenAI would satisfy
+  "every call was private" by having made none.
 
 **Prefer "more than zero" to an exact count** unless the number is meant to be
 stable. The inline-script count is *meant to fall* as scripts move into

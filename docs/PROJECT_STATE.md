@@ -722,17 +722,42 @@ Two further measurements from the same pass:
   (§6.5). Recorded because "swept and found nothing" saves the next person the
   sweep.
 
-**Not enforced, and worth a gate:** the doc's `store: false` claim is currently
-true — verified 2026-08-09 that all five `openai.responses.parse` call sites (two
-in `src/routes/index.js`, three in `src/services/reportImport.js`) spread
-`buildOpenAIParams`. Nothing makes that stay true. A sixth call site written
-without the spread would default `store` to true — meaning the payload is
-retained by OpenAI — and send no `safety_identifier`, and no test would go red.
-This is the same two-lists shape as §6.9 and §6.13, guarding the most
-load-bearing privacy claim in the project. The gate wants to be a *runtime* one:
-drive each OpenAI-calling path with a recording stub and assert every captured
-call carries `store: false` and a `safety_identifier`, rather than scanning the
-source for the spread — a source scan is satisfied by a comment mentioning it.
+**The `store: false` claim was true but unenforced — now gated.** Verified
+2026-08-09 that all five `openai.responses.parse` call sites (two in
+`src/routes/index.js`, three in `src/services/reportImport.js`) spread
+`buildOpenAIParams`. Nothing made that stay true: a sixth call site written
+without the spread would default `store` to **true** — the pasted report text
+then retained by OpenAI — and send no `safety_identifier`, with no test going
+red. Same two-lists shape as §6.9 and §6.13, guarding the most load-bearing
+privacy claim in the project.
+
+`tests/openai-privacy-params.test.js` closes it, and deliberately works in two
+directions because neither alone is sufficient:
+
+- **Runtime.** Drives `/generate-report` and `/api/import-reports` with a
+  recording stub and asserts what was *actually handed to the client* — four
+  captured calls covering all five sites (`comment_relevance`,
+  `report_paragraphs`, `category_bank`, `comment_relevance_import`,
+  `category_bank_merge`). `store` is asserted with `toBe(false)`, not a falsy
+  check: an omitted `store` is `undefined`, which is falsy but means *retain*.
+  The identifier must match `/^[0-9a-f]{64}$/` and must not be the bare user id.
+  Not a source scan — a grep for `store: false` is satisfied by a comment saying
+  `store: false`, which is the LESSONS §3 trap exactly.
+- **Census.** Counts `.responses.parse(` across `src/` and asserts the set is
+  exactly `{routes/index.js: 2, reportImport.js: 3}`, because the runtime half
+  cannot see a path it does not drive.
+
+The two-direction meta-test, run 2026-08-09, shows they are genuinely
+complementary rather than redundant:
+
+| Planted fault | Runtime | Census |
+|---|---|---|
+| `buildOpenAIParams` stops sending `store: false` | **red** | green |
+| `safety_identifier` sends the raw user id | **red** | green |
+| a sixth call site appears | green | **red** |
+| an existing call site drops the spread | **red** | green |
+
+Rows 3 and 4 are the point: each half catches something the other cannot.
 
 ---
 
