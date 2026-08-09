@@ -4,7 +4,21 @@ Use this checklist before pulling or deploying changes on the live server.
 
 ## Before Pulling
 
-- Confirm a recent database backup exists.
+- Confirm a recent database backup exists **and contains tables**. Its existence
+  is not enough: a failed `mysqldump` writes its header before it errors, so it
+  leaves a well-formed ~871-byte file with a correct `-- MariaDB dump` banner and
+  no data, and `exportDatabase` names files by date, so that stub overwrites a
+  good backup taken earlier the same day (`docs/PROJECT_STATE.md` §6.10). One
+  command tells them apart:
+
+  ```bash
+  ls -l <latest backup>.sql
+  grep -c 'CREATE TABLE' <latest backup>.sql   # expect 11, not 0
+  ```
+
+  If that count is 0, the backup does not exist in any useful sense — stop, and
+  take a fresh one before pulling. (The 11 is checked against the migrations by
+  `tests/migration-coverage.test.js`, so it stays right as the schema grows.)
 - If the update is risky, confirm the backup has recently passed the restore
   drill in `docs/restore_drill.md`.
 - Confirm a recent file/server backup exists if uploads, `.env`, or service
@@ -22,8 +36,19 @@ Use this checklist before pulling or deploying changes on the live server.
   `git branch --show-current`
 - Install dependency changes if `package-lock.json` or `package.json` changed:
   `npm install`
-- Run migrations if new migration files were added:
-  `node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(console.error)"`
+- Run migrations if new migration files were added. Run this from
+  `comment-bank-api/`, and note the `process.exit(1)` — **without it the command
+  prints the error and still exits 0**, so a scripted deploy would carry on past a
+  failed migration:
+
+  ```bash
+  cd /path/to/report-gen/comment-bank-api
+  node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(e=>{console.error(e);process.exit(1)})"
+  ```
+
+  Exit 0 still does not prove a migration *ran*: umzug resolves happily when its
+  glob matches nothing (measured — `docs/PROJECT_STATE.md` §6.13). If you expected
+  a new table, check for it rather than trusting the exit code.
 - Check that `.env` still has all variables listed in
   `comment-bank-api/.env.example`.
 - For production, confirm `SESSION_SECRET` is a long random value,

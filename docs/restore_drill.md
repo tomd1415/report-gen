@@ -125,7 +125,17 @@ cd /path/to/report-gen/comment-bank-api
 set -a
 . ./.env.restore-test
 set +a
-node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(console.error)"
+node -e "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(e=>{console.error(e);process.exit(1)})"
+```
+
+`.catch(console.error)` on its own prints the error and **still exits 0**, which
+in a drill reads as "migrations ran". Note also that exit 0 does not prove any
+migration ran at all — umzug resolves cleanly when its glob matches nothing
+(`docs/PROJECT_STATE.md` §6.13). Confirm the table you expected is there:
+
+```sql
+USE comment_bank_restore_test;
+SHOW TABLES;   -- expect 11, including SequelizeMeta
 ```
 
 ## 5. Verify Restored Data

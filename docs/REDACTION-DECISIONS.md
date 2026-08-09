@@ -253,3 +253,33 @@ browser-redacted free text reaches both prompts unchanged.
 **Not done, deliberately:** decision 2(B)'s stored metadata row. It remains a
 separate decision to take alongside the unresolved ImportJobs audit-table
 question in the backlog.
+
+---
+
+## The import path — a different answer (2026-08-06/07)
+
+Everything above concerns **report generation**. The **import** path was settled
+separately and more strictly, and this section exists because `CLAUDE.md` cites
+this document as the detail behind the project's privacy framing — so it must not
+leave a reader thinking generation is the whole story.
+
+The import pages used to take a `pupilNames` list from the teacher and substitute
+each name server-side. Two defects were found in it (`PROJECT_STATE.md` §6.3.2),
+and rather than improve the matching the owner **overruled the options offered**:
+teachers should not be entering pupil names at all, and no pupil-name list should
+be held server-side. So:
+
+- The `pupilNames` field is gone from both import pages, the payloads, the routes
+  and `reportImport.js`. **Pasted report text now reaches the model as typed** —
+  there is no substitution on this path.
+- Both import pages carry the guidance, the **warn-only** suspect-name
+  highlighter and the confirm-before-send preview that generation already had, so
+  the instruction has something backing it. The helpers fail closed: if
+  `report-selection.js` does not load, the send is blocked rather than allowed.
+
+The residual risk is stated plainly in `PROJECT_STATE.md` §6.3.2 and is not
+softened here: **this reduces the surface rather than guaranteeing no name ever
+appears in pasted text.** The highlighter is a heuristic — *Newton* the physicist
+and *Newton* the pupil are indistinguishable — so **no warning appearing does not
+mean no name is present**. The accepted basis is unchanged from the top of this
+document: teachers are expected not to enter another pupil's name.

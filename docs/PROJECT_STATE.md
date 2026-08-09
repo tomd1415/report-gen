@@ -693,6 +693,47 @@ that moment leaves `Sessions` permanently without its `createdAt`/`updatedAt`
 columns and the migration marked done. Narrow the catch to the table-missing
 case, or re-check `showAllTables()` instead of catching at all.
 
+### 6.14 A stale architecture doc claimed a privacy safeguard that is gone (found 2026-08-09)
+`docs/server_mjs.txt` is not a copy of `server.mjs` — it is an architecture
+overview in Markdown with a `.txt` extension, and **nothing in the repo links to
+it**. That is how it came to say, under "Privacy safeguards currently in code":
+
+> Pupil names are replaced with `PUPIL_NAME` before report imports and report
+> generation prompts.
+
+Both halves are false, and false in the direction that matters — it claims a
+server-side protection the code does not provide. Generation moved to
+browser-side redaction on 2026-07-30 (the server has no `redactPupilName` and
+rejects a request carrying a name), and the import path's `pupilNames` mechanism
+was removed on 2026-08-06 by owner decision. Corrected, with the CLAUDE.md
+framing quoted beside it so the next reader cannot take the summary without the
+caveat.
+
+Two further measurements from the same pass:
+
+- **The route list is an index, not an inventory.** Enumerated `app.router.stack`
+  at runtime: **68 routes registered, 44 documented.** Nothing documented is
+  phantom, which is the better failure of the two — but the whole admin
+  target-staff group and eight other endpoints are missing. Marked as an index
+  and pointed at `tests/route-auth-matrix.test.js` as the authoritative list,
+  rather than hand-maintaining 68 entries that will drift again.
+- **`.env.example` and `src/config/env.js` agree** — 26 variables each, the only
+  difference being `SECRET_KEY`, the deliberate legacy alias for `SESSION_SECRET`
+  (§6.5). Recorded because "swept and found nothing" saves the next person the
+  sweep.
+
+**Not enforced, and worth a gate:** the doc's `store: false` claim is currently
+true — verified 2026-08-09 that all five `openai.responses.parse` call sites (two
+in `src/routes/index.js`, three in `src/services/reportImport.js`) spread
+`buildOpenAIParams`. Nothing makes that stay true. A sixth call site written
+without the spread would default `store` to true — meaning the payload is
+retained by OpenAI — and send no `safety_identifier`, and no test would go red.
+This is the same two-lists shape as §6.9 and §6.13, guarding the most
+load-bearing privacy claim in the project. The gate wants to be a *runtime* one:
+drive each OpenAI-calling path with a recording stub and assert every captured
+call carries `store: false` and a `safety_identifier`, rather than scanning the
+source for the spread — a source scan is satisfied by a comment mentioning it.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)

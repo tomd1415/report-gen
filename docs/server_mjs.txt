@@ -1,5 +1,13 @@
 # Current Server Architecture
 
+> **The name of this file is misleading and nothing links to it.** It is not a
+> copy of `server.mjs` (that file is now ten lines). It is an architecture
+> overview, in Markdown, with a `.txt` extension. Checked 2026-08-09: no other
+> document references `docs/server_mjs.txt`, so it had drifted unread — which is
+> how the privacy section below came to describe a safeguard that had been removed.
+> Renaming it to `docs/ARCHITECTURE.md` is the obvious fix and is left as a
+> deliberate change rather than done in passing.
+
 ## Overview
 
 `comment-bank-api/server.mjs` is now a thin application entrypoint. It loads
@@ -60,6 +68,20 @@ admin feature that writes comments for another staff member: the target staff
 member's `User.id` must be used as the owner, not the admin's session user id.
 
 ## Main API Areas
+
+> **This is an index, not an inventory.** Measured 2026-08-09 by enumerating
+> `app.router.stack` at runtime: the app registers **68** routes and the lists
+> below name **44**. Nothing documented here is phantom — every listed route
+> exists — but 24 are missing, most of them the admin target-staff endpoints added
+> later (`/api/admin/staff/:userId/…`) plus `GET /api/version`, `GET /api/health/db`,
+> `GET /api/user-settings`, `GET /api/user-selected-settings`, `POST /api/user-subjects`,
+> `POST /api/user-year-groups`, `GET /api/categories/:id` and `GET /api/comments/:id`.
+>
+> A hand-kept list of 68 routes will drift again, so **the authoritative list is
+> the runtime enumeration** in `comment-bank-api/tests/route-auth-matrix.test.js`
+> — that test walks the real router and fails when a route appears without a
+> guard. Use the groupings below to find your way around, not to answer "does
+> endpoint X exist".
 
 ### Auth and Sessions
 
@@ -140,12 +162,45 @@ OpenAI calls use the Responses API with strict JSON schema output parsing.
 
 Privacy safeguards currently in code:
 
-- Pupil names are replaced with `PUPIL_NAME` before report imports and report
-  generation prompts.
-- `store: false` is sent with OpenAI requests.
-- `safety_identifier` is a SHA-256 hash of the session user id.
+- **Report generation:** the *current pupil's* name is redacted **in the browser**
+  and never transmitted. `public/report-selection.js` swaps it for `PUPIL_NAME`
+  before sending and swaps it back on the response. The server has no
+  `redactPupilName` helper any more and **rejects** a request that carries a name
+  with a 400 (since 2026-07-30). It follows that the server cannot double-check
+  this — correctness rests on the browser code, which is why
+  `tests/ui-redaction.test.js` matters more than its size suggests.
+- **Report import:** there is **no name substitution at all**. The
+  `pupilNames` mechanism was removed on 2026-08-06 by owner decision — teachers
+  are not to enter pupil names, and no pupil-name list is to be held server-side.
+  Pasted report text reaches the model as typed. Both import pages carry guidance,
+  a **warn-only** suspect-name highlighter, and a confirm-before-send preview.
+- `store: false` is sent with OpenAI requests. Verified 2026-08-09: all five
+  `openai.responses.parse` call sites (two in `src/routes/index.js`, three in
+  `src/services/reportImport.js`) spread `buildOpenAIParams`. Nothing *enforces*
+  that — see the note below.
+- `safety_identifier` is a SHA-256 hash of the session user id, from the same
+  helper.
 - Subject descriptions are used as context and explicitly excluded from report
   output.
+
+> **Read the framing in `/workspace/CLAUDE.md` before changing any of the above.**
+> The mitigation is *"a mitigation with an accountability trail"*, **not** *"names
+> never reach the model"*. Other pupils' names cannot be auto-redacted — no roster
+> is held, by design — and the highlighter is a heuristic, so **no warning
+> appearing does not mean no name is present**. The explicit basis for accepting
+> that residual risk is that teachers are expected not to enter another pupil's
+> name. Detail: `docs/REDACTION-DECISIONS.md`, `docs/PROJECT_STATE.md` §6.3.1–6.3.2.
+>
+> This section previously claimed *"Pupil names are replaced with `PUPIL_NAME`
+> before report imports and report generation prompts."* That described a
+> server-side safeguard that no longer exists on either path — a stale claim in the
+> dangerous direction, since it would have let a reader assume a protection the
+> code does not provide.
+
+**Not enforced:** a sixth `openai.responses.parse` written without spreading
+`buildOpenAIParams` would default `store` to true and send no `safety_identifier`,
+and no test would go red. Two lists that must agree, with nothing checking them —
+see `PROJECT_STATE.md` §6.14.
 
 ## Admin Uploads
 

@@ -47,6 +47,13 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   advisory. Needs triage of what is actually reachable from this app's code
   paths before any upgrade — the advice below about avoiding broad
   `npm audit fix` on the live branch still stands.
+- `2026-08-09`: **Nothing enforces `store: false` on OpenAI calls.** All five
+  `openai.responses.parse` call sites currently spread `buildOpenAIParams`
+  (verified), so `store: false` and the hashed `safety_identifier` are sent. A
+  sixth call site written without the spread would silently retain the payload at
+  OpenAI and send no identifier, and no test would fail. Wants a runtime gate —
+  drive each OpenAI-calling path with a recording stub and assert every captured
+  call, rather than grepping for the spread. `docs/PROJECT_STATE.md` §6.14.
 - `2026-04-17`: Consider consolidating duplicate admin routes under one
   namespace. The code currently has both `/api/admin/*` and non-admin-looking
   admin-protected routes such as `/api/users`, `/api/subjects`, and
