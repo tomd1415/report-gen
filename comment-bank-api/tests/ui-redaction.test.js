@@ -211,6 +211,15 @@ describe('summariseSuspectNames (warn-only, for the import page)', () => {
   it('stays fast on a realistic 60k-character paste', () => {
     // LIMITS.reports caps the paste at 60000 characters; the highlighter runs on
     // every keystroke, so this must not be quadratic.
+    //
+    // MEASURED 2026-08-08 on this box: 63k chars took 80 ms cold, then 14-27 ms
+    // warm. The 1000 ms bound below is therefore ~40x looser than reality, and
+    // deliberately so — it is sized to catch a quadratic blow-up (which would be
+    // seconds), not a 2x regression, because this host's load average reaches
+    // 20-38 and a tight timing assertion would flake constantly. Recording the
+    // real figure so a future reader can tell a genuine slowdown from normal:
+    // if this ever takes 200 ms warm, something has changed even though the
+    // assertion still passes.
     const text = 'PUPIL_NAME worked hard with Jordan this term. '.repeat(1300);
     expect(text.length).toBeGreaterThan(55000);
 

@@ -143,4 +143,56 @@ describe('route auth matrix', () => {
     const overlap = KNOWN_UNGUARDED.filter((entry) => INTENTIONALLY_PUBLIC.has(entry));
     expect(overlap).toEqual([]);
   });
+
+  // The two checks below close a hole found on 2026-08-12 by asking the question
+  // in docs/TESTING.md rule 6 — *what would satisfy this gate without satisfying
+  // the thing it stands for?*
+  //
+  // Answer: INTENTIONALLY_PUBLIC. The main test `continue`s past those routes
+  // before it sends anything, so an entry there is not a documented exception,
+  // it is a route that is never tested at all. KNOWN_UNGUARDED is asserted exact
+  // and checked for staleness; this list had neither. Adding
+  // 'GET /api/users' to it would have turned a real hole green, and moving a
+  // route out of the app would have left a stale entry silently covering for
+  // whatever took its place.
+
+  it('keeps INTENTIONALLY_PUBLIC honest: every entry names a route that still exists', () => {
+    const { models, openai } = createTripwires();
+    const routes = listRoutes(createLoggedOutApp({ models, openai })).map(label);
+
+    for (const entry of INTENTIONALLY_PUBLIC) {
+      expect(routes).toContain(entry);
+    }
+  });
+
+  it('proves each INTENTIONALLY_PUBLIC route is genuinely unguarded, not just skipped', async () => {
+    const { models, openai } = createTripwires();
+    const app = createLoggedOutApp({ models, openai });
+
+    // The guards in src/middleware/auth.js answer with these exact bodies, which
+    // is what distinguishes "blocked before the handler ran" from "the handler
+    // ran and chose this status". GET /api/authenticated is the case that makes
+    // the distinction necessary: it legitimately answers 401 with
+    // { authenticated: false } when there is no session, so a status check alone
+    // would either fail it or have to carve it out by name.
+    const blockedByGuard = (response) => (
+      (response.status === 401 && response.body?.message === 'Unauthorized')
+      || (response.status === 403 && response.body?.message === 'Forbidden')
+    );
+
+    const entries = [...INTENTIONALLY_PUBLIC];
+    expect(entries.length).toBeGreaterThan(0);
+
+    const actuallyGuarded = [];
+    for (const entry of entries) {
+      const [method, path] = entry.split(' ');
+      const response = await request(app)[method.toLowerCase()](concretePath(path)).send({});
+      if (blockedByGuard(response)) {
+        actuallyGuarded.push(`${entry} -> ${response.status} ${response.body?.message}`);
+      }
+    }
+
+    // A guarded route listed here would be a hole hidden by the skip list.
+    expect(actuallyGuarded).toEqual([]);
+  });
 });

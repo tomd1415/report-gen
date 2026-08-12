@@ -1,4 +1,9 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { expect, test } from '@playwright/test';
+
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public');
 
 const OFF_ORIGIN = /^https?:\/\/(?!127\.0\.0\.1[:/]|localhost[:/])/;
 
@@ -359,19 +364,26 @@ test('no page loads an asset from another origin', async ({ page }) => {
 
   await mockApis(page);
 
-  const pages = [
-    '/index.html',
-    '/login.html',
-    '/register.html',
-    '/settings.html',
-    '/adminpage.html',
-    '/admin-login.html',
-    '/import_reports.html',
-    '/manage_categories_comments.html',
-    '/manage_export_import.html',
-    '/manage_subjects_years.html',
-    '/footer.html'
-  ];
+  // Derived from the directory rather than hand-listed. The hand-written list
+  // named eleven pages while public/ held twelve — `header.html` was missing,
+  // an exact instance of the two-lists-that-must-agree shape this suite exists
+  // to catch, sitting inside one of the gates.
+  //
+  // Measured 2026-08-12 before changing it: planting an off-origin <img> in
+  // header.html DID turn the old test red, because page-layout.js injects that
+  // fragment into every page, so its assets are requested during the visits that
+  // were listed. So this was a latent gap, not a live hole — worth saying
+  // plainly rather than dressing up as a catch. What it would have missed is a
+  // genuinely new standalone page, which is the ordinary way pages get added.
+  //
+  // The floor below is what the explicit list was really providing (see
+  // docs/TESTING.md rule 4): a readdir that returned nothing would otherwise
+  // make this test pass having visited no pages at all.
+  const pages = fs.readdirSync(publicDir)
+    .filter((name) => name.endsWith('.html'))
+    .sort()
+    .map((name) => `/${name}`);
+  expect(pages.length).toBeGreaterThanOrEqual(12);
   for (const path of pages) {
     await page.goto(path).catch((error) => {
       // The login pages redirect as soon as the mocked session reports it is
@@ -592,5 +604,34 @@ test('import refuses to send if the possible-name check could not load', async (
 
   await page.getByRole('button', { name: 'Import Reports' }).click();
   await expect(page.locator('#result-container')).toContainText('Could not run the possible-name check');
+  expect(requestCount).toBe(0);
+});
+
+test('admin staff import refuses to send if the possible-name check could not load', async ({ page }) => {
+  // The admin Staff Comment Banks panel carries its OWN copy of the possible-name
+  // check — a second implementation of the same privacy control. Only the
+  // teacher-facing page's fail-closed branch was covered, so this one could rot
+  // without anything going red. Two implementations that must agree, with
+  // nothing checking that they do.
+  let requestCount = 0;
+  await mockApis(page, {
+    isAdmin: true,
+    username: 'admin',
+    importReportsResponse: (route) => {
+      requestCount += 1;
+      return fulfillJson(route, { message: 'Reports imported successfully.' });
+    }
+  });
+  await page.route('**/report-selection.js', (route) => route.abort());
+
+  await page.goto('/adminpage.html');
+  await page.selectOption('#staff-bank-user', '1');
+  await page.selectOption('#staff-bank-subject', '1');
+  await page.selectOption('#staff-bank-year-group', '1');
+  await page.fill('#staff-bank-reports', 'Worked well with Jordan this term.');
+
+  await page.locator('#staff-bank-import-button').click();
+
+  await expect(page.locator('#staff-bank-result')).toContainText('Could not run the possible-name check');
   expect(requestCount).toBe(0);
 });
