@@ -779,6 +779,52 @@ complementary rather than redundant:
 
 Rows 3 and 4 are the point: each half catches something the other cannot.
 
+### 6.15 Applying rule 6 to the older gates (2026-08-12)
+`docs/TESTING.md` rule 6 came out of finding a false pass in a gate I had written
+(§6.12). The obvious next move was to point the same question — *what would
+satisfy this check without satisfying the thing it stands for?* — at the gates
+that were already here. Both of the two big ones had an answer.
+
+**`route-auth-matrix`: the skip list was unguarded.** The gate carries two lists.
+`KNOWN_UNGUARDED` is asserted **exact** and checked for staleness.
+`INTENTIONALLY_PUBLIC` had neither check — and the main test `continue`s past
+those routes *before it sends anything*, so an entry there is not a documented
+exception, it is a route that is never tested at all. Adding `GET /api/users` to
+that set would have turned a real hole green; removing a route from the app would
+have left a stale entry covering for whatever later took its name.
+
+Two checks added. Staleness mirrors the `KNOWN_UNGUARDED` one. The second proves
+each listed route is *genuinely* unguarded rather than merely skipped, by
+sending the request and rejecting any response that came from a guard — matched
+on the guards' exact bodies (`{message:'Unauthorized'}` / `{message:'Forbidden'}`
+in `src/middleware/auth.js`) rather than on status, because
+`GET /api/authenticated` legitimately answers **401** with `{authenticated:false}`
+when there is no session. A status check would have had to carve it out by name;
+matching the guard's own reply distinguishes "blocked before the handler ran"
+from "the handler ran and chose this status", which is the real question.
+
+Meta-tested 2026-08-12: hiding `GET /api/user-info` in the skip list goes red
+(`GET /api/user-info -> 401 Unauthorized`); a stale entry goes red. **In both
+cases the pre-existing test stayed green**, which is the evidence the hole was
+real rather than theoretical.
+
+**The off-origin guard visited a hand-written list of pages.** `public/` holds
+**12** HTML files; the list named **11**. The missing one was `header.html`.
+
+Measured before changing anything, because the interesting question was whether
+this was a live hole: planting an off-origin `<img>` in `header.html` **did**
+turn the old test red, because `page-layout.js` injects that fragment into every
+page, so its assets are requested during the visits that *were* listed. So it was
+a latent gap, not a live one — recorded that way rather than dressed up as a
+catch. What it would genuinely have missed is a **new standalone page**, which is
+the ordinary way pages get added.
+
+The list is now derived from the directory with a floor of 12, which is what the
+explicit list was really providing (rule 4). Meta-tested: a new page carrying an
+off-origin asset turns it red; the hand-written version would not have seen it.
+
+Both changes are test-only and sit uncommitted with the others.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)

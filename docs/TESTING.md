@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 21 files, 133 tests | nothing |
+| `npm test` | Vitest — 21 files, 135 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -137,8 +137,11 @@ So every gate needs a floor:
   broken router cannot pass it.
 - `check-inline-scripts` asserts it checked at least one script in at least one
   file.
-- The off-origin guard visits an explicit list of eleven pages rather than
-  whatever it happens to find.
+- The off-origin guard derives its page list from `public/*.html` and asserts it
+  found at least twelve. It used to visit an explicit list, which is a different
+  trade: an explicit list cannot shrink by accident but also cannot grow, and it
+  had in fact fallen one page behind the directory (`PROJECT_STATE.md` §6.15).
+  Deriving plus a floor gets both properties.
 - `migration-coverage` asserts the glob resolved at least one migration and that
   at least one table was created. Both matter: umzug's `up()` resolves happily
   with zero migrations (measured — see `PROJECT_STATE.md` §6.13), so without the
@@ -198,6 +201,19 @@ match, and check the direction it fails in. The census in
 `openai-privacy-params` counts `.responses.parse(` call sites; a stray mention in
 a comment inflates that count and turns the gate **red**. A false alarm someone
 reads is an acceptable cost. A false pass is not.
+
+**The question is worth asking of the gates you did not write.** Pointed at the
+two oldest ones on 2026-08-12 it found an answer in both: `route-auth-matrix`
+never sent a request to anything in `INTENTIONALLY_PUBLIC`, so that list was a
+silencer rather than an exception list, and the off-origin guard's hand-written
+page list had fallen a page behind `public/`. Details and the meta-tests are in
+`PROJECT_STATE.md` §6.15. A gate being old is not evidence it is sound; it only
+means nobody has asked recently.
+
+**A skip list needs the same discipline as a known-failures list.** Rules 1 and 2
+say a list of things that currently fail must be exact and must go stale loudly.
+The same applies to a list of things deliberately *not* checked — otherwise the
+cheapest way to make a gate green is to add a line to it.
 
 ---
 
