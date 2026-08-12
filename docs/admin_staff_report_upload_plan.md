@@ -7,6 +7,14 @@
 > not to paste names, and no roster is held server-side). What replaced it is a
 > warn-only highlighter and a confirm-before-send preview. See
 > `docs/PROJECT_STATE.md` §6.3.2 for what the import path does today.
+>
+> **This banner was not enough**, which is why individual lines below are struck
+> through as well. It was added on 2026-08-06 and left two sentences further down
+> still stating the old mechanism as fact — requirement 9, and a "Current
+> Baseline" bullet. `/claude-guidance/LESSONS.md` §3 is explicit that a reader
+> matches the sentence and misses the correction beside it, and a status note at
+> the top of a 400-line document is a long way from "beside it". **Correct the
+> claim where the claim is, not only where the summary is.**
 
 ## Purpose
 
@@ -39,8 +47,9 @@ These rules are mandatory for this feature.
    database should roll back to the previous state for that operation.
 8. The app must not store raw pasted reports unless a separate audit/archive
    requirement is added later.
-9. Pupil names must continue to be replaced with `PUPIL_NAME` before OpenAI
-   receives any report text.
+9. ~~*(superseded 2026-08-06 — see the status note at the top of this file; the
+   requirement as written no longer describes the import path, and
+   `docs/PROJECT_STATE.md` §6.3.2 states what does.)*~~
 
 ## Current Baseline
 
@@ -402,7 +411,10 @@ Automated tests:
 - Replace mode is rejected unless `confirmReplace: true`.
 - Admin import creates missing `UserSubject` and `UserYearGroup` rows.
 - CSV admin import/export uses the target user's bank.
-- Pupil names are replaced with `PUPIL_NAME` before OpenAI receives prompts.
+- *(This line described the 2026-07 baseline and was removed on 2026-08-12: it
+  had gone false, and in the dangerous direction — it asserted a safeguard the
+  code no longer provides. `docs/PROJECT_STATE.md` §6.3.2 is the current
+  statement; `/workspace/CLAUDE.md` carries the framing that must go with it.)*
 - Cross-user category/comment/prompt edits are rejected by ownership checks.
 - Existing report generation tests still pass.
 

@@ -741,12 +741,13 @@ case, or re-check `showAllTables()` instead of catching at all.
 ### 6.14 A stale architecture doc claimed a privacy safeguard that is gone (found 2026-08-09)
 `docs/server_mjs.txt` is not a copy of `server.mjs` — it is an architecture
 overview in Markdown with a `.txt` extension, and **nothing in the repo links to
-it**. That is how it came to say, under "Privacy safeguards currently in code":
+it**. That is how it came to list, under "Privacy safeguards currently in code",
+a single bullet asserting that pupil names were substituted server-side on
+**both** the import and the generation path. (Paraphrased rather than quoted, on
+the same principle as `docs/TESTING.md` rule 5: reproducing a retracted sentence
+verbatim leaves it matchable by the next person's search.)
 
-> Pupil names are replaced with `PUPIL_NAME` before report imports and report
-> generation prompts.
-
-Both halves are false, and false in the direction that matters — it claims a
+Both halves were false, and false in the direction that matters — it claimed a
 server-side protection the code does not provide. Generation moved to
 browser-side redaction on 2026-07-30 (the server has no `redactPupilName` and
 rejects a request carrying a name), and the import path's `pupilNames` mechanism
@@ -936,6 +937,52 @@ correctly; `docs/release_checklist.md` listed the call as a verification step
 without saying what it verifies, which is now fixed. Starting the service with
 `GIT_COMMIT=$(git rev-parse --short HEAD)` would make the endpoint useful and
 costs nothing.
+
+### 6.18 Fixing one instance of a false claim is not fixing the claim (2026-08-12)
+On 2026-08-09 I found `docs/server_mjs.txt` asserting a pupil-name safeguard that
+had been removed, corrected it, and wrote it up as §6.14. I did not sweep for the
+same claim elsewhere. Sweeping today found **four more instances across four
+files**, one of them in `README.md`, the front door:
+
+- `docs/admin_staff_report_upload_plan.md` — twice: requirement 9, and a "Current
+  Baseline" bullet. The file already carried a 2026-08-06 status banner saying the
+  mechanism was gone, and both sentences sat below it stating it as fact.
+  `/claude-guidance/LESSONS.md` §3 predicts exactly this: the reader matches the
+  sentence and misses the correction, and a banner at the top of a 400-line
+  document is a long way from "beside it".
+- `docs/phase1_audit.md` — a document titled "(Current State)" asserting both
+  server-side substitution *and* server-side restoration.
+- `README.md` — **the one that mattered most**, and the one a keyword sweep
+  missed, because it was phrased differently: *comments imported into the bank are
+  redacted against the pupil names supplied at import time, so bank comments are
+  already placeholder-only*. Not a restatement of the mechanism — a **downstream
+  inference from it**, asserting a property of the data.
+
+**That is the transferable part.** Searching for the *wording* of a retracted
+claim finds its copies; it does not find the conclusions other documents drew
+from it. Those are the dangerous ones, because they read as independent facts.
+The second sweep — for `already redacted|placeholder-only|redacted at import` —
+is what turned up the inference, and it found two more places relying on it,
+including a second `README.md` line under "Notes on Privacy".
+
+**And one of them is not a documentation problem.** `docs/REDACTION-DECISIONS.md`
+decision 1(A) — show the confirm-before-send preview only when there is free text
+— was chosen on the stated basis that *"the only other content is the bank
+comments, which are already redacted at import"*. That premise was true on
+2026-07-29 and was invalidated by the 2026-08-06 removal. So a report with no
+free text is still sent with no confirm step, and the reason given for that being
+safe no longer holds.
+
+Recorded, annotated in place, and **not changed unilaterally** — 1(A) was an owner
+decision and whether the changed premise should change it is theirs. Worth being
+precise about the size of it: the teacher curates their own bank, comments
+imported before 2026-08-06 went through the old substitution, and nothing here
+says a name *is* present. What is gone is the argument that one cannot be.
+
+Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 above
+and the note in `server_mjs.txt`). Both now paraphrase, for the reason
+`docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
+person's search and gets read as current.
 
 ---
 

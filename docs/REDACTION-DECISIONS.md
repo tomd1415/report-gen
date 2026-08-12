@@ -40,6 +40,17 @@ Generate, or only sometimes?
   the only other content is the bank comments, which are already redacted at
   import. So in that case, skip the preview and send straight away. Show the
   preview only when at least one free-text field has content.
+
+  > **The premise of this option no longer holds (noted 2026-08-12).** "The bank
+  > comments are already redacted at import" was true when this was written on
+  > 2026-07-29. The import-time name substitution was removed on 2026-08-06 by a
+  > later owner decision, so comments imported after that date enter the bank as
+  > the AI extracted them from the pasted reports. The reasoning below is left as
+  > written because it is the record of why 1(A) was chosen — but **the "nothing
+  > un-vetted" claim it rests on is now weaker than it was**, and a report with no
+  > free text is sent with no confirm step at all. Whether that changes the
+  > decision is the owner's call; it is recorded in `PROJECT_STATE.md` §6.18 and
+  > has not been changed unilaterally.
 - **(B) On every send, unconditionally.** The preview appears each time, even when
   both free-text fields are empty.
 

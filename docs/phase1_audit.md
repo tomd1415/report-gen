@@ -244,6 +244,12 @@ target.
 - Report import creates paragraph-aligned categories and comments.
 - CSV export/import works for one subject/year group.
 - Report generation returns exactly four paragraphs.
-- Pupil names are replaced with `PUPIL_NAME` before OpenAI calls and restored in
-  the final report.
+- **Free-text privacy** — corrected 2026-08-12; the line that stood here had gone
+  false in both halves and asserted a server-side safeguard the code does not
+  provide. What is true now: on **generation**, the current pupil's name is
+  swapped for `PUPIL_NAME` **in the browser** and swapped back there, so the
+  server never sees it and cannot double-check it; on **import**, there is **no
+  name substitution at all**, only guidance, a warn-only highlighter and a
+  confirm-before-send preview. `docs/PROJECT_STATE.md` §6.3.1–6.3.2, and read the
+  framing in `/workspace/CLAUDE.md` before summarising it anywhere.
 - Relevance warning appears for out-of-scope selected comments.

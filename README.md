@@ -180,8 +180,15 @@ details and selected comments remain on the page so you can retry. Once a valid
   request leaves the machine, so the name itself is not transmitted to this
   server or to OpenAI. The browser swaps the placeholder back when the report
   comes back.
-- Comments imported into the bank are redacted against the pupil names supplied
-  at import time, so bank comments are already placeholder-only.
+- **Bank comments are not guaranteed to be placeholder-only.** Until 2026-08-06
+  the import page collected a list of pupil names and substituted them, and this
+  line used to say that made the bank safe. That mechanism was removed by owner
+  decision — teachers are told not to paste names, and no roster is held
+  server-side — so imported comments now enter the bank exactly as the AI
+  extracted them from the pasted reports. The import page carries guidance, a
+  **warn-only** possible-name highlighter and a confirm-before-send preview, and
+  none of those is a guarantee: the highlighter is a heuristic, so no warning
+  appearing does not mean no name is present. `docs/PROJECT_STATE.md` §6.3.2.
 
 ### Free-text fields: what is and is not guaranteed
 The "additional comments" and "strength focus" boxes are free text and are sent
@@ -487,12 +494,16 @@ Use this when upgrading from the old project:
 - **The current pupil's name is redacted in the browser and never transmitted.**
   `POST /generate-report` rejects any request that carries a `name` at all, so no
   server code path can receive one.
-- **What *is* sent to OpenAI:** the selected comments (already placeholder-only),
-  the subject description, the pronouns, the per-subject prompt, and the two
-  free-text boxes (additional comments, strength focus) as the teacher typed them
-  minus the current pupil's name. The free-text boxes are the residual risk — see
-  *Free-text fields: what is and is not guaranteed* for what is and is not
-  guaranteed there, and do not shorten it to "names never reach the model".
+- **What *is* sent to OpenAI:** the selected comments, the subject description,
+  the pronouns, the per-subject prompt, and the two free-text boxes (additional
+  comments, strength focus) as the teacher typed them minus the current pupil's
+  name. This line used to describe the selected comments as "already
+  placeholder-only" — **that is no longer true**, and was corrected on
+  2026-08-12: the import-time name substitution it relied on was removed on
+  2026-08-06, so comments imported after that date enter the bank as the AI
+  extracted them from the pasted reports. The free-text boxes and the bank are
+  both residual risk — see *Free-text fields: what is and is not guaranteed*, and
+  do not shorten any of it to "names never reach the model".
 - `store: false` is enforced for Responses API calls.
 - A hashed (SHA-256) `safety_identifier` is used per user.
 

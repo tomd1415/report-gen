@@ -191,11 +191,13 @@ Privacy safeguards currently in code:
 > that residual risk is that teachers are expected not to enter another pupil's
 > name. Detail: `docs/REDACTION-DECISIONS.md`, `docs/PROJECT_STATE.md` §6.3.1–6.3.2.
 >
-> This section previously claimed *"Pupil names are replaced with `PUPIL_NAME`
-> before report imports and report generation prompts."* That described a
-> server-side safeguard that no longer exists on either path — a stale claim in the
-> dangerous direction, since it would have let a reader assume a protection the
-> code does not provide.
+> This section previously asserted server-side name substitution on both the
+> import and the generation path — a safeguard that no longer exists on either.
+> That is a stale claim in the dangerous direction: it would have let a reader
+> assume a protection the code does not provide. The old sentence is deliberately
+> not reproduced here, because a verbatim quotation stays matchable by the next
+> person's search and gets read as current — `/claude-guidance/LESSONS.md` §3.
+> `git log` has it if it is ever needed.
 
 **Now enforced.** A sixth `openai.responses.parse` written without spreading
 `buildOpenAIParams` would default `store` to true and send no `safety_identifier`.
