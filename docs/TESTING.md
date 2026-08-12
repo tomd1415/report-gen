@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 24 files, 149 tests | nothing |
+| `npm test` | Vitest — 24 files, 150 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -77,6 +77,20 @@ being written down everywhere else. **A trap documented in one place is not
 documented.** If a command is unsafe, the fix is to stop the unsafe form
 appearing anywhere, not to explain it well in a single document.
 
+**And now enforced**, in `tests/repo-hygiene.test.js` rather than a tenth gate —
+it belongs with the other checks that read the repository rather than the code.
+It fails if any tracked `.md`/`.txt` recommends `npx vitest`, with exactly one
+file allowed to spell the form out: **this one**, because explaining the trap
+requires naming it. Scoped to the invocation, not the word, so ordinary prose
+about Vitest is unaffected. `npx playwright` is deliberately not included — no
+equivalent trap is documented for it.
+
+The justification for spending a check on a documentation rule, since that is not
+usually worth it: this rule provably does not hold itself. It was written down
+once and then broken four times in three documents inside a week, by someone who
+knew it. That is the bar — not "it would be nice if people remembered", but
+"people demonstrably did not, repeatedly".
+
 ---
 
 ## The gates, and the rules they follow
@@ -93,7 +107,7 @@ that is *stated* somewhere and enforced nowhere.
 | Browser-module coverage | `tests/public-module-coverage.test.js` | every `public/*.js` parses — the test imports each one itself |
 | Migration coverage | `tests/migration-coverage.test.js` | the glob matches every migration file, every model's table gets created, and the restore drill's table count is right |
 | OpenAI privacy params | `tests/openai-privacy-params.test.js` | every OpenAI request really sends `store: false` and a hashed `safety_identifier`, and no call site escapes the check |
-| Repository hygiene | `tests/repo-hygiene.test.js` | nothing tracked in git that `.gitignore` claims to ignore, no credential-shaped filenames, no SQL carrying a `Users` dump |
+| Repository hygiene | `tests/repo-hygiene.test.js` | nothing tracked in git that `.gitignore` claims to ignore, no credential-shaped filenames, no SQL carrying a `Users` dump, and no doc recommending `npx vitest` |
 | Feedback targets | `tests/feedback-target-ids.test.js` | every element id a page asks `ReportGenUI` to write to actually exists on that page |
 
 ### Rule 1 — a known-failures list is a bug list, not an exceptions list
