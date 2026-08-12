@@ -391,14 +391,18 @@ pupil's name is unaffected — that name is never transmitted at all. It is the
 *import* path, which handles a list of several real pupils' names, where the
 guarantee is weaker than the README implied.
 
-### 6.3.3 An empty import silently wipes the comment bank (found 2026-08-06)
-`persistCategoryMap` in `src/services/reportImport.js` **always** deletes the
-target user's existing categories and comments for that subject + year group,
-then writes the new `categoryMap`. Nothing checks that the new map is non-empty.
+### 6.3.3 An empty import silently wiped the comment bank — fixed (found and fixed 2026-08-06)
+*(Heading corrected 2026-08-12. It read as a present-tense defect, with the fix
+eight paragraphs below — the §6.18 pattern, in this document. Headings are what
+get skimmed, grepped and quoted, so they have to carry the status.)*
 
-An import whose model call returns nothing usable therefore **succeeds**, having
-destroyed the comment bank and replaced it with nothing, and responds 200 with
-*"Reports imported successfully and categories/comments generated."*
+`persistCategoryMap` in `src/services/reportImport.js` **always** deleted the
+target user's existing categories and comments for that subject + year group,
+then wrote the new `categoryMap`. Nothing checked that the new map was non-empty.
+
+An import whose model call returned nothing usable therefore **succeeded**,
+having destroyed the comment bank and replaced it with nothing, and responded 200
+with *"Reports imported successfully and categories/comments generated."*
 
 Three routes to an empty map, all reproduced in
 `tests/import-empty-result.test.js` (with a control test proving the harness
@@ -649,12 +653,32 @@ So there are two ways for user-facing feedback to disappear with no trace:
    it did not notice), but the unit and e2e suites both fail. See §6.12.
 2. **An element id is renamed or mistyped.** `showStatus('#typo', …)` returns
    `false`, the caller ignores it, and that one message silently never appears
-   while everything around it keeps working. **This case is not caught by
-   anything**, and it is the more likely of the two in ordinary maintenance.
+   while everything around it keeps working. It is the more likely of the two in
+   ordinary maintenance. **Gated 2026-08-12** —
+   `tests/feedback-target-ids.test.js` compares the selectors the pages pass
+   against the ids the pages contain, per page. Static by necessity: the failure
+   is a *missing* element, so there is no runtime signal to observe.
 
-Not fixed. The honest options are a one-line assertion at page load that
-`window.ReportGenUI` exists, and/or making the helpers `console.warn` when they
-cannot resolve a target so a missing element leaves a trace. Both are small; both
+   Two results from building it, both worth having. **106 of the 138 call sites
+   pass a literal `'#id'`, and every one of them currently resolves** — so
+   nothing is broken today; the gate is holding a clean state rather than
+   reporting a mess. And the other **32 cannot be checked statically**: 26
+   `setButtonLoading` (handed an element reference, so a rename breaks the lookup
+   loudly rather than silently — the safe kind), 5 `setFieldInvalid` and 1
+   `getSelectedOptionText` built as `` `#${id}` `` from a loop variable. That
+   count is asserted exactly, so the unverifiable surface cannot grow unnoticed;
+   the `` `#${id}` `` six are the residue worth removing if this is revisited.
+
+   Meta-tested: renaming an element while leaving its call turns it red naming
+   the page and the selector; adding a dynamic call site turns it red on the
+   count.
+
+**Still not fixed in the code** — the gate above catches the renamed-id case at
+test time, which is where it belongs, but the underlying design is unchanged: the
+helpers still return `false` into a void. The honest options are a one-line
+assertion at page load that `window.ReportGenUI` exists, and/or making the helpers
+`console.warn` when they cannot resolve a target so a missing element leaves a
+trace. Both are small; both
 are behaviour changes across six pages, so they want to be one deliberate change
 rather than a drive-by.
 

@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 23 files, 146 tests | nothing |
+| `npm test` | Vitest — 24 files, 149 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -71,7 +71,7 @@ repo and is not always present.
 
 ## The gates, and the rules they follow
 
-Eight checks exist to catch a class of problem that ordinary tests do not: a rule
+Nine checks exist to catch a class of problem that ordinary tests do not: a rule
 that is *stated* somewhere and enforced nowhere.
 
 | Gate | Where | Guards |
@@ -84,13 +84,15 @@ that is *stated* somewhere and enforced nowhere.
 | Migration coverage | `tests/migration-coverage.test.js` | the glob matches every migration file, every model's table gets created, and the restore drill's table count is right |
 | OpenAI privacy params | `tests/openai-privacy-params.test.js` | every OpenAI request really sends `store: false` and a hashed `safety_identifier`, and no call site escapes the check |
 | Repository hygiene | `tests/repo-hygiene.test.js` | nothing tracked in git that `.gitignore` claims to ignore, no credential-shaped filenames, no SQL carrying a `Users` dump |
+| Feedback targets | `tests/feedback-target-ids.test.js` | every element id a page asks `ReportGenUI` to write to actually exists on that page |
 
 ### Rule 1 — a known-failures list is a bug list, not an exceptions list
 
-Three gates carry a list of things that currently fail: `KNOWN_UNGUARDED`,
-`KNOWN_OFF_ORIGIN_VIOLATIONS` and `KNOWN_TRACKED_BUT_IGNORED`. All are
-**outstanding bugs awaiting a fix**, not approved carve-outs. When you fix one,
-delete its entry. Never add an entry to make a build green.
+Four gates carry a list of things that currently fail or cannot be checked:
+`KNOWN_UNGUARDED`, `KNOWN_OFF_ORIGIN_VIOLATIONS`, `KNOWN_TRACKED_BUT_IGNORED` and
+`KNOWN_UNCHECKABLE_CALL_SITES`. All are **outstanding bugs or blind spots**, not
+approved carve-outs. When you fix one, delete its entry — or decrement the count.
+Never add an entry to make a build green.
 
 ### Rule 2 — assert the list is *exact*, where the stakes justify it
 
@@ -153,6 +155,9 @@ So every gate needs a floor:
 - `repo-hygiene` asserts `git ls-files` returned more than 50 paths. Every check
   in it reads that command, so a missing git binary or a wrong cwd would
   otherwise make all of them pass by examining an empty list.
+- `feedback-target-ids` asserts it found the pages *and* more than a hundred
+  literal call sites. It is a regex over HTML, and a regex that quietly stops
+  matching is the most ordinary way a check like this becomes a green no-op.
 
 **Prefer "more than zero" to an exact count** unless the number is meant to be
 stable. The inline-script count is *meant to fall* as scripts move into
