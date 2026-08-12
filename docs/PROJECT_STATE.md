@@ -99,7 +99,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-24 Vitest files (149 tests) + 13 Playwright browser journeys, as of 2026-08-12.
+24 Vitest files (152 tests) + 13 Playwright browser journeys, as of 2026-08-12.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -108,7 +108,7 @@ security headers, password-change consistency, browser-side redaction helpers,
 and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
-> 2026-08-12:** `npm install` + `npm test` run green here — **24 files, 149 tests
+> 2026-08-12:** `npm install` + `npm test` run green here — **24 files, 152 tests
 > passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
 > `git diff --check` clean.
@@ -571,9 +571,13 @@ listed in `KNOWN_UNGUARDED`, which the test asserts is *exact* — fixing a rout
 without shrinking the list fails, and adding a new unguarded route fails. Like
 `KNOWN_OFF_ORIGIN_VIOLATIONS`, it is a bug list, not an exceptions list.
 
-### 6.10 A failed backup overwrites a good one (found 2026-08-08)
-`src/services/dbBackup.js` has **no test coverage at all** — nothing in `tests/`
-references it — and it is what `docs/restore_drill.md` depends on.
+### 6.10 A failed backup overwrote a good one — fixed (found 2026-08-08, fixed 2026-08-12)
+**Fixed 2026-08-12 with the owner's approval, code and tests in one commit.** The
+account below is what was wrong and how it was measured; what the code does now is
+at the foot of this section.
+
+`src/services/dbBackup.js` had **no test coverage at all** — nothing in `tests/`
+referenced it — and it is what `docs/restore_drill.md` depends on.
 
 **Measured against the live MariaDB here, not reasoned about:**
 
@@ -601,19 +605,51 @@ and the whole point of a backup is the day nobody rehearsed.
 `backupDatabase` is not exposed to this: it uses a full timestamp, so each run
 gets its own filename. Only the download path collides.
 
-**Update 2026-08-12: the service now has tests, and they are a tripwire for this
-fix.** `tests/db-backup.test.js` (test-only, uncommitted) pins the two
-characterisations — the export path is date-named, and a failed dump leaves its
-partial file with nothing unlinking or renaming it — and both are labelled in
-the file as defects rather than intended behaviour. Meta-tested in the two
-directions rule 3 asks for: putting the password into argv turns the security
-test red, and **applying the fix below turns the defect test red**, which is
-exactly what should happen. When you fix this, *replace* that test with one
-asserting a failed dump cannot replace a good backup; do not adjust it to match.
+**What the code does now.** `dumpToVerifiedFile` dumps to `<target>.partial`,
+proves the artefact, and only then renames it into place; on any failure it
+unlinks the partial and rethrows. Both entry points name files with a full
+timestamp, so no two runs target one path.
+
+The verification is the part worth arguing about, and it changed during the work.
+It checks that the file **ends with `-- Dump completed`** — measured against the
+three real dumps in `dbbackup_web/`, all of which do. The original plan here was
+non-zero size and at least one `CREATE TABLE`; the devil's advocate pointed out
+that both would pass a dump that died *between the schema and the data*, which is
+a perfectly ordinary way for one to fail. Only the trailer says the process
+reached the end.
+
+Two properties that look incidental and are not:
+
+- the temporary file is in the **same directory** as its target, because `rename`
+  is atomic only within one filesystem — and only an atomic rename guarantees a
+  concurrent reader sees the old backup or the new one, never a half-written file;
+- on a full disk the dump now fails at the *temporary* path and the existing
+  backup survives, which is the exact inverse of the old behaviour.
+
+**How it was tested, in the order it happened.** `tests/db-backup.test.js` was
+written first against the *old* behaviour, characterising both halves of the
+defect and labelled as defects rather than intent. Applying the fix turned those
+tests red — the tripwire firing as designed — and only then were they rewritten as
+the positive assertions that stand there now. That order is the difference between
+a test that describes the fix and one that was seen to distinguish it from the bug.
+
+Each part of the fix is independently pinned; verified 2026-08-12 by reverting one
+at a time. Removing the trailer check reddens the two verification tests; removing
+the unlink reddens both failure-path tests; renaming before verifying reddens
+broadly; a date-only export name reddens the timestamp test; dumping straight to
+the final path reddens the temporary-file test. There is a positive control — *a
+complete dump is moved into place* — without which every one of those would still
+pass if the service simply refused everything.
 
 It also pins a security invariant nothing was checking: the password reaches
 `mysqldump` through `MYSQL_PWD`, never through argv, where every user on this
-shared box could read it from `ps`. That one holds today and is worth keeping.
+shared box could read it from `ps`.
+
+**Still true, and still worth the operator's time:** the `grep -c 'CREATE TABLE'`
+check in `docs/restore_drill.md` and the release checklist. New stubs can no
+longer be created, but **any stub already sitting in a backup directory is still
+there**, and this fix does not go back in time. Check the file you are about to
+rely on.
 
 **Fix (not applied — this needs its own test, and both belong together):**
 1. Write to a temporary path and rename onto the final name only after a

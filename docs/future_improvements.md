@@ -103,8 +103,16 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   is an inline `<script>` in the HTML, so it cannot be imported by a test. That
   is a concrete, named cost of the inline-script debt in §6.4 — the CSP unlock
   and the testability unlock are the same piece of work.
-- `2026-08-08`: **A failed backup overwrites a good one, and the backup service
-  has no tests.** Measured: `mysqldump` writes its header to `--result-file`
+- `2026-08-08`: ~~A failed backup overwrites a good one, and the backup service
+  has no tests.~~ **Fixed 2026-08-12** (owner approved) — the service dumps to a
+  temporary file beside its target, verifies the artefact ends with
+  `-- Dump completed`, and only then renames it into place, unlinking the partial
+  on any failure; both entry points are now timestamped. The tests were written
+  against the old behaviour, watched to go red when the fix landed, then rewritten
+  as positive assertions. Note the fix does **not** go back in time: a stub
+  already sitting in a backup directory is still there, so the
+  `grep -c 'CREATE TABLE'` check in the drill and the release checklist is still
+  worth running. Detail in `docs/PROJECT_STATE.md` §6.10. Original report: Measured: `mysqldump` writes its header to `--result-file`
   before it hits an error, so a failed dump leaves a well-formed 871-byte stub;
   nothing unlinks it; and `exportDatabase` names files by date only, so a failed
   afternoon export replaced a good 11,386-byte morning backup with the stub. The
