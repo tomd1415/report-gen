@@ -610,9 +610,14 @@ shared box could read it from `ps`. That one holds today and is worth keeping.
 1. Write to a temporary path and rename onto the final name only after a
    successful dump, so a failure cannot replace a good file.
 2. On failure, unlink the partial file in a `finally`.
-3. Assert the artefact before reporting success — non-zero size and at least one
-   `CREATE TABLE` — rather than trusting the exit code. LESSONS §4: check for the
-   artefact, not the exit code.
+3. Assert the artefact before reporting success — rather than trusting the exit
+   code. LESSONS §4: check for the artefact, not the exit code. Check the
+   **trailer**, not just the header: a completed `mysqldump` ends with
+   `-- Dump completed`, and the stub by definition does not, because it died
+   partway. Non-zero size and a `CREATE TABLE` count are weaker versions of the
+   same idea — a dump that failed after the schema but before the data would pass
+   both. (Trailer check suggested by the devil's advocate, 2026-08-12; it is a
+   strictly better test than the one originally written here.)
 4. Give `exportDatabase` a full timestamp like `backupDatabase`, or write it
    somewhere transient, since it is a download rather than an archive.
 
@@ -844,6 +849,42 @@ explicit list was really providing (rule 4). Meta-tested: a new page carrying an
 off-origin asset turns it red; the hand-written version would not have seen it.
 
 Both changes are test-only and sit uncommitted with the others.
+
+### 6.16 Three database dumps are committed to the repository (found 2026-08-12)
+`dbbackup_web/database-backup-2024-06-{09,29,30}.sql` are **tracked in git** and
+pushed to the GitHub remote, added in commit `a381b78` ("Database backup"). They
+are full `mysqldump` output including `INSERT INTO Users` — usernames and bcrypt
+password hashes — alongside the comment banks, prompts and subject lists.
+
+`.gitignore` lists `dbbackup_web/`, which is why this is easy to miss: the rule
+is correct and has been there for ages, but **`.gitignore` does not untrack files
+that were already committed.** New dumps are ignored; these three are not.
+
+Raised on the outbox 2026-08-12 with three options — delete from the working tree
+(leaves them in history), history rewrite and force-push (an owner decision, and
+it breaks other clones), or leave them if the repo is private and the accounts are
+test accounts. Nothing has been touched pending that answer.
+
+**Found while checking a claim, not while looking for it**, which is worth
+recording: a devil's-advocate reply pointed out that "backups are also taken
+elsewhere" was an assumption I had never measured. Checking it meant looking in
+`dbbackup_web/`, and the answer to the original question was also worth having —
+**there is no scheduled backup on this box at all**: no crontab entry, no timer,
+and the newest file there is from June 2024. If nothing else takes backups, then
+the §6.10 defect is not one safety net among several, it is the safety net.
+
+### 6.17 The app is served out of the working tree
+Measured 2026-08-12: PID 61, `node server.mjs`, cwd `/workspace/comment-bank-api`,
+listening on 44344, started 2026-08-09.
+
+This changes what "leave it staged rather than done" means for anything under
+`src/`. Node does not reload, so an uncommitted source edit is inert while that
+process lives — and then becomes live the moment anyone restarts it, for any
+unrelated reason, without review and without appearing in any commit. A staged
+*test* file is genuinely neutral; a staged source file on this tree is a delayed
+deployment.
+
+Worth knowing before the next person leaves something "half done and described".
 
 ---
 
