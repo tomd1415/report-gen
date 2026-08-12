@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 22 files, 142 tests | nothing |
+| `npm test` | Vitest — 23 files, 146 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
@@ -71,7 +71,7 @@ repo and is not always present.
 
 ## The gates, and the rules they follow
 
-Seven checks exist to catch a class of problem that ordinary tests do not: a rule
+Eight checks exist to catch a class of problem that ordinary tests do not: a rule
 that is *stated* somewhere and enforced nowhere.
 
 | Gate | Where | Guards |
@@ -83,13 +83,14 @@ that is *stated* somewhere and enforced nowhere.
 | Browser-module coverage | `tests/public-module-coverage.test.js` | every `public/*.js` parses — the test imports each one itself |
 | Migration coverage | `tests/migration-coverage.test.js` | the glob matches every migration file, every model's table gets created, and the restore drill's table count is right |
 | OpenAI privacy params | `tests/openai-privacy-params.test.js` | every OpenAI request really sends `store: false` and a hashed `safety_identifier`, and no call site escapes the check |
+| Repository hygiene | `tests/repo-hygiene.test.js` | nothing tracked in git that `.gitignore` claims to ignore, no credential-shaped filenames, no SQL carrying a `Users` dump |
 
 ### Rule 1 — a known-failures list is a bug list, not an exceptions list
 
-Two gates carry a list of things that currently fail: `KNOWN_UNGUARDED` and
-`KNOWN_OFF_ORIGIN_VIOLATIONS`. Both are **outstanding bugs awaiting a fix**, not
-approved carve-outs. When you fix one, delete its entry. Never add an entry to
-make a build green.
+Three gates carry a list of things that currently fail: `KNOWN_UNGUARDED`,
+`KNOWN_OFF_ORIGIN_VIOLATIONS` and `KNOWN_TRACKED_BUT_IGNORED`. All are
+**outstanding bugs awaiting a fix**, not approved carve-outs. When you fix one,
+delete its entry. Never add an entry to make a build green.
 
 ### Rule 2 — assert the list is *exact*, where the stakes justify it
 
@@ -149,6 +150,9 @@ So every gate needs a floor:
 - `openai-privacy-params` asserts a minimum number of *captured* OpenAI calls per
   path. Without it, a request that 400s before reaching OpenAI would satisfy
   "every call was private" by having made none.
+- `repo-hygiene` asserts `git ls-files` returned more than 50 paths. Every check
+  in it reads that command, so a missing git binary or a wrong cwd would
+  otherwise make all of them pass by examining an empty list.
 
 **Prefer "more than zero" to an exact count** unless the number is meant to be
 stable. The inline-script count is *meant to fall* as scripts move into

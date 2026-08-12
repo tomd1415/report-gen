@@ -154,6 +154,34 @@ would satisfy this check without satisfying the thing it stands for.** Meta-
 testing catches a gate that cannot fail; only that question catches a gate that
 fails for the wrong reason.
 
+**A third instance, and the one with teeth (2026-08-12).** `.gitignore` has listed
+`dbbackup_web/` for years. It is correct, it is old, and it was doing nothing:
+**`.gitignore` does not untrack what was already committed.** Three full database
+dumps — including `INSERT INTO Users`, so usernames and bcrypt hashes — had been
+tracked and pushed since 2024 (`PROJECT_STATE.md` §6.16).
+
+The shape is the familiar one: a rule stated in one place, reality in another,
+nothing comparing them. What is worth noticing is *why this instance survived
+longest*. The others were two lists inside the code, where a test could enumerate
+one side and compare. This is a rule about the **repository**, and every test in
+the suite reads the *working tree* — so no amount of test-writing about the source
+could have seen it. The files were imported by nothing, served by nothing, and
+mentioned by nothing.
+
+**So when hunting for two lists that must agree, include the ones that are not
+about code:** what git tracks, what the ignore rules claim, what the deploy
+actually copies, what the service account can reach. The check here was one
+command that had never been run:
+
+```bash
+git ls-files -i -c --exclude-standard
+```
+
+And the trigger for running it was not diligence. It was a devil's advocate
+asking whether a claim I had leaned on for six cycles — "backups are also taken
+elsewhere" — was measured or assumed. It was assumed. Checking it meant opening a
+directory nothing else had any reason to open.
+
 ---
 
 ## 4. The documentation drifted precisely where the code changed most

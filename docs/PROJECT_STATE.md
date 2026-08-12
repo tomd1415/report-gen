@@ -865,6 +865,32 @@ Raised on the outbox 2026-08-12 with three options — delete from the working t
 it breaks other clones), or leave them if the repo is private and the accounts are
 test accounts. Nothing has been touched pending that answer.
 
+**The one-line check that would have caught this in 2024**, and which had never
+been run:
+
+```bash
+git ls-files -i -c --exclude-standard    # tracked files that .gitignore ignores
+```
+
+Swept the rest of the repository the same way and **found nothing else**: those
+three files are the only tracked-but-ignored ones, no `.env`/`.pem`/`.key`/
+`id_rsa` is tracked anywhere, and the only other tracked `.sql` —
+`comment-bank-api/insert_years_subjects.sql` — inserts Subjects and YearGroups
+only. `.env.example` is tracked deliberately; its `OPENAI_API_KEY` value is an
+eleven-character `sk-` placeholder, far too short to be a real key.
+
+`tests/repo-hygiene.test.js` (test-only, uncommitted) now runs all of that on
+every test run, with the three dumps as an **exact** known-bugs list, so removing
+them without emptying the list fails too. It also checks the content rather than
+only the name: a tracked `.sql` containing `INSERT INTO Users` fails, which is
+what catches a dump that lands somewhere `.gitignore` never mentioned. Blocking
+`.sql` outright would have been a false alarm on the legitimate seed script, and
+a gate that cries wolf gets silenced.
+
+Meta-tested in both of rule 3's directions: committing a new dump into the
+ignored directory goes red, tracking a `.pem` goes red, and `git rm --cached`-ing
+one of the three known files *also* goes red because the list still names it.
+
 **Found while checking a claim, not while looking for it**, which is worth
 recording: a devil's-advocate reply pointed out that "backups are also taken
 elsewhere" was an assumption I had never measured. Checking it meant looking in
