@@ -143,6 +143,22 @@ A gate nobody has watched fail is decoration. Before relying on a new one:
 Then revert and confirm with `git diff --quiet`, not by eye. Every gate above has
 been through this; the results are in `docs/LESSONS-LEARNT.md` §2.
 
+**Re-verified 2026-08-12, all nine, by hand rather than by trusting this
+sentence.** The two that had not been watched fail recently were the oldest:
+
+- `check-inline-scripts` — a syntax error planted in `settings.html` made it name
+  the file and **exit 1**; clean, exit 0. Sound. (It briefly appeared to exit 0
+  on the broken tree, which would have meant `check:deploy` going green on a
+  syntax error. That was a measurement error, not a gate defect —
+  `LESSONS-LEARNT.md` §6 has it, and it is worth reading before trusting any
+  exit code you piped through something.)
+- the import name warning — replacing its confirm condition with `if (false)`
+  turned the e2e red; restored, green.
+
+The point of redoing all nine is §6.12's lesson: *a gate being documented as
+meta-tested is not evidence that it is*. This paragraph is now a claim someone
+checked on a date, which is the only kind worth writing.
+
 `openai-privacy-params` is the clearest illustration of *why* both directions,
 because it is built from two halves and the meta-test shows neither is redundant
 (`PROJECT_STATE.md` §6.14): dropping `store: false` reddens the runtime half and

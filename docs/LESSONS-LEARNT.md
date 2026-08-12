@@ -261,6 +261,21 @@ is loaded; leave the defaults alone.
   `src` attributes silently load nothing, which renders as a blank image rather
   than an error. Use absolute `http://127.0.0.1:<port>/…` URLs when rendering a
   fragment for a screenshot.
+- **`$?` after a pipeline is the *last* command's status, not the one you care
+  about.** Meta-testing `check:inline-scripts` on 2026-08-12, I ran
+  `npm run check:inline-scripts 2>&1 | tail -3; echo "exit=$?"` — and read
+  `exit=0` while a planted syntax error was in the tree. For about a minute I
+  believed the pre-deploy gate passed on broken code, which would have been a
+  serious finding. `$?` was `tail`'s. Re-measured without the pipe: **exit 1 with
+  the error, exit 0 when clean — the gate is sound.**
+
+  The trap is not the shell rule, which everyone knows. It is that the wrong
+  answer *confirmed a suspicion* — I was meta-testing precisely because I doubted
+  the gate — and a wrong answer you already half-expect does not feel wrong. When
+  a check produces the alarming result you went looking for, measure it a second
+  way before writing it down. Use `${PIPESTATUS[0]}`, or do not pipe at all when
+  the exit code is the thing under test.
+
 - **A staged migration can be safer without being smaller.** Decision 3(A) in
   `docs/REDACTION-DECISIONS.md` kept both server paths during the cut-over. It
   made the change safe to land incrementally; it did not reduce the total work,
