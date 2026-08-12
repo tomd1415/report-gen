@@ -67,12 +67,42 @@ Use this checklist before pulling or deploying changes on the live server.
   `npm run test:e2e`
 - Start or restart the service:
   `sudo systemctl restart reportgen`
+
+  **A pull is only half a deploy until you do this, and the two halves are not
+  symmetrical.** Measured 2026-08-12 against the running instance: files under
+  `public/` are served by `express.static` and read from disk **per request**, so
+  a pulled page, stylesheet or browser module is live the instant it lands — no
+  restart, no commit needed. Everything under `src/` is loaded once into the
+  Node module cache at start and does **not** change until the process does.
+
+  So between the pull and the restart the browser is running the new contract
+  while the server is still running the old one. On this app that window includes
+  the free-text privacy controls, whose page-side confirm and server-side
+  handling have to agree. Pull and restart together; do not pull and "restart
+  later".
 - Check service status:
   `sudo systemctl status reportgen -l`
 - Check the health endpoint:
   `curl http://localhost:44344/api/health`
-- Check the deployed version:
+- Check the service answers, and note what this does **not** tell you:
   `curl http://localhost:44344/api/version`
+
+  Measured 2026-08-12 — it returns `"commit": null`. The endpoint reads the first
+  of `GIT_COMMIT`, `SOURCE_VERSION`, `RENDER_GIT_COMMIT`, `COMMIT_SHA` that is
+  set, and nothing in this deployment sets any of them (`README.md` is accurate
+  about that; it is the checklist that implied more). So this step confirms the
+  service is up and reports the **package** version. It cannot tell you which
+  code is running.
+
+  To make it able to, start the service with the commit in its environment — in
+  the systemd unit, or:
+
+  ```bash
+  GIT_COMMIT=$(git rev-parse --short HEAD) npm start
+  ```
+
+  Until then, the deployed commit is the one you noted before pulling **and only
+  after the restart below** — see the next item for why.
 - Check database connectivity from an authenticated admin browser session:
   `/api/health/db`
 - Watch logs while doing the smoke test:

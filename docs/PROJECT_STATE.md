@@ -912,6 +912,31 @@ deployment.
 
 Worth knowing before the next person leaves something "half done and described".
 
+**And the two halves are not symmetrical**, measured 2026-08-12 against the
+running instance rather than reasoned about: a brand-new file dropped into
+`public/` was served **immediately with no restart** (200), reflected an edit on
+the next request, and 404'd once deleted. `express.static` reads from disk per
+request. `src/` does not — Node caches the modules at start.
+
+So a pull without a restart leaves the browser on the new contract and the server
+on the old one. On this app that window includes the free-text privacy controls,
+where the page-side confirm and the server-side handling have to agree. Recorded
+in `docs/release_checklist.md` next to the restart step, which is where somebody
+will actually be standing when it matters.
+
+**Checked and clean:** no commit touching `src/` or `server.mjs` has landed since
+the process started, and there are no uncommitted changes there, so the running
+service *is* the committed server code. Verified rather than assumed — the last
+`src/` commit is `9b08c67` (2026-08-06) and the process started 2026-08-09.
+
+**`/api/version` cannot answer "what is deployed".** It returns `"commit": null`
+here, because it reads `GIT_COMMIT` / `SOURCE_VERSION` / `RENDER_GIT_COMMIT` /
+`COMMIT_SHA` and this deployment sets none of them. `README.md` describes that
+correctly; `docs/release_checklist.md` listed the call as a verification step
+without saying what it verifies, which is now fixed. Starting the service with
+`GIT_COMMIT=$(git rev-parse --short HEAD)` would make the endpoint useful and
+costs nothing.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)
