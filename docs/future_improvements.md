@@ -35,6 +35,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   import pages, plus fail-closed behaviour if the helper does not load. Residual
   risk recorded honestly in `docs/PROJECT_STATE.md` §6.3.2 — the highlighter is a
   heuristic, so **no dialog appearing does not mean no name is present**.
+- `2026-08-12`: ~~Three database dumps are tracked in git and pushed, including
+  the `Users` table.~~ **Closed by owner decision — leave them as they are**, on
+  the stated basis that the repository is private and those are test accounts.
+  Not removed. The premise is recorded beside the decision in
+  `docs/PROJECT_STATE.md` §6.16: if the repo is ever made public, or a real staff
+  account turns out to be in one of the files, it needs retaking. The
+  `repo-hygiene` gate now labels the three as an accepted exception rather than
+  outstanding bugs, and stays exact so a *fourth* dump still fails.
 - `2026-08-06`: **`.gitignore` covers `.env` but not `.env.*`**, while
   `docs/restore_drill.md` §3 instructs the operator to create
   `.env.restore-test` as a full copy of production secrets. On the live server

@@ -890,10 +890,29 @@ password hashes — alongside the comment banks, prompts and subject lists.
 is correct and has been there for ages, but **`.gitignore` does not untrack files
 that were already committed.** New dumps are ignored; these three are not.
 
-Raised on the outbox 2026-08-12 with three options — delete from the working tree
-(leaves them in history), history rewrite and force-push (an owner decision, and
-it breaks other clones), or leave them if the repo is private and the accounts are
-test accounts. Nothing has been touched pending that answer.
+**Decided 2026-08-12 — leave them as they are.** Raised on the outbox with three
+options (delete from the working tree, history rewrite and force-push, or leave
+them); the owner chose to leave them, **on the stated basis that the repository is
+private and the accounts in those dumps are test accounts**. Nothing was removed,
+and my recommendation of the delete-from-tree option was not taken — recorded that
+way rather than quietly rewritten, because the reasoning matters if this is
+revisited.
+
+**The premise is the part to keep hold of.** That decision is only as good as the
+two facts it rests on. If the repository is ever made public, or if a real staff
+account turns out to be in one of those files, it was taken on facts that no
+longer hold and needs retaking — bcrypt hashes in a public repo are disclosed the
+moment anyone clones it, and no later deletion undoes that. This is §6.18's lesson
+applied forward instead of in hindsight: the premise is written next to the
+decision so a change in it is visible, rather than left to be rediscovered when
+someone wonders why the files are still there.
+
+`tests/repo-hygiene.test.js` reflects the decision rather than contradicting it:
+the three files are now labelled an **accepted exception with its basis and date**,
+not outstanding bugs. The list stays **exact**, which is the whole reason for
+keeping it — a *fourth* dump is not covered by this decision and will fail, and
+that is the case the check is really for: the next one committed by someone who
+does not know.
 
 **The one-line check that would have caught this in 2024**, and which had never
 been run:

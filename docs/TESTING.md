@@ -114,9 +114,27 @@ that is *stated* somewhere and enforced nowhere.
 
 Four gates carry a list of things that currently fail or cannot be checked:
 `KNOWN_UNGUARDED`, `KNOWN_OFF_ORIGIN_VIOLATIONS`, `KNOWN_TRACKED_BUT_IGNORED` and
-`KNOWN_UNCHECKABLE_CALL_SITES`. All are **outstanding bugs or blind spots**, not
+`KNOWN_UNCHECKABLE_CALL_SITES`. They are **outstanding bugs or blind spots**, not
 approved carve-outs. When you fix one, delete its entry — or decrement the count.
-Never add an entry to make a build green.
+**Never add an entry to make a build green.**
+
+**One exception exists, and it is written down because an unexplained exception is
+how this rule dies.** `KNOWN_TRACKED_BUT_IGNORED`'s three database dumps are an
+*accepted* carve-out: the owner decided on 2026-08-12 to leave them, on the stated
+basis that the repository is private and the accounts in them are test accounts
+(`PROJECT_STATE.md` §6.16). The bar for that is deliberately high, and it is not
+"we decided it was fine":
+
+- an **explicit decision by someone entitled to take it**, not a maintainer
+  silencing their own build;
+- the **premise recorded next to the entry**, so that if it stops being true —
+  the repo goes public, a real account turns up in the file — the decision is
+  visibly due for retaking rather than quietly inherited;
+- the list still **exact**, so the exception covers *those three files* and
+  nothing else. A fourth dump fails, which is the case the check is really for.
+
+If you find yourself wanting to add an entry and cannot satisfy all three, what
+you have is a bug, not an exception.
 
 ### Rule 2 — assert the list is *exact*, where the stakes justify it
 
