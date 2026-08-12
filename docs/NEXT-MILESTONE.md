@@ -35,11 +35,13 @@ Then empty `KNOWN_UNGUARDED` in `tests/route-auth-matrix.test.js` and delete
 §6.9's "Fix (one line, not applied)" note from `docs/PROJECT_STATE.md`.
 
 **Verify:**
-1. `npx vitest run tests/route-auth-matrix.test.js` — green **only after** the
+1. `./node_modules/.bin/vitest run tests/route-auth-matrix.test.js` — green **only after** the
    list is emptied. Before emptying it the test fails with
    `expected [] to deeply equal [ …(4) ]`; that failure is the proof the fix
    landed, so watch for it rather than skipping to the end.
-2. `npx vitest run` — 16 files still green; no other test asserted the old 500.
+2. `./node_modules/.bin/vitest run` — the whole suite still green; no other test
+   asserted the old 500. (**24 files / 149 tests as of 2026-08-12**; this number
+   moves, so check the run rather than the sentence.)
 
 **Confidence:** high. Both directions of this were exercised on 2026-08-06 —
 removing an unrelated guard turned the test red and named the five affected
@@ -93,10 +95,11 @@ if (env === 'production' && INSECURE_SECRETS.has(sessionSecret)) {
 }
 ```
 
-**Verify:** `npx vitest run tests/config-env.test.js` green; full `npx vitest run`
-green. Checked 2026-08-06: **no existing test sets `NODE_ENV` at all**, so none of
-the 16 files can trip the new throw — but re-check rather than trusting this line,
-because a test added between then and now is exactly what would break here.
+**Verify:** `./node_modules/.bin/vitest run tests/config-env.test.js` green; then
+the full `./node_modules/.bin/vitest run` green. Checked 2026-08-06: **no existing
+test set `NODE_ENV` at all**, so none could trip the new throw — but re-check
+rather than trusting this line. Eight test files have been added since it was
+written, which is exactly the situation it warned about.
 
 ### 1c. Prove it at the process level
 The unit test proves the module throws; it does not prove the *server* refuses to
@@ -163,7 +166,9 @@ Export the four helpers; delete the local copies; import in both files. No other
 edit in the same commit.
 
 **Verify:**
-1. `npx vitest run` — all 17 files green (16 + `lib-text`).
+1. `./node_modules/.bin/vitest run` — every file green, including the new
+   `lib-text` one. (Do not pin the count here; it was 16 when this was written
+   and is 24 now.)
 2. `grep -n "const cleanText\|const escapeRegex\|const isTargetPlaceholderComment\|TARGET_PLACEHOLDER_COMMENT =" src/routes/index.js src/services/reportImport.js`
    returns **nothing** — the definitions are gone, not merely shadowed.
 3. `npm run check:inline-scripts` still reports 10 scripts.

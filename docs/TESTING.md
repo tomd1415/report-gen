@@ -67,6 +67,16 @@ performance regression is consistently slow. Check `uptime` before debugging.
 weakens the suite for everyone, to compensate for a condition that is not in the
 repo and is not always present.
 
+**Trap 1 had spread into the documents that were meant to warn about it.** Swept
+2026-08-12: `npx vitest run` was still the *recommended* command in four places
+across `NEXT-MILESTONE.md`, `PROJECT_STATE.md` and `LESSONS-LEARNT.md` — three
+documents that each explain, elsewhere, why that invocation silently drops test
+files. All now use `./node_modules/.bin/vitest`. Worth noticing how it happened:
+the warning was written once, in this file, and the *habit* it warns about kept
+being written down everywhere else. **A trap documented in one place is not
+documented.** If a command is unsafe, the fix is to stop the unsafe form
+appearing anywhere, not to explain it well in a single document.
+
 ---
 
 ## The gates, and the rules they follow

@@ -241,15 +241,16 @@ varying together points outside the process.
 **The trap avoided:** raising the committed `testTimeout` would have "fixed" it
 and permanently weakened the suite for everyone, to compensate for a condition
 that is not in the repo and not always present. Use
-`npx vitest run --testTimeout=30000` and `npx playwright test --workers=1` on the
-command line when the box is loaded; leave the defaults alone.
+`./node_modules/.bin/vitest run --testTimeout=30000` and
+`./node_modules/.bin/playwright test --workers=1` on the command line when the box
+is loaded; leave the defaults alone.
 
 ---
 
 ## 6. Small environment traps worth writing down once
 
 - **The Bash tool's working directory persists between calls.** A `cd public`
-  early in a session made a later `npx vitest run` report `No tests found` from
+  early in a session made a later `vitest run` report `No tests found` from
   inside `public/`. Re-anchor with an absolute `cd` before running a suite rather
   than assuming the directory.
 - **Node resolves dependencies from the script's location, not the cwd.** A probe

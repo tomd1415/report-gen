@@ -63,7 +63,7 @@ comment-bank-api/
   migrations/             # 3 Umzug migrations
   public/                 # static frontend: 10 pages + header.html/footer.html
                           #   partials, 5 shared JS helpers, no build step
-  tests/                  # 18 Vitest files + Playwright e2e (tests/e2e/)
+  tests/                  # 24 Vitest files + Playwright e2e (tests/e2e/)
 ```
 
 ---
@@ -99,22 +99,27 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-18 Vitest files + Playwright smoke tests. Coverage is genuinely broad for a
+24 Vitest files (149 tests) + 13 Playwright browser journeys, as of 2026-08-12.
+Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
+for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
 incomplete-output rejection, import caps, ownership checks, rate limiting,
 security headers, password-change consistency, browser-side redaction helpers,
 and UI helpers.
 
-> **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31 and 2026-08-06:**
-> `npm install` + `npm test` run green here — **18 files, 111 tests passing** —
-> plus `npm run check:inline-scripts` (10 scripts) and `git diff --check` clean.
+> **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
+> 2026-08-12:** `npm install` + `npm test` run green here — **24 files, 149 tests
+> passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
+> `git diff --check` clean.
 > The Vitest suite mocks the models and OpenAI client (injected into
 > `registerRoutes`), so it needs **no database**. A live MariaDB 10.11 was also
 > installed, migrated, and the server booted: `/api/health`, `/api/version`,
 > register/login, and admin subject/year-group creation all work end-to-end
 > against the real DB.
 >
-> **The Playwright e2e now runs here too — 9/9 green** (first run 2026-07-30).
+> **The Playwright e2e now runs here too — 13/13 green** (first run 2026-07-30,
+> 9 journeys then).
 > Chromium was already present in this sandbox; the earlier note that the
 > browser-binary CDN was firewalled was about `npx playwright install`, not about
 > running the tests. What had actually been blocking every e2e test was the
@@ -123,9 +128,9 @@ and UI helpers.
 >
 > **Timing caveat for this box:** load average reaching ~20–30 on 4 cores pushes
 > tests past Vitest's 5000 ms default and produces 2–3 *different* failures per
-> run. When it happens use `npx vitest run --testTimeout=30000` and
-> `npx playwright test --workers=1`; do **not** raise the committed defaults to
-> paper over it.
+> run. When it happens use `./node_modules/.bin/vitest run --testTimeout=30000`
+> and `./node_modules/.bin/playwright test --workers=1`; do **not** raise the
+> committed defaults to paper over it.
 >
 > **Corrected 2026-08-08.** This paragraph used to assert the high load was
 > "environmental, not a repo defect". A measured `npm run check:deploy` on an
