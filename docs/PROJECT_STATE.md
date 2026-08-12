@@ -592,6 +592,20 @@ and the whole point of a backup is the day nobody rehearsed.
 `backupDatabase` is not exposed to this: it uses a full timestamp, so each run
 gets its own filename. Only the download path collides.
 
+**Update 2026-08-12: the service now has tests, and they are a tripwire for this
+fix.** `tests/db-backup.test.js` (test-only, uncommitted) pins the two
+characterisations — the export path is date-named, and a failed dump leaves its
+partial file with nothing unlinking or renaming it — and both are labelled in
+the file as defects rather than intended behaviour. Meta-tested in the two
+directions rule 3 asks for: putting the password into argv turns the security
+test red, and **applying the fix below turns the defect test red**, which is
+exactly what should happen. When you fix this, *replace* that test with one
+asserting a failed dump cannot replace a good backup; do not adjust it to match.
+
+It also pins a security invariant nothing was checking: the password reaches
+`mysqldump` through `MYSQL_PWD`, never through argv, where every user on this
+shared box could read it from `ps`. That one holds today and is worth keeping.
+
 **Fix (not applied — this needs its own test, and both belong together):**
 1. Write to a temporary path and rename onto the final name only after a
    successful dump, so a failure cannot replace a good file.
@@ -601,6 +615,12 @@ gets its own filename. Only the download path collides.
    artefact, not the exit code.
 4. Give `exportDatabase` a full timestamp like `backupDatabase`, or write it
    somewhere transient, since it is a download rather than an archive.
+
+Two cautions on step 1, from sketching it: `rename` is atomic only *within* one
+filesystem, so the temporary file must live in the backup directory rather than
+`/tmp`; and the rename must not happen until step 3 has passed, or it just moves
+the stub into place more tidily. The rename is not the fix on its own — the
+content check is.
 
 **Separate, smaller note:** the dump runs without `--single-transaction`, so it
 takes mysqldump's default table locks. That gives a consistent dump but blocks

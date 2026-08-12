@@ -102,8 +102,13 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   afternoon export replaced a good 11,386-byte morning backup with the stub. The
   stub carries a correct MariaDB banner and looks fine until you restore it. Fix
   and the four steps it needs are in `docs/PROJECT_STATE.md` §6.10. This is the
-  first thing to fix in that file — it is also completely untested, and it is
-  what `docs/restore_drill.md` relies on.
+  first thing to fix in that file, and it is what `docs/restore_drill.md` relies
+  on. **Updated 2026-08-12:** it is no longer untested —
+  `tests/db-backup.test.js` characterises both halves of the defect and is
+  meta-tested so that *applying the fix turns it red*, which is the intended
+  tripwire. It also pins a previously unchecked security invariant: the password
+  reaches `mysqldump` through `MYSQL_PWD`, never argv, where every user on this
+  shared box could read it from `ps`.
 - `2026-08-09`: **A migration that swallows its own error is then recorded as
   done.** `migrations/20250106-002-add-session-timestamps.mjs` wraps
   `describeTable('Sessions')` in `try { … } catch { return; }`. The intent is
