@@ -328,6 +328,16 @@ with that id"*), a message argument would be ceremony.
 went vacuous for a year, and who acts on red and how. If neither has a good
 answer, that is an argument against the gate.
 
+**A worked example of the rule saying no.** `.env.example` and `config/env.js`
+were verified by hand on 2026-08-09 (26 keys, agreeing) — a two-lists-must-agree
+shape, and an obvious candidate for gate number eleven. Applying the rule instead:
+*if this drifted for a year, what is the worst outcome?* An operator copies the
+example, misses a key the code reads, and gets a default they did not intend. The
+two where that would be dangerous — `SESSION_SECRET` and `CORS_ORIGINS` — are now
+**fatal at boot in production** (§6.5), so the app refuses to start rather than
+running wrong. The rot-consequence is therefore low, and the gate was not built.
+The rule earns its keep by declining as well as approving.
+
 ### Rule 4a — fixing a bug can silently disable the guard that watched it
 
 Found 2026-08-13, and it is the sharpest instance of rule 4 so far.
