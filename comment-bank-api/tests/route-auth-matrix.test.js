@@ -149,6 +149,11 @@ describe('route auth matrix', () => {
   });
 
   it('lists no route as both intentionally public and known-unguarded', () => {
+    // Honest label rather than a fix: this assertion is INERT while
+    // KNOWN_UNGUARDED is empty, because there is nothing to overlap with. It is
+    // kept for the day an entry returns, and it is called out so nobody reads a
+    // green tick here as evidence of anything today. No floor is possible — the
+    // healthy state of the list it guards is genuinely empty.
     const overlap = KNOWN_UNGUARDED.filter((entry) => INTENTIONALLY_PUBLIC.has(entry));
     expect(overlap).toEqual([]);
   });

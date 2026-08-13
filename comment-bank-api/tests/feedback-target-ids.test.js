@@ -106,18 +106,28 @@ describe('every feedback target the pages ask for actually exists', () => {
 
   it('resolves every literal selector to an id on the same page', () => {
     const missing = [];
+    let examined = 0;
 
     for (const name of pages) {
       const ids = new Set(matchAll(readPage(name), ELEMENT_ID).map((match) => match[1]));
 
       for (const source of sourcesFor(name)) {
         for (const [, helper, id] of matchAll(source.text, LITERAL_CALL)) {
+          examined += 1;
           if (!ids.has(id)) {
             missing.push(`${source.from}: ReportGenUI.${helper}('#${id}') — no element with that id`);
           }
         }
       }
     }
+
+    // The floor belongs HERE, not only in the sibling test above. `missing` is
+    // empty both when every selector resolves and when the regex found no
+    // selectors at all — and a floor in a different `it()` is one `.only`, one
+    // filter or one file split away from silence. That is not hypothetical: on
+    // 2026-08-13 exactly this shape made a route-auth staleness test assert
+    // nothing for a day (LESSONS-LEARNT §7). Report what was examined.
+    expect(examined).toBeGreaterThan(100);
 
     // If this fails, the named call is a silent no-op in the browser: the helper
     // returns false, the call site discards it, and the teacher simply never

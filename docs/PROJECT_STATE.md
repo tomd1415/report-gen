@@ -1360,6 +1360,17 @@ a set, `route-enumeration-returns-nothing` reported *1 of 3 expected assertions
 stayed green while 2 others went red* — the shortfall that LESSONS §5 names as
 the real signal, and that a bare pass/fail would have called covered.
 
+**Swept for the same shape 2026-08-13 and found one more.** `feedback-target-ids`'s
+*resolves every literal selector* asserted an empty `missing` list with its floor
+in a **sibling** test — one `.only`, one filter or one file split from silence.
+Blinding the selector regex used to leave it green while only its sibling
+reddened; it now counts what it examined and fails `expected 0 to be greater than
+100` in the assertion itself. The other absence-asserting tests were checked and
+are behavioural, where empty genuinely is the answer. Also labelled, not fixed:
+*lists no route as both intentionally public and known-unguarded* is **inert**
+while `KNOWN_UNGUARDED` is empty, and says so, because a green tick there is
+evidence of nothing today.
+
 Fixed by giving both staleness tests the floor the main assertion already had:
 the enumeration must find more than 50 routes before either iterates. All three
 assertions now redden. Written up as `docs/TESTING.md` rule 4a, with the general
