@@ -99,7 +99,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-25 Vitest files (159 tests) + 13 Playwright browser journeys, as of 2026-08-13.
+25 Vitest files (159 tests) + 17 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -119,7 +119,7 @@ and UI helpers.
 > register/login, and admin subject/year-group creation all work end-to-end
 > against the real DB.
 >
-> **The Playwright e2e now runs here too — 13/13 green** (first run 2026-07-30,
+> **The Playwright e2e now runs here too — 17/17 green** (first run 2026-07-30,
 > 9 journeys then).
 > Chromium was already present in this sandbox; the earlier note that the
 > browser-binary CDN was firewalled was about `npx playwright install`, not about
@@ -1068,6 +1068,43 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.22 The three Playwright coverage gaps — closed (2026-08-13)
+Login, settings persistence and admin user management had no browser coverage.
+Four journeys now cover them (four rather than three: the login gap needs both
+the success and the rejection path — a login page that silently does nothing on a
+wrong password is indistinguishable from a slow one, and the user retypes).
+
+**They assert what the page SENT, not what it redrew.** That distinction is the
+whole of the settings case: a page that shows a ticked box having saved nothing
+looks exactly like one that saved it, so a journey built on *the box is ticked*
+tests rendering and calls it persistence. The harness gained a `record` array for
+this, and the assertions read from it.
+
+**Mutation-proven**, which the work-list item required of each:
+
+| Break | Journey that reddened |
+|---|---|
+| the selection POST goes to a typo'd path | settings persists a subject choice |
+| the render ignores what the server holds | settings persists a subject choice |
+| the login POST goes to a typo'd path | both login journeys |
+| the create-user POST goes to a typo'd path | admin creates and deletes a staff user |
+
+The first is the exact scenario the item named as the failure mode to avoid.
+
+**A defect found and deliberately NOT fixed here.** `settings.html`'s
+`toggleSubject` and `toggleYearGroup` both `throw` on a non-ok response inside a
+`try` whose `catch` only calls `console.error`. So a failed save tells the teacher
+nothing: the box stays ticked, and the next page load quietly shows it unticked.
+Same silent-failure shape as §6.20, on the page this item flags as failing by
+showing an empty page rather than an error.
+
+Left alone because this item is *close the coverage gaps*, and its check is about
+mutation-proving journeys, not repairing pages — fixing it would change
+user-visible behaviour on two handlers under an item that did not ask for it. It
+is now cheap to test: the harness takes `writeOk: false` precisely so the journey
+can be written when the fix is scheduled. Recorded in
+`docs/future_improvements.md`.
 
 ### 6.21 `index.html`'s inline script moved to a module (2026-08-13)
 `public/index.html` carried a single **1,225-line** inline `<script>` — the whole

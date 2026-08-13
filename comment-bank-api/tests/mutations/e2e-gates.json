@@ -60,6 +60,43 @@
       "expect": [
         "ui-smoke.spec.js Generate Report ready check validates required fields and reaches a generated report"
       ]
+    },
+    {
+      "id": "settings-selection-never-sent",
+      "file": "public/settings.html",
+      "find": "await fetch('/api/user-subjects', {",
+      "replace": "await fetch('/api/user-subjects-not-sent', {",
+      "expect": [
+        "ui-smoke.spec.js settings persists a subject choice, and reflects what the server holds"
+      ]
+    },
+    {
+      "id": "settings-render-ignores-server",
+      "file": "public/settings.html",
+      "find": "const isChecked = userSettings.userYearGroups.some(y => y.yearGroupId === yearGroup.id);",
+      "replace": "const isChecked = false;",
+      "expect": [
+        "ui-smoke.spec.js settings persists a subject choice, and reflects what the server holds"
+      ]
+    },
+    {
+      "id": "login-never-posted",
+      "file": "public/login.html",
+      "find": "const response = await fetch('/api/login', {",
+      "replace": "const response = await fetch('/api/login-not-sent', {",
+      "expect": [
+        "ui-smoke.spec.js login posts the credentials and lands on the report page",
+        "ui-smoke.spec.js a rejected login says so and stays put"
+      ]
+    },
+    {
+      "id": "admin-user-create-never-sent",
+      "file": "public/adminpage.html",
+      "find": "const response = await fetch('/api/users', {",
+      "replace": "const response = await fetch('/api/users-not-sent', {",
+      "expect": [
+        "ui-smoke.spec.js admin creates and deletes a staff user, sending each to the API"
+      ]
     }
   ]
 }

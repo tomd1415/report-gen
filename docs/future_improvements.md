@@ -89,6 +89,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   now throws `ReportImportEmptyResultError`, the route returns 502 saying the
   comment bank is unchanged, and the existing bank is left untouched. See
   `docs/PROJECT_STATE.md` §6.3.3.
+- `2026-08-13`: **`settings.html` swallows failed saves.** `toggleSubject` and
+  `toggleYearGroup` throw on a non-ok response inside a `try` whose `catch` only
+  calls `console.error`. The teacher sees the box stay ticked and is told nothing;
+  the next page load quietly shows it unticked. Same shape as the non-atomic save
+  in §6.20, and it decides which subjects and year groups a teacher can see at
+  all. Found while closing the e2e coverage gaps (§6.22) and deliberately left —
+  that item was coverage, not repair. Cheap to test now: `mockApis` accepts
+  `writeOk: false`, so the journey is a few lines once the fix is scheduled.
 - `2026-08-06`: ~~Saving on `manage_subjects_years.html` is two independent
   writes with no atomicity, and one all-or-nothing error message.** The handler
   POSTs/PUTs `/api/prompts` and then POSTs `/api/subject-context`, and reports

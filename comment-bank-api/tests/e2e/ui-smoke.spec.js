@@ -83,7 +83,15 @@ const mockApis = async (page, {
   },
   isAdmin = false,
   username = 'teacher',
-  importReportsResponse = null
+  importReportsResponse = null,
+  // Added 2026-08-13 for the login / settings / admin-user journeys. `record`
+  // collects every write the page makes, so a journey can assert what was SENT
+  // rather than what the page redrew — the distinction the work-list item turns
+  // on: a page that renders a ticked box having saved nothing looks identical.
+  loginOk = true,
+  userSettings = { userSubjects: [], userYearGroups: [] },
+  writeOk = true,
+  record = null
 } = {}) => {
   // Abort off-origin requests. On a network that cannot reach the remote host
   // they hang, the page 'load' event never fires and every page.goto times out
@@ -147,6 +155,31 @@ const mockApis = async (page, {
     }
     if (path === '/api/logout') {
       return fulfillJson(route, { ok: true });
+    }
+    if (path === '/api/login') {
+      record?.push({ path, method: request.method(), body: JSON.parse(request.postData() || '{}') });
+      return loginOk
+        ? fulfillJson(route, { message: 'Logged in' })
+        : fulfillJson(route, { message: 'Invalid username or password.' }, 401);
+    }
+    if (path === '/api/user-settings') {
+      return fulfillJson(route, userSettings);
+    }
+    if (path === '/api/user-subjects' || path === '/api/user-year-groups') {
+      record?.push({ path, method: request.method(), body: JSON.parse(request.postData() || '{}') });
+      return writeOk
+        ? fulfillJson(route, { ok: true })
+        : fulfillJson(route, { message: 'Could not save that selection.' }, 500);
+    }
+    if (path === '/api/users' && request.method() === 'POST') {
+      record?.push({ path, method: 'POST', body: JSON.parse(request.postData() || '{}') });
+      return writeOk
+        ? fulfillJson(route, { message: 'User added' })
+        : fulfillJson(route, { message: 'Username already exists.' }, 409);
+    }
+    if (/^\/api\/users\/[^/]+$/.test(path) && request.method() === 'DELETE') {
+      record?.push({ path, method: 'DELETE' });
+      return fulfillJson(route, { message: 'User deleted' });
     }
 
     return fulfillJson(route, { message: `Unhandled test route: ${path}` }, 404);
@@ -634,4 +667,100 @@ test('admin staff import refuses to send if the possible-name check could not lo
 
   await expect(page.locator('#staff-bank-result')).toContainText('Could not run the possible-name check');
   expect(requestCount).toBe(0);
+});
+
+// ── The three coverage gaps: login, settings persistence, admin user management ──
+//
+// Added 2026-08-13. These journeys assert what the page SENT, not what it
+// redrew. That distinction is the whole point of the settings one: a page that
+// shows a ticked box having saved nothing looks exactly like a page that saved
+// it, so a journey built on "the box is ticked" tests rendering and calls it
+// persistence. Each is mutation-proven in tests/mutations/e2e-gates.json.
+
+test('login posts the credentials and lands on the report page', async ({ page }) => {
+  const sent = [];
+  await mockApis(page, { record: sent });
+
+  await page.goto('/login.html');
+  await page.fill('#username', 'teacher');
+  await page.fill('#password', 'harbour-alex-sunrise');
+  await page.getByRole('button', { name: /log ?in/i }).click();
+
+  await page.waitForURL('**/index.html');
+
+  const login = sent.find((call) => call.path === '/api/login');
+  expect(login, 'no request reached /api/login').toBeTruthy();
+  expect(login.body).toEqual({ username: 'teacher', password: 'harbour-alex-sunrise' });
+});
+
+test('a rejected login says so and stays put', async ({ page }) => {
+  // The failure path matters more than the happy one here: a login page that
+  // silently does nothing on a wrong password is indistinguishable from a slow
+  // one, and the user retypes the same credentials.
+  await mockApis(page, { loginOk: false });
+
+  const messages = [];
+  page.on('dialog', async (dialog) => {
+    messages.push(dialog.message());
+    await dialog.dismiss();
+  });
+
+  await page.goto('/login.html');
+  await page.fill('#username', 'teacher');
+  await page.fill('#password', 'wrong');
+  await page.getByRole('button', { name: /log ?in/i }).click();
+
+  await expect.poll(() => messages.join(' ')).toContain('Invalid username or password');
+  expect(page.url()).toContain('login.html');
+});
+
+test('settings persists a subject choice, and reflects what the server holds', async ({ page }) => {
+  const sent = [];
+  await mockApis(page, {
+    record: sent,
+    // Year 7 already chosen, Mathematics not — so the initial render and the
+    // change are distinguishable from each other.
+    userSettings: { userSubjects: [], userYearGroups: [{ yearGroupId: 1 }] }
+  });
+
+  await page.goto('/settings.html');
+
+  const subject = page.locator('#subject-checkboxes input[type="checkbox"]').first();
+  const yearGroup = page.locator('#year-group-checkboxes input[type="checkbox"]').first();
+
+  // The render must reflect the server's state, not a default.
+  await expect(yearGroup).toBeChecked();
+  await expect(subject).not.toBeChecked();
+
+  await subject.check();
+
+  // Asserted on what was SENT. `await expect(subject).toBeChecked()` would pass
+  // with the fetch deleted entirely — the browser ticks the box either way.
+  await expect.poll(() => sent.filter((c) => c.path === '/api/user-subjects').length).toBe(1);
+  expect(sent.at(-1).body).toEqual({ subjectId: 1, selected: true });
+});
+
+test('admin creates and deletes a staff user, sending each to the API', async ({ page }) => {
+  const sent = [];
+  await mockApis(page, { isAdmin: true, username: 'admin', record: sent });
+
+  await page.goto('/adminpage.html');
+  await page.fill('#username-input', 'newteacher');
+  await page.fill('#password', 'harbour-alex-sunrise');
+
+  await page.getByRole('button', { name: 'Add User' }).click();
+  await expect(page.locator('#admin-status')).toContainText('User added successfully');
+
+  const created = sent.find((call) => call.path === '/api/users' && call.method === 'POST');
+  expect(created, 'no request reached POST /api/users').toBeTruthy();
+  expect(created.body).toMatchObject({ username: 'newteacher', isAdmin: false });
+  // The form must clear, or the next click deletes the user just created.
+  await expect(page.locator('#username-input')).toHaveValue('');
+
+  await page.fill('#username-input', 'oldteacher');
+  await page.getByRole('button', { name: 'Delete User' }).click();
+  await expect(page.locator('#admin-status')).toContainText('User deleted successfully');
+
+  expect(sent.some((call) => call.path === '/api/users/oldteacher' && call.method === 'DELETE'))
+    .toBe(true);
 });
