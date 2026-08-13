@@ -38,19 +38,16 @@ const INTENTIONALLY_PUBLIC = new Set([
  *   - fixing a route without deleting its entry here fails, and
  *   - adding a new unguarded route fails.
  *
- * Fix: add `app.use('/api/categories', isAuthenticated);` to the guard block in
- * src/routes/index.js (~line 465), then empty this list. Note that
- * `/api/categories-comments` needs its own entry regardless — an
- * `app.use('/api/categories')` prefix does not match it.
+ * **Emptied 2026-08-13**, when `app.use('/api/categories', isAuthenticated)` was
+ * added to the guard block in src/routes/index.js. The order was the point: the
+ * guard went in first and this test was watched to fail with
+ * `expected [] to deeply equal [ …(4) ]` — that failure is the evidence the fix
+ * landed, and a green run reached by editing both at once would have proved
+ * nothing. See docs/PROJECT_STATE.md §6.9.
  *
- * See docs/PROJECT_STATE.md §6.9.
+ * Keep it empty. An entry here is a hole someone has decided to live with.
  */
-const KNOWN_UNGUARDED = [
-  'POST /api/categories',
-  'GET /api/categories/:id',
-  'PUT /api/categories/:id',
-  'DELETE /api/categories/:id'
-];
+const KNOWN_UNGUARDED = [];
 
 /** Models/OpenAI that scream if an unauthenticated request ever reaches them. */
 const createTripwires = () => {

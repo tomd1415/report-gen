@@ -16,7 +16,12 @@ decision from the owner except where marked **DECISION**.
 
 ---
 
-## Step 0 — Guard the four unguarded `/api/categories` routes
+## Step 0 — Guard the four unguarded `/api/categories` routes ✅ DONE 2026-08-13
+
+> **Completed.** The guard is in `src/routes/index.js`, `KNOWN_UNGUARDED` is empty,
+> and the failure that proves it landed — `expected [] to deeply equal [ …(4) ]` —
+> was seen before the list was emptied, in that order. `PROJECT_STATE.md` §6.9.
+> The steps below are kept as the record of how it was done.
 
 **Why first:** one line, already measured, already has a test that goes red.
 

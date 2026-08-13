@@ -17,10 +17,10 @@
       ]
     },
     {
-      "id": "categories-guard-added",
+      "id": "categories-guard-removed",
       "file": "src/routes/index.js",
-      "find": "  app.use('/api/categories-comments', isAuthenticated);",
-      "replace": "  app.use('/api/categories', isAuthenticated);\n  app.use('/api/categories-comments', isAuthenticated);",
+      "find": "  app.use('/api/categories', isAuthenticated);\n",
+      "replace": "",
       "expect": [
         "route auth matrix answers 401 or 403 to every logged-out request except the known-unguarded ones"
       ]

@@ -463,6 +463,10 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
 
   app.use('/api/subjects', isAuthenticated);
   app.use('/api/year-groups', isAuthenticated);
+  // `/api/categories` and `/api/categories-comments` both need their own entry:
+  // an `app.use('/api/categories')` prefix does NOT match `/api/categories-comments`,
+  // so removing either line leaves four or five routes unguarded.
+  app.use('/api/categories', isAuthenticated);
   app.use('/api/categories-comments', isAuthenticated);
   app.use('/generate-report', isAuthenticated, openAiLimiter);
   app.use('/api/comments', isAuthenticated);

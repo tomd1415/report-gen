@@ -114,7 +114,15 @@ that is *stated* somewhere and enforced nowhere.
 
 Four gates carry a list of things that currently fail or cannot be checked:
 `KNOWN_UNGUARDED`, `KNOWN_OFF_ORIGIN_VIOLATIONS`, `KNOWN_TRACKED_BUT_IGNORED` and
-`KNOWN_UNCHECKABLE_CALL_SITES`. They are **outstanding bugs or blind spots**, not
+`KNOWN_UNCHECKABLE_CALL_SITES`. **Two of them are now empty**
+(`KNOWN_UNGUARDED` as of 2026-08-13, `KNOWN_OFF_ORIGIN_VIOLATIONS` since it was
+written), which is the state to keep them in.
+
+**When you empty one, re-point its mutation break.** Clearing `KNOWN_UNGUARDED`
+made the break that proved *adding* the guard reddens the gate meaningless — worse
+than meaningless, since it would still apply cleanly and leave the suite green,
+recording a real guard as unprotected. It was flipped to remove the guard instead.
+A cleared bug list and a stale spec look identical from a passing run. They are **outstanding bugs or blind spots**, not
 approved carve-outs. When you fix one, delete its entry — or decrement the count.
 **Never add an entry to make a build green.**
 

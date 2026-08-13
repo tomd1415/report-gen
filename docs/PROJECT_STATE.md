@@ -522,11 +522,30 @@ origin"* visits all eleven pages and fails on any off-origin request. Its
 `KNOWN_OFF_ORIGIN_VIOLATIONS` list is currently empty and should stay that way;
 it is a list of outstanding bugs, not approved exceptions.
 
-### 6.9 Four `/api/categories` routes have no auth guard (found 2026-08-06)
+### 6.9 Four `/api/categories` routes had no auth guard — fixed (found 2026-08-06, fixed 2026-08-13)
+**Fixed 2026-08-13** by adding `app.use('/api/categories', isAuthenticated)` to the
+guard block. All four now answer **401** with the guard's own body, measured; and
+`/api/categories-comments` was re-checked alongside them, because an
+`app.use('/api/categories')` prefix does **not** match it and both lines are
+load-bearing.
+
+The order was the point, and is the reason this entry is worth reading. The guard
+went in **first** and `tests/route-auth-matrix.test.js` was watched to fail with
+`expected [] to deeply equal [ …(4) ]`; only then was `KNOWN_UNGUARDED` emptied.
+Reaching green by editing both at once would have proved nothing — the list and
+the code would simply have agreed with each other. The mutation break that used to
+prove *adding* the guard reddens the gate has been flipped to
+`categories-guard-removed`, since the old direction would now apply cleanly and
+leave the suite green, recording a real guard as unprotected. **When a known-bug
+entry is cleared, the mutation that proved the bug has to be re-pointed at the
+fix, or the spec quietly stops testing anything.**
+
+The account below is what was wrong.
+
 Authentication is applied by a block of `app.use(...)` prefix guards near the top
-of `registerRoutes` (`routes/index.js` ~line 465). That block covers
+of `registerRoutes` (`routes/index.js` ~line 465). That block covered
 `/api/comments` and `/api/categories-comments` but **not** `/api/categories`.
-So these four routes run with no guard:
+So these four routes ran with no guard:
 
 | Route | Guard | Logged-out response |
 |---|---|---|

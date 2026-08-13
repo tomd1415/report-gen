@@ -16,15 +16,12 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Security and Authorization
 
-- `2026-08-06`: **Four `/api/categories` routes have no auth guard** —
-  `POST /api/categories` and `GET`/`PUT`/`DELETE /api/categories/:id`. The
-  `app.use(prefix, isAuthenticated)` block in `src/routes/index.js` (~line 465)
-  covers `/api/comments` and `/api/categories-comments` but not
-  `/api/categories`. Logged-out requests get 500, not 401. Not a breach today
-  (the handlers throw on `req.session.user.id` before any query) but one
-  careless edit from being a silent unauthenticated write. One-line fix and a
-  gate test are described in `docs/PROJECT_STATE.md` §6.9 and
-  `docs/NEXT-MILESTONE.md` step 0.
+- `2026-08-06`: ~~Four `/api/categories` routes have no auth guard.~~ **Fixed
+  2026-08-13.** `app.use('/api/categories', isAuthenticated)` added; all four now
+  answer 401, measured, and `/api/categories-comments` re-checked beside them
+  because the prefix does not cover it. `KNOWN_UNGUARDED` is empty. The guard was
+  added first and the gate watched to fail before the list was cleared —
+  `docs/PROJECT_STATE.md` §6.9.
 - `2026-08-06`: ~~Pupil names can survive redaction on the import path.~~
   **Resolved — the mechanism was removed rather than the regex improved.** The
   owner overruled all the match-improvement options: teachers should not be
