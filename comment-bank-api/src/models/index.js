@@ -245,6 +245,25 @@ User.hasMany(SubjectContext, { foreignKey: 'userId' });
 Subject.hasMany(SubjectContext, { foreignKey: 'subjectId' });
 YearGroup.hasMany(SubjectContext, { foreignKey: 'yearGroupId' });
 
+/**
+ * A metadata record of comment-bank imports: who did it, for whom, and how it
+ * ended. See migrations/20260813-001-add-import-jobs.mjs for what this
+ * deliberately does NOT hold — no report text, no comments, no pupil names.
+ */
+export const ImportJob = sequelize.define('ImportJob', {
+  actorUserId: { type: DataTypes.INTEGER, allowNull: false },
+  ownerUserId: { type: DataTypes.INTEGER, allowNull: false },
+  subjectId: { type: DataTypes.INTEGER, allowNull: true },
+  yearGroupId: { type: DataTypes.INTEGER, allowNull: true },
+  source: { type: DataTypes.STRING, allowNull: false },
+  mode: { type: DataTypes.STRING, allowNull: false },
+  status: { type: DataTypes.STRING, allowNull: false },
+  categoryCount: { type: DataTypes.INTEGER, allowNull: true },
+  commentCount: { type: DataTypes.INTEGER, allowNull: true },
+  errorMessage: { type: DataTypes.STRING(500), allowNull: true },
+  confirmed: { type: DataTypes.BOOLEAN, allowNull: true }
+});
+
 export const models = {
   User,
   Subject,
@@ -254,5 +273,6 @@ export const models = {
   Prompt,
   SubjectContext,
   UserSubject,
-  UserYearGroup
+  UserYearGroup,
+  ImportJob
 };

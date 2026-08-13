@@ -61,7 +61,7 @@ comment-bank-api/
       dbBackup.js          # mysqldump-based backup
     models/index.js        # Sequelize models + associations
     middleware/auth.js     # isAuthenticated / isAdmin
-  migrations/             # 3 Umzug migrations
+  migrations/             # 4 Umzug migrations
   public/                 # static frontend: 10 pages + header.html/footer.html
                           #   partials, 7 shared JS helpers, no build step
   tests/                  # 25 Vitest files + Playwright e2e (tests/e2e/)
@@ -100,7 +100,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-28 Vitest files (184 tests) + 17 Playwright browser journeys, as of 2026-08-13.
+29 Vitest files (190 tests) + 17 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -110,7 +110,7 @@ and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
 > 2026-08-12 and 2026-08-13:** `npm install` + `npm test` run green here —
-> **28 files, 184 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> **29 files, 190 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
 > `git diff --check` clean. (`check:inline-scripts` reports 9 from 2026-08-13 —
 > see §6.21.)
@@ -505,13 +505,58 @@ planned pre-deploy `.env` check should gate it). Same check could cover
 placeholder secrets, missing `CORS_ORIGINS`, and `SESSION_SECURE=false` on HTTPS.
 Low effort, meaningful safety.
 
-### 6.6 No audit trail on admin/destructive actions
-Admin can import/replace comment banks for any staff user and delete global
-subjects/year-groups, but there's no record of who did what. The backlog already
-proposes an `ImportJobs` metadata table (actor, target, mode, counts, status —
-**no raw report text**). Deletion of shared subjects/year-groups also relies on
-DB/ORM cascade behaviour without a clear "this affects N comment banks" warning —
-review before a non-technical admin can trigger it.
+### 6.6 Audit trail on admin/destructive actions — added (2026-08-13)
+**Built 2026-08-13**, answering the owner's "yes please" to both halves of a
+question that had been asked twice: store the confirmation interaction
+(`REDACTION-DECISIONS.md` decision 2(B)) *and* add the `ImportJobs` table this
+section proposed. **One mechanism answers both**, which was the point of putting
+them together — otherwise the system ends up with two inconsistent answers about
+what it remembers.
+
+`ImportJobs` records **actor, owner, subject, year group, source, mode, status,
+counts, error message, confirmed**. Migration
+`20260813-001-add-import-jobs.mjs`, model `ImportJob`, written from both import
+paths.
+
+**The constraint that shaped every field: the table must be readable by someone
+with no right to see pupil data.** No report text, no extracted comments, no free
+text, no names. `errorMessage` is the message the user was already shown — never
+a stack trace, never the payload. The test asserting this sweeps the *whole
+recorded row* rather than naming fields, so a column added later cannot quietly
+carry content past it, and a mutation break makes the row carry the report text
+to prove the assertion bites.
+
+**Two design calls, recorded at the code:**
+
+- `confirmed` is **tri-state**. `null` means the client did not say, which is what
+  a stale client looks like and is not the same as an explicit `false`.
+- A failed audit write is **logged and swallowed**. The trail is not worth losing
+  a teacher's import over. That means the trail can have holes, which is why the
+  log line says *"audit trail may have a gap"* — a silent failure here would read
+  as "no imports happened".
+
+**Three things the tests forced out**, each of which would have shipped otherwise:
+
+1. A `ReferenceError` on **every** import — `recordImportJob` sat at module scope
+   while `ImportJob` is destructured inside `registerRoutes`. The model is now
+   passed in.
+2. The success record was placed **after** `ensureUserVisibility`, so an unrelated
+   join-table failure would have logged a successful import as `failed`. It now
+   records before: the row describes what happened to the bank, and by that point
+   the bank is written.
+3. A comment that briefly **lied** — a botched block move left the code after the
+   visibility call while the comment said "BEFORE". Fixed rather than left, which
+   is §6.18's whole lesson.
+
+**Still not covered by this table:** deletion of shared subjects/year-groups,
+which was the other half of this section's original concern, and CSV imports
+(`source` exists to distinguish them, but only the AI-report paths write rows so
+far). Both are in the backlog rather than silently implied to be done.
+
+**Retention is undecided and deliberately so.** These rows are staff metadata,
+not pupil data — but they accumulate for ever with nothing to prune them, and
+"we keep an audit log" without a retention answer is how a small table becomes a
+data-protection question later. Raised in `docs/future_improvements.md`.
 
 ### 6.7 Smaller notes
 - **No pagination** on list endpoints (`/api/categories-comments` eager-loads all
@@ -832,7 +877,8 @@ Two more gaps sat next to it, both the same shape:
   is not called), so a missing table only shows up in production.
 - **The restore drill's table count was an unguarded constant.** §2 of
   `docs/restore_drill.md` tells an operator to run `grep -c 'CREATE TABLE'` and
-  expect 11, which is how they tell a real backup from the 871-byte stub in
+  expect 12 (11 until the ImportJobs migration on 2026-08-13), which is how they
+  tell a real backup from the 871-byte stub in
   §6.10. The next migration that adds a table makes that number wrong, and a
   wrong expected count on that page is worse than none — it is the only thing
   standing between an operator and restoring an empty database.

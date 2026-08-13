@@ -18,7 +18,7 @@ Use these rules for every future improvement:
    migrates data. **Check the backup is real before trusting it** — a failed
    `mysqldump` leaves a well-formed ~870-byte file with no data, and can
    overwrite a good same-day backup (`docs/PROJECT_STATE.md` §6.10).
-   `grep -c 'CREATE TABLE' backup.sql` should return 11, not 0.
+   `grep -c 'CREATE TABLE' backup.sql` should return 12, not 0.
 2. Prefer additive migrations. Do not delete, rewrite, or backfill live data
    without a separate migration and rollback plan.
 3. Keep default behaviour conservative. If a feature can merge or replace data,

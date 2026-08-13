@@ -13,11 +13,11 @@ Use this checklist before pulling or deploying changes on the live server.
 
   ```bash
   ls -l <latest backup>.sql
-  grep -c 'CREATE TABLE' <latest backup>.sql   # expect 11, not 0
+  grep -c 'CREATE TABLE' <latest backup>.sql   # expect 12, not 0
   ```
 
   If that count is 0, the backup does not exist in any useful sense — stop, and
-  take a fresh one before pulling. (The 11 is checked against the migrations by
+  take a fresh one before pulling. (The 12 is checked against the migrations by
   `tests/migration-coverage.test.js`, so it stays right as the schema grows.)
 - If the update is risky, confirm the backup has recently passed the restore
   drill in `docs/restore_drill.md`.

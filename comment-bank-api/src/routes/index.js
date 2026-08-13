@@ -82,6 +82,43 @@ const hashIdentifier = (value) => crypto.createHash('sha256').update(String(valu
  * artefact the decision removed. Only the shape is reported, which is enough to
  * tell an operator a client is stale and which account to go and reload.
  */
+/**
+ * Record that an import happened — who, for whom, and how it ended.
+ *
+ * Admins can import into or REPLACE any staff member's comment bank and nothing
+ * recorded it (docs/PROJECT_STATE.md §6.6). This is that record, and it also
+ * carries decision 2(B)'s `confirmed` flag.
+ *
+ * Two rules, both load-bearing:
+ *
+ * 1. **Metadata only.** No report text, no extracted comments, no free text, no
+ *    names. `errorMessage` is the message already shown to the user, never a
+ *    stack trace and never the payload. The table has to stay readable by someone
+ *    with no right to see pupil data.
+ * The model is passed in rather than closed over: this helper sits at module
+ * scope while `ImportJob` is destructured inside `registerRoutes`, and closing over
+ * it silently produced a ReferenceError on every import until the tests caught it.
+ *
+ * 2. **Never break the import.** The audit trail is not worth losing a teacher's
+ *    work over, so a failed write is logged and swallowed. That is a deliberate
+ *    trade: the trail can have holes, and a hole is preferable to a lost import.
+ *    It is why the log line below says "audit" — a silent gap would look like
+ *    "no imports happened".
+ */
+const recordImportJob = async (ImportJob, fields) => {
+  if (!ImportJob?.create) {
+    return;
+  }
+  try {
+    await ImportJob.create(fields);
+  } catch (error) {
+    console.error('Failed to record an import job (audit trail may have a gap):', error.message);
+  }
+};
+
+/** `confirmed` is tri-state: true, false, or null when the client did not say. */
+const confirmedFlag = (body) => (typeof body?.confirmed === 'boolean' ? body.confirmed : null);
+
 const warnIfPupilNamesSent = (req, endpoint) => {
   const value = req.body?.pupilNames;
   if (value === undefined || value === null) {
@@ -287,6 +324,7 @@ const buildOpenAIParams = (req) => ({
 
 export function registerRoutes(app, { models, openai, sequelizeClient = sequelize }) {
   const {
+    ImportJob,
     User,
     Subject,
     YearGroup,
@@ -1312,8 +1350,39 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         subjectDescription
       });
 
+      await recordImportJob(ImportJob, {
+        actorUserId: userId,
+        ownerUserId: userId,
+        subjectId: subjectId ?? null,
+        yearGroupId: yearGroupId ?? null,
+        source: 'reports',
+        mode: 'merge',
+        status: 'success',
+        categoryCount: result?.totalCategories ?? null,
+        commentCount: result?.totalComments ?? null,
+        errorMessage: null,
+        confirmed: confirmedFlag(req.body)
+      });
+
       res.json(result);
     } catch (error) {
+      await recordImportJob(ImportJob, {
+        actorUserId: userId,
+        ownerUserId: userId,
+        subjectId: subjectId ?? null,
+        yearGroupId: yearGroupId ?? null,
+        source: 'reports',
+        mode: 'merge',
+        status: 'failed',
+        categoryCount: null,
+        commentCount: null,
+        // The message the user is about to see — not the stack, not the payload.
+        errorMessage: (error instanceof ReportImportValidationError
+          ? error.message
+          : 'Error importing reports').slice(0, 500),
+        confirmed: confirmedFlag(req.body)
+      });
+
       if (error instanceof ReportImportValidationError) {
         return res.status(error.statusCode).json({ message: error.message });
       }
@@ -1449,6 +1518,28 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         mode: normalizedMode,
         subjectDescription
       });
+      // Recorded BEFORE ensureUserVisibility, and the ordering is deliberate.
+      // This row describes what happened to the comment bank, and by this point
+      // the bank has been written. Visibility is a separate concern — recording
+      // after it would log a successful import as 'failed' because an unrelated
+      // join-table write threw, which is a worse record than none.
+      //
+      // The case §6.6 exists for: actor and owner differ, so the record answers
+      // "which admin changed whose bank, and was it a replace?".
+      await recordImportJob(ImportJob, {
+        actorUserId: req.session.user.id,
+        ownerUserId: targetUser.id,
+        subjectId: subjectId ?? null,
+        yearGroupId: yearGroupId ?? null,
+        source: 'reports',
+        mode: normalizedMode,
+        status: 'success',
+        categoryCount: result?.totalCategories ?? null,
+        commentCount: result?.totalComments ?? null,
+        errorMessage: null,
+        confirmed: confirmedFlag(req.body)
+      });
+
       const visibility = await ensureUserVisibility({
         userId: targetUser.id,
         subjectId,
@@ -1464,6 +1555,22 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
         visibility
       });
     } catch (error) {
+      await recordImportJob(ImportJob, {
+        actorUserId: req.session.user?.id ?? null,
+        ownerUserId: Number(userId) || null,
+        subjectId: subjectId ?? null,
+        yearGroupId: yearGroupId ?? null,
+        source: 'reports',
+        mode: normalizedMode,
+        status: 'failed',
+        categoryCount: null,
+        commentCount: null,
+        errorMessage: (error instanceof ReportImportValidationError
+          ? error.message
+          : 'Error importing reports for target user').slice(0, 500),
+        confirmed: confirmedFlag(req.body)
+      });
+
       if (error instanceof ReportImportValidationError) {
         return res.status(error.statusCode).json({ message: error.message });
       }

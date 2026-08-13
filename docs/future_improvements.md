@@ -86,6 +86,19 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Reliability and Data Safety
 
+- `2026-08-13`: **`ImportJobs` has no retention policy.** The table added for the
+  audit trail (§6.6) accumulates one row per import for ever, with nothing to
+  prune it. The rows are staff metadata rather than pupil data — actor, owner,
+  subject, year group, counts, status — so this is not urgent, but "we keep an
+  audit log" with no retention answer is how a small table becomes a
+  data-protection question two years later. Decide a period and add a prune, or
+  decide explicitly to keep for ever and write that down.
+- `2026-08-13`: **The audit trail does not cover deletions or CSV imports.**
+  §6.6's original concern was admin/destructive actions generally; what was built
+  covers the AI-report import paths. Deleting a shared subject or year group still
+  leaves no record, and CSV import/replace writes no row — the `source` column
+  exists to distinguish it, but nothing populates it yet.
+
 - `2026-08-13`: **Non-string request fields are coerced instead of rejected.**
   `POST /api/categories` with `{"name": {"a":1}}` returns **200** and stores a
   category called `"[object Object]"`. Before the `src/lib/text.js` merge that

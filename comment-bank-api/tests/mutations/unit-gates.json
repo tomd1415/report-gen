@@ -150,6 +150,27 @@
       "expect": [
         "a stale client sending pupilNames NEVER writes the names themselves into the log"
       ]
+    },
+    {
+      "id": "import-job-not-recorded",
+      "file": "src/routes/index.js",
+      "find": "  if (!ImportJob?.create) {\n    return;\n  }",
+      "replace": "  if (true) {\n    return;\n  }",
+      "expect": [
+        "import jobs are recorded records a successful teacher import against the teacher",
+        "import jobs are recorded records who the admin acted FOR, not just who acted",
+        "import jobs are recorded records a FAILED import, not only successful ones",
+        "import jobs are recorded records confirmed -null when the client does not say, distinct from false"
+      ]
+    },
+    {
+      "id": "import-job-records-the-report-text",
+      "file": "src/routes/index.js",
+      "find": "        errorMessage: null,\n        confirmed: confirmedFlag(req.body)\n      });\n\n      res.json(result);",
+      "replace": "        errorMessage: String(req.body?.reports ?? '').slice(0, 500),\n        confirmed: confirmedFlag(req.body)\n      });\n\n      res.json(result);",
+      "expect": [
+        "import jobs are recorded stores NO report text, comments, free text or names"
+      ]
     }
   ]
 }

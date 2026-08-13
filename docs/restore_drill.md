@@ -45,7 +45,7 @@ EXIT;
 >
 > ```bash
 > ls -l /path/to/comment_bank_backup.sql
-> grep -c 'CREATE TABLE' /path/to/comment_bank_backup.sql   # expect 11, not 0
+> grep -c 'CREATE TABLE' /path/to/comment_bank_backup.sql   # expect 12, not 0
 > ```
 >
 > If that count is 0, stop — the file is a failed dump, not a backup, and
@@ -135,7 +135,7 @@ migration ran at all — umzug resolves cleanly when its glob matches nothing
 
 ```sql
 USE comment_bank_restore_test;
-SHOW TABLES;   -- expect 11, including SequelizeMeta
+SHOW TABLES;   -- expect 12, including SequelizeMeta
 ```
 
 ## 5. Verify Restored Data
