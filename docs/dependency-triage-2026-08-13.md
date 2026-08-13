@@ -11,27 +11,44 @@ tracing.
 
 ---
 
-## A discrepancy to resolve before trusting any number
+## The discrepancy — raised, then resolved the same day
 
-GitHub reports **41** open advisories (1 critical, 16 high, 22 moderate, 2 low). Local
-`npm audit` against the current lockfile reports **16** (1 critical, 6 high, 8 moderate,
-1 low).
+When this triage was written GitHub reported **41** open advisories against `npm audit`'s
+**16**, and I recorded that I could not reconcile them (no `gh` CLI here) and that the
+triage was therefore complete only for what the lockfile showed.
 
-**I could not reconcile these, and I am not going to pretend otherwise.** The `gh` CLI is
-not installed in this container, so the GitHub list cannot be read directly and I have
-only the push banner's counts. The likely causes, in order:
+**It resolved on the next push.** Committing the `axios` removal and the regenerated
+lockfile (`01838bc`) took GitHub from **41 to 15** — 1 critical, 6 high, 7 moderate, 1 low.
+That was cause (2) on the list below, and it turned out to be almost the whole of it:
+GitHub had been scanning the default branch's lockfile, which still carried `axios` and its
+transitive tree.
+
+| | critical | high | moderate | low | total |
+|---|---|---|---|---|---|
+| GitHub, before | 1 | 16 | 22 | 2 | **41** |
+| GitHub, after `01838bc` | 1 | 6 | 7 | 1 | **15** |
+| `npm audit`, local | 1 | 6 | 8 | 1 | **16** |
+
+**The remaining gap is one moderate**, and I have not chased it down. The most likely
+explanation is grouping: `npm audit` lists `@rushstack/node-core-library`,
+`@rushstack/terminal`, `@rushstack/ts-command-line`, `sequelize` and
+`connect-session-sequelize` as separate entries when they are flagged **solely** as parents
+of `ajv` and `uuid`, so one of those parent entries may not correspond to a distinct
+GitHub alert. That is a guess, and it is labelled as one — a single moderate that is
+already classified below either way.
+
+The candidate causes, kept because the reasoning generalises to the next time the two
+numbers disagree:
 
 1. GitHub raises **one alert per vulnerable path**, while `npm audit` groups by advisory —
    a package reached through three parents is three alerts and one audit entry.
-2. GitHub scanned the lockfile **as committed on the default branch**, which until
-   `01838bc` today still contained `axios` and its transitive tree.
-3. GitHub alerts persist until dismissed or the fix lands on the default branch.
+2. GitHub scans the lockfile **as committed on the default branch**, not your working tree.
+   ← *this was it*
+3. GitHub alerts persist until dismissed or until the fix lands on the default branch.
 
-**What this means for the triage below:** it covers the 16 advisories that exist in the
-tree as it stands. If the true figure is 41 alerts over the same 16 advisories, the
-classification holds. If GitHub is seeing advisories `npm audit` is not, this triage is
-incomplete — and the way to find out is to read the alert list, which needs `gh` or the
-web UI. **That is the one open action from this item.**
+The generalisable lesson: **a dependency count from a scanner is a fact about a committed
+artefact, not about your checkout.** Before treating a discrepancy as a mystery, push and
+look again.
 
 ---
 
@@ -124,8 +141,8 @@ is reachable from `server.mjs`.
 
 1. **Bump `multer` to `>=2.2.0`.** In-range, no API change, and the only advisory traced to
    a live request path.
-2. **Read the actual GitHub alert list** (needs `gh` or the web UI) and reconcile 41 against
-   16. Until that is done, this triage is complete only for what the lockfile shows.
+2. ~~Reconcile 41 against 16.~~ **Done** — the `axios` removal took GitHub to 15; see
+   above. One moderate remains unexplained and is probably a grouping artefact.
 3. **Refresh the dev dependencies** — `vitest`/`vite`/`postcss`/`nanoid`/`form-data` all
    have in-range fixes and none affects production.
 4. **Do nothing about `sequelize`/`connect-session-sequelize`.** npm's proposed "fix" is a
@@ -135,7 +152,9 @@ is reachable from `server.mjs`.
 
 ## What this triage does not establish
 
-- That the 16 advisories are all of them — see the discrepancy above.
+- That the 16 advisories are all of them. The counts now agree to within one moderate,
+  which is a far better position than when this was written, but "agrees to within one"
+  is not "verified item by item" and should not be read as such.
 - That an unreachable dependency is *safe*; only that no current call path reaches the
   vulnerable code. A new feature can change that, and nothing in the repository would
   notice. The `ws` entry is the clearest example: one Realtime call would move it from
