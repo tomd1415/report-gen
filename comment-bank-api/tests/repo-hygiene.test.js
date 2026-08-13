@@ -115,7 +115,17 @@ describe('repository hygiene', () => {
     // `sk-` placeholder, far too short to be a real key. Nothing to do.
     const dangerous = /(^|\/)(\.env(?!\.example)($|\.)|id_rsa|.*\.(pem|key|p12|pfx)$)/;
 
-    const offenders = gitLines(['ls-files']).filter((file) => dangerous.test(file));
+    const tracked = gitLines(['ls-files']);
+    // Its own floor, added 2026-08-13. The mutation run that day predicted this
+    // assertion would stay GREEN when `gitLines` was made to return nothing —
+    // and it did. `offenders` was `[]` because there was nothing to filter, not
+    // because the repository was clean, and the two are indistinguishable from
+    // the result. It was relying on the sibling floor test above, which is a
+    // real protection but a fragile one: a `.only`, a filter, or splitting this
+    // file apart separates them and nothing says so.
+    expect(tracked.length).toBeGreaterThan(50);
+
+    const offenders = tracked.filter((file) => dangerous.test(file));
     expect(offenders).toEqual([]);
   });
 

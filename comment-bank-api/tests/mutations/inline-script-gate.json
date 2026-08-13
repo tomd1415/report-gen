@@ -1,0 +1,21 @@
+{
+  "name": "the inline-script gate — including the floor it grew after passing vacuously",
+  "why": "This gate's verdict is a bare exit code, which is the kind that never gets mutation-tested. Its own history is the reason: it used to print 'Checked 0 inline scripts' and exit 0, so `npm run check:deploy` went green whether or not it had run. The second break below is the one that matters — it blinds the scan rather than breaking a script, and a gate without a floor would report success having examined nothing.",
+  "command": ["node", "scripts/mutation-report.mjs", "inline"],
+  "breaks": [
+    {
+      "id": "inline-script-syntax-error",
+      "file": "public/settings.html",
+      "find": "<script>",
+      "replace": "<script>\nconst broken = (;",
+      "expect": ["check-inline-scripts"]
+    },
+    {
+      "id": "inline-scan-matches-nothing",
+      "file": "scripts/check-inline-scripts.mjs",
+      "find": "const scriptPattern = /<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi;",
+      "replace": "const scriptPattern = /<scriptNOMATCH(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi;",
+      "expect": ["check-inline-scripts"]
+    }
+  ]
+}

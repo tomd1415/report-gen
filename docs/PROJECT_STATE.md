@@ -1068,6 +1068,51 @@ and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
 
+### 6.19 Mutation-testing the gates properly, and the two defects it found (2026-08-13)
+Every gate here had been meta-tested **by hand**. `/claude-guidance/LESSONS.md` §5
+is explicit that this is a tooling gap rather than a discipline one: six steps
+with no feedback when one is skipped, and the signal that matters is **a break
+tripping fewer assertions than expected, not zero**. By hand I only ever answered
+*did something go red?*
+
+Fourteen breaks now run from `tests/mutations/*.json` via `mutate`, each naming
+the exact assertions that must fail. `scripts/mutation-report.mjs` adapts the
+suites, because `mutate` reads unittest output or `PASS`/`FAIL` lines and
+understands neither Vitest nor Playwright.
+
+**Every prediction was exact, first time, and that is the weaker result — not a
+win.** Two honest qualifications: most of these breaks had been hand-checked
+before, so predicting them was partly memory; and all the value came from the two
+places where I predicted something would **not** be caught.
+
+**Defect 1 — a gate with no floor of its own.** `repo-hygiene`'s *tracks no file
+whose name says it holds a credential* stayed green when the git enumeration was
+blinded. `offenders` was `[]` because there was nothing to filter, not because the
+repository was clean, and the assertion cannot tell those apart. It was relying on
+the sibling floor test in the same file — real protection, but fragile: a `.only`,
+a filter, or splitting the file separates them silently. It now has its own floor,
+and the break reddens five assertions where it reddened four.
+
+**Defect 2 — a gate guarding a copy rather than the thing.**
+`tests/migration-coverage.test.js` hard-coded its own copy of the migrations glob
+rather than importing it, on the reasoning that importing `src/db/migrate.js`
+constructs a Sequelize instance — true, but it does not connect, and the models
+that file already imports construct one anyway. So breaking the **real** glob left
+all five of its assertions green. Declared as `expect_none_because` before the run
+and confirmed by it; `migrationsGlob` is now exported and imported, and that
+break's expectation has flipped from "nothing catches this" to naming all five.
+
+That second one is the same two-lists-that-must-agree shape this suite keeps
+finding (§6.13, §6.16) — and it was **inside the test written to catch it**.
+
+**A trap in the tooling, worth knowing before writing a spec.** `mutate`'s failure
+regex is `^\s*FAIL (.+?)(?::.*)?$` — it stops at a colon, while its pass regex
+does not. A test named `keeps KNOWN_UNGUARDED honest: every entry …` would be
+recorded as passing under its full name and failing under a truncated one, so the
+tool would report *the named assertion stayed green* when it had in fact gone red
+— precisely the class of error it exists to catch. `mutation-report.mjs`
+sanitises colons in both directions.
+
 ---
 
 ## 7. Suggested next steps (if resuming work)

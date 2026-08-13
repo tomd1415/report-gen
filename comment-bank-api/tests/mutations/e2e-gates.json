@@ -1,0 +1,43 @@
+{
+  "name": "browser gates — the off-origin guard and the import name warning",
+  "why": "Two of the four gates named in the work-list live in Playwright, and both were meta-tested by hand. Each break below names the journey that must go red. The two 'guard blinded' breaks matter more than the two 'behaviour broken' ones: they check the floors, which are what stop a journey passing because it looked at nothing.",
+  "command": ["node", "scripts/mutation-report.mjs", "e2e"],
+  "breaks": [
+    {
+      "id": "off-origin-asset-planted",
+      "file": "public/footer.html",
+      "find": "<!-- footer.html -->",
+      "replace": "<!-- footer.html -->\n<img src=\"https://cdn.example.com/planted.png\" alt=\"\">",
+      "expect": [
+        "ui-smoke.spec.js no page loads an asset from another origin"
+      ]
+    },
+    {
+      "id": "off-origin-page-list-emptied",
+      "file": "tests/e2e/ui-smoke.spec.js",
+      "find": "  const pages = fs.readdirSync(publicDir)",
+      "replace": "  const pages = [].concat(fs.readdirSync(publicDir)).slice(0, 0)",
+      "expect": [
+        "ui-smoke.spec.js no page loads an asset from another origin"
+      ]
+    },
+    {
+      "id": "import-confirm-gate-removed",
+      "file": "public/import_reports.html",
+      "find": "if (suspects.length > 0 && confirmedImportSignature !== importSignature) {",
+      "replace": "if (false) {",
+      "expect": [
+        "ui-smoke.spec.js import page warns about possible names and requires confirmation before sending"
+      ]
+    },
+    {
+      "id": "import-check-fails-open",
+      "file": "public/import_reports.html",
+      "find": "                // Fail closed: if the helper did not load, say so rather than\n                // silently importing with no check at all.\n                return null;",
+      "replace": "                return [];",
+      "expect": [
+        "ui-smoke.spec.js import refuses to send if the possible-name check could not load"
+      ]
+    }
+  ]
+}

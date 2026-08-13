@@ -5,6 +5,7 @@ import { Umzug, memoryStorage } from 'umzug';
 import { describe, it, expect } from 'vitest';
 
 import { models } from '../src/models/index.js';
+import { migrationsGlob } from '../src/db/migrate.js';
 
 // Why this exists
 // ---------------
@@ -41,9 +42,12 @@ const apiRoot = path.join(here, '..');
 const migrationsDir = path.join(apiRoot, 'migrations');
 const restoreDrillPath = path.join(apiRoot, '..', 'docs', 'restore_drill.md');
 
-// The same glob src/db/migrate.js builds. Kept as a literal rather than imported
-// because importing migrate.js constructs a Sequelize instance.
-const migrationsGlob = path.join(migrationsDir, '*.mjs');
+// Imported from the runner, not copied. This was a hard-coded literal until
+// 2026-08-13, on the reasoning that importing migrate.js constructs a Sequelize
+// instance — true, but it does not connect, and the models this file already
+// imports construct one anyway. The cost of the copy was that breaking the real
+// glob in src/db/migrate.js left every test here green, which a mutation run
+// declared and then confirmed (tests/mutations/unit-gates.json).
 
 const resolveMigrations = () => new Umzug({
   migrations: { glob: migrationsGlob },

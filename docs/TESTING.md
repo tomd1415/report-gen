@@ -150,9 +150,39 @@ where a stale line would start failing builds for a cosmetic reason — and a ga
 that fails for cosmetic reasons gets switched off within a fortnight, taking the
 real coverage with it. For those, assert "no *new* entries" instead.
 
-### Rule 3 — meta-test every gate, in both directions, before trusting it
+### Rule 3 — meta-test every gate with `mutate`, not by hand
 
-A gate nobody has watched fail is decoration. Before relying on a new one:
+A gate nobody has watched fail is decoration. **Use `mutate`** (on PATH in every
+container; `/claude-guidance/LESSONS.md` §5) rather than editing files yourself.
+The specs live in `tests/mutations/*.json`:
+
+```bash
+cd comment-bank-api
+mutate --root . --list tests/mutations/unit-gates.json   # what a spec claims
+mutate --root . tests/mutations/*.json                   # run them
+```
+
+**Run it alone.** It edits source in place, so anything else reading the tree at
+the same time — another suite, a browser run, the live service on port 44344 — is
+reading deliberately broken code. Restoration is from bytes it read first, never
+`git checkout`, which would silently revert any uncommitted work along with it.
+
+`mutate` reads unittest output or `PASS name` / `FAIL name` lines, and understands
+neither Vitest nor Playwright. `scripts/mutation-report.mjs` adapts all three
+suites — unit, e2e, and the inline-script gate, whose verdict is a bare exit code.
+**Names in a spec's `expect` must use the sanitised form that script prints**: its
+FAIL regex stops at a colon while its PASS regex does not, so a test whose name
+contains one would be recorded as passing under its full name and failing under a
+truncated one — reported as "the named assertion stayed green" when it was red.
+Colons become ` -`.
+
+**Why not by hand.** Doing it by hand is six steps with no feedback when one is
+skipped, and it only ever answers *did something go red?* The signal that matters
+is **a break tripping FEWER assertions than expected**. Every gate here was
+hand-checked before 2026-08-13 and every one of them passed that weaker test;
+running them properly still found two defects (`PROJECT_STATE.md` §6.19).
+
+The old by-hand procedure, which is what a spec now encodes:
 
 1. **Break the thing it guards.** It must go red *and name what broke*.
 2. **Fix an entry it records as a known bug.** It must *also* go red, so the list
@@ -176,6 +206,13 @@ sentence.** The two that had not been watched fail recently were the oldest:
 The point of redoing all nine is §6.12's lesson: *a gate being documented as
 meta-tested is not evidence that it is*. This paragraph is now a claim someone
 checked on a date, which is the only kind worth writing.
+
+**Superseded 2026-08-13 by the specs above.** Both of those hand-checks were
+real, and both were the weaker test: they answered *did something go red?* rather
+than *did the assertion I named go red, and only that one?* Redoing all four
+gates with `mutate` reproduced every hand result **and** found two things the hand
+method could not — see `PROJECT_STATE.md` §6.19. Fourteen breaks across three
+specs now run in about four minutes.
 
 `openai-privacy-params` is the clearest illustration of *why* both directions,
 because it is built from two halves and the meta-test shows neither is redundant

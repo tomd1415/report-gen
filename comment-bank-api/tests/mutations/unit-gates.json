@@ -1,0 +1,96 @@
+{
+  "name": "unit gates \u2014 do the named assertions actually protect what they claim?",
+  "why": "Every gate in this project was meta-tested BY HAND, which /claude-guidance/LESSONS.md \u00a75 calls a tooling gap rather than a discipline one: six steps with no feedback when one is skipped, and the real signal is a break tripping FEWER assertions than expected, not zero. By hand I only ever checked that SOMETHING went red. Each break below names exactly which assertions must fail; a shortfall is the finding.",
+  "command": [
+    "node",
+    "scripts/mutation-report.mjs",
+    "unit"
+  ],
+  "breaks": [
+    {
+      "id": "comments-guard-removed",
+      "file": "src/routes/index.js",
+      "find": "  app.use('/api/comments', isAuthenticated);\n",
+      "replace": "",
+      "expect": [
+        "route auth matrix answers 401 or 403 to every logged-out request except the known-unguarded ones"
+      ]
+    },
+    {
+      "id": "categories-guard-added",
+      "file": "src/routes/index.js",
+      "find": "  app.use('/api/categories-comments', isAuthenticated);",
+      "replace": "  app.use('/api/categories', isAuthenticated);\n  app.use('/api/categories-comments', isAuthenticated);",
+      "expect": [
+        "route auth matrix answers 401 or 403 to every logged-out request except the known-unguarded ones"
+      ]
+    },
+    {
+      "id": "route-enumeration-returns-nothing",
+      "file": "tests/route-auth-matrix.test.js",
+      "find": "  for (const layer of app.router.stack) {",
+      "replace": "  for (const layer of []) {",
+      "expect": [
+        "route auth matrix answers 401 or 403 to every logged-out request except the known-unguarded ones",
+        "route auth matrix keeps KNOWN_UNGUARDED honest - every entry names a route that still exists",
+        "route auth matrix keeps INTENTIONALLY_PUBLIC honest - every entry names a route that still exists"
+      ]
+    },
+    {
+      "id": "category-ownership-unscoped",
+      "file": "src/routes/index.js",
+      "find": "  const findOwnedCategory = (id, userId, options = {}) => {\n    return Category.findOne({\n      where: { id, userId },",
+      "replace": "  const findOwnedCategory = (id, userId, options = {}) => {\n    return Category.findOne({\n      where: { id },",
+      "expect": [
+        "comment bank ownership checks scopes GET /api/categories/ -id to the session user, not the request",
+        "comment bank ownership checks scopes PUT /api/categories/ -id to the session user, not the request body",
+        "comment bank ownership checks scopes DELETE /api/categories/ -id to the session user"
+      ]
+    },
+    {
+      "id": "repo-hygiene-git-blind",
+      "file": "tests/repo-hygiene.test.js",
+      "find": "const gitLines = (args) => git(args)\n  .split('\\n')\n  .map((line) => line.trim())\n  .filter(Boolean);",
+      "replace": "const gitLines = (args) => [];",
+      "expect": [
+        "repository hygiene can see the repository at all",
+        "repository hygiene recommends no command that silently skips tests",
+        "repository hygiene tracks no SQL file containing a Users table dump",
+        "repository hygiene tracks no file whose name says it holds a credential",
+        "repository hygiene tracks nothing that .gitignore claims to ignore"
+      ]
+    },
+    {
+      "id": "feedback-target-id-renamed",
+      "file": "public/manage_export_import.html",
+      "find": "id=\"csv-status\"",
+      "replace": "id=\"csv-status-renamed\"",
+      "expect": [
+        "every feedback target the pages ask for actually exists resolves every literal selector to an id on the same page"
+      ]
+    },
+    {
+      "id": "openai-store-flag-dropped",
+      "file": "src/routes/index.js",
+      "find": "  store: false,\n",
+      "replace": "",
+      "expect": [
+        "every OpenAI request carries store -false and a hashed identifier on both /generate-report calls (relevance filter and report)",
+        "every OpenAI request carries store -false and a hashed identifier on all three /api/import-reports calls (relevance, extraction, merge)"
+      ]
+    },
+    {
+      "id": "migration-glob-narrowed-for-real",
+      "file": "src/db/migrate.js",
+      "find": "const migrationsGlob = path.join(__dirname, '..', '..', 'migrations', '*.mjs');",
+      "replace": "const migrationsGlob = path.join(__dirname, '..', '..', 'migrations', '*.js');",
+      "expect": [
+        "the migration glob actually matches the migration files resolves at least one migration",
+        "the migration glob actually matches the migration files resolves every file in migrations/, whatever it is named",
+        "every model has a table some migration creates creates a table for each defined model",
+        "every model has a table some migration creates creates Sessions, which has no model to fall back on",
+        "the table count in the restore drill matches the migrations agrees with what a real backup would contain"
+      ]
+    }
+  ]
+}
