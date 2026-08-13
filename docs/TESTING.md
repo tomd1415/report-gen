@@ -181,6 +181,23 @@ the same time — another suite, a browser run, the live service on port 44344 �
 reading deliberately broken code. Restoration is from bytes it read first, never
 `git checkout`, which would silently revert any uncommitted work along with it.
 
+**And check its children are gone afterwards.** This cost a four-hour outage on
+2026-08-13: repeated runs across the day leaked `vitest` and `esbuild` processes,
+which bred to load **269** on a four-core box shared by ten containers, and
+nothing noticed — the load even wedged `docker exec`, so the dashboard reported
+this container as *down* while it was up. **An exit code is a statement about the
+parent.** After a run:
+
+```bash
+ps -eo pid,args | grep -E "[v]itest|[m]utation-report"   # expect nothing
+uptime                                                    # expect single digits
+```
+
+The bracket in `[v]itest` is not decoration: `pgrep -f vitest` matches its own
+command line, which during that incident reported two survivors when there were
+none. One spec at a time, never backgrounded alongside other work.
+`LESSONS-LEARNT.md` §12 has the full account.
+
 `mutate` reads unittest output or `PASS name` / `FAIL name` lines, and understands
 neither Vitest nor Playwright. `scripts/mutation-report.mjs` adapts all three
 suites — unit, e2e, and the inline-script gate, whose verdict is a bare exit code.
