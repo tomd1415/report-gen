@@ -129,6 +129,18 @@ describe('route auth matrix', () => {
     const { models, openai } = createTripwires();
     const routes = listRoutes(createLoggedOutApp({ models, openai })).map(label);
 
+    // Floor, added 2026-08-13. Without it this test asserts NOTHING once
+    // KNOWN_UNGUARDED is empty — the loop below simply does not run, so it passes
+    // whatever the router does, including when the enumeration returns nothing at
+    // all. Emptying the list in the /api/categories fix is what made it vacuous:
+    // **fixing the bug silently disabled the guard that watched the bug's list.**
+    //
+    // Found by running every mutation spec together rather than one at a time.
+    // `route-enumeration-returns-nothing` reported "1 of 3 expected assertions
+    // stayed green while 2 others went red" — the shortfall, which a bare
+    // pass/fail would have called covered because something did go red.
+    expect(routes.length).toBeGreaterThan(50);
+
     for (const entry of KNOWN_UNGUARDED) {
       // A stale entry would let a genuinely unguarded route hide behind a name
       // that no longer resolves to anything.
@@ -156,6 +168,12 @@ describe('route auth matrix', () => {
   it('keeps INTENTIONALLY_PUBLIC honest: every entry names a route that still exists', () => {
     const { models, openai } = createTripwires();
     const routes = listRoutes(createLoggedOutApp({ models, openai })).map(label);
+
+    // Same floor, for the same reason. This list is not empty today, so the loop
+    // does run — but that is a property of today's data, not of the test, and a
+    // guard that depends on its list staying non-empty is one deletion from
+    // silence.
+    expect(routes.length).toBeGreaterThan(50);
 
     for (const entry of INTENTIONALLY_PUBLIC) {
       expect(routes).toContain(entry);

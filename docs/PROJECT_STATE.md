@@ -1174,6 +1174,30 @@ and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
 
+### 6.25 Fixing a bug disabled the guard that watched it (2026-08-13)
+`route-auth-matrix`'s staleness test loops over `KNOWN_UNGUARDED`. When the
+`/api/categories` guard landed and that list was emptied (§6.9), **the loop
+stopped running and the test began asserting nothing.** It passed whatever the
+router did — including with the route enumeration blinded to return nothing.
+
+Nobody broke it. *Fixing the bug* made its guard vacuous, and a green run looks
+the same either way.
+
+**Caught only by running all 28 mutation breaks together**, which had never been
+done: each was verified in isolation as it was written, against the tree as it
+stood then. Since then `routes/index.js` changed repeatedly, `cleanText` moved to
+a new module, 1,225 lines came out of `index.html` and a migration landed. Run as
+a set, `route-enumeration-returns-nothing` reported *1 of 3 expected assertions
+stayed green while 2 others went red* — the shortfall that LESSONS §5 names as
+the real signal, and that a bare pass/fail would have called covered.
+
+Fixed by giving both staleness tests the floor the main assertion already had:
+the enumeration must find more than 50 routes before either iterates. All three
+assertions now redden. Written up as `docs/TESTING.md` rule 4a, with the general
+form: **any assertion that loops over a list needs a floor outside the loop**, and
+**run the specs as a set** — a spec is hand-maintained and decays like anything
+else (LESSONS §3).
+
 ### 6.24 A stale client sending `pupilNames` is now visible (2026-08-13)
 The import page's possible-name warning is entirely browser-side, so a cached
 page — or a crafted request — bypasses it. The `pupilNames` field was removed on

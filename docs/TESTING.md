@@ -267,6 +267,37 @@ stable. The inline-script count is *meant to fall* as scripts move into
 `public/*.js` (see `PROJECT_STATE.md` §6.4), so pinning it would make legitimate
 progress fail the build.
 
+### Rule 4a — fixing a bug can silently disable the guard that watched it
+
+Found 2026-08-13, and it is the sharpest instance of rule 4 so far.
+
+`route-auth-matrix` has a staleness test: *every entry in `KNOWN_UNGUARDED` names
+a route that still exists*. It is a `for` loop over that list. When the
+`/api/categories` guard landed and the list was emptied, **the loop stopped
+running and the test began asserting nothing** — it passed whatever the router
+did, including with the enumeration blinded to return no routes at all.
+
+Nobody broke it. *Fixing the bug* is what made its guard vacuous, and a passing
+run looks identical either way.
+
+**It was caught only by running every mutation spec together.** Each break had
+been verified in isolation as it was written; run as a set,
+`route-enumeration-returns-nothing` reported
+
+> 1 of 3 expected assertions stayed green while 2 others went red
+
+which is the **shortfall** LESSONS §5 calls the real signal. A bare pass/fail
+would have called it covered, because something did go red.
+
+Two things follow:
+
+- **Any assertion that loops over a list needs a floor outside the loop.** Both
+  staleness tests now assert the enumeration found more than 50 routes before
+  iterating, so they mean something whether or not their list is empty.
+- **Run the specs as a set, not one at a time.** A spec is hand-maintained, and
+  §3 of LESSONS applies to it: breaks verified individually at the moment they
+  were written can decay as the code moves under them.
+
 ### Rule 5 — test the branch that fires when a check cannot run
 
 A check that silently finds nothing is indistinguishable from one that never
