@@ -1174,6 +1174,58 @@ and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
 
+### 6.28 The migration has never run against a real database (2026-08-13)
+The riskiest assumption under this fortnight's work is the one `docs/TESTING.md`
+states in its opening paragraphs: **the Vitest suite mocks the database
+entirely**, so a green run says nothing about the SQL Sequelize generates. The
+`ImportJobs` work — new migration, new model, new writes — is the sharpest case,
+because a migration is the one artefact whose whole job is to execute against a
+real server.
+
+**I could not close it here, and did not force it.** MariaDB 10.11 is running on
+this box, but the app's database user cannot `CREATE DATABASE` — correct
+least-privilege, and good news in itself. That left two ways to test, and both
+were refused: using the MySQL root account is a privileged action on a live box,
+and running the migration against the **live** database is a change nobody asked
+for, however additive. No sqlite driver is installed, so there is no third,
+isolated dialect to fall back on.
+
+**What narrowing it statically did establish**, so the residual risk is small and
+named rather than vague:
+
+- The **real** migration functions execute, against a recording stub — not a
+  re-typed copy (`tests/migration-coverage.test.js`).
+- `ImportJob.getTableName()` is `ImportJobs`, which is exactly what the migration
+  creates. Sequelize's pluralisation agreeing with a hand-written `createTable` is
+  not automatic and is the kind of thing that fails only at runtime.
+- **Model attributes and migration columns match exactly**, 14 each, compared
+  programmatically in both directions: no attribute the model would write that the
+  table lacks (which fails the INSERT), and no column the model ignores.
+
+**What is genuinely still unverified**, and it is narrow: that the `CREATE TABLE`
+executes on MariaDB — the column types, `STRING(500)` becoming `VARCHAR(500)`, the
+three foreign keys resolving, and the two indexes being created.
+
+**What to run, by someone with the credentials** (the restore drill's own pattern,
+against a throwaway database so the live one is untouched):
+
+```sql
+CREATE DATABASE comment_bank_migration_test;
+GRANT ALL ON comment_bank_migration_test.* TO 'reportgen'@'localhost';
+```
+
+```bash
+cd /path/to/report-gen/comment-bank-api
+DB_NAME=comment_bank_migration_test node -e \
+  "import('./src/db/migrate.js').then(m=>m.runMigrations()).catch(e=>{console.error(e);process.exit(1)})"
+# expect 12 tables, and ImportJobs among them:
+mysql -u reportgen -p comment_bank_migration_test -e "SHOW TABLES; DESCRIBE ImportJobs;"
+DROP DATABASE comment_bank_migration_test;
+```
+
+Recorded rather than left as an unstated assumption: **"the tests pass" and "the
+migration runs" are different claims**, and only one of them has been checked.
+
 ### 6.27 A documentation sweep, and a gate deliberately not built (2026-08-13)
 Swept every `§x.y` cross-reference and every backticked repo path across the
 documentation — the text written this fortnight is the least-verified in the
