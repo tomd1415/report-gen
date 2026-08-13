@@ -100,7 +100,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-27 Vitest files (179 tests) + 17 Playwright browser journeys, as of 2026-08-13.
+28 Vitest files (184 tests) + 17 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -110,7 +110,7 @@ and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
 > 2026-08-12 and 2026-08-13:** `npm install` + `npm test` run green here —
-> **27 files, 179 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> **28 files, 184 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
 > `git diff --check` clean. (`check:inline-scripts` reports 9 from 2026-08-13 —
 > see §6.21.)
@@ -1117,6 +1117,45 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.24 A stale client sending `pupilNames` is now visible (2026-08-13)
+The import page's possible-name warning is entirely browser-side, so a cached
+page — or a crafted request — bypasses it. The `pupilNames` field was removed on
+2026-08-06 and the server dropped it **in silence**: nothing recorded that a
+client was still sending one, so the situation could persist indefinitely with
+nobody knowing.
+
+**The owner chose accept-and-warn, not reject.** This deliberately differs from
+`/generate-report`, which refuses a transmitted name with a 400 (§6.3.1). The
+work-list item's own `check` presumed rejection; the owner's answer overrode it,
+and the test pinning the 200 says so, so that nobody later "tidies up the
+inconsistency" without realising it was a decision.
+
+**The part that was not in the item, and mattered more than the part that was.**
+The obvious implementation of a deprecation warning logs the value — and that
+would recreate exactly the artefact the 2026-08-06 decision removed: a pupil-name
+list held server-side, in the most widely copied form there is, because logs get
+shipped, tailed and pasted into tickets. The warning therefore reports **shape
+only**:
+
+```
+[deprecated] POST /api/import-reports received a pupilNames field (string of 31 chars)
+from user id 7. The server stopped collecting pupil names on 2026-08-06 and is ignoring
+it; the client is stale and should be reloaded (Ctrl+F5). The value itself is
+deliberately not logged — see docs/PROJECT_STATE.md §6.3.2.
+```
+
+Enough to tell an operator which account to reload; nothing to leak.
+
+**Both** import endpoints warn. A warning that went quiet exactly when an admin
+imports on another member of staff's behalf would be worse than none.
+
+**A vacuous pass, noted because it is the kind that hides.** The
+`NEVER writes the names themselves into the log` test passed *before* the
+implementation existed — because nothing was logged at all, so there was nothing
+to find the names in. It only became a real assertion once the warning existed.
+That is why one of the two mutation breaks interpolates the value instead of the
+shape: without it, the test would look like a guard while proving nothing.
 
 ### 6.23 The two copies of `cleanText` had drifted (2026-08-13)
 `cleanText`, `isTargetPlaceholderComment` and `TARGET_PLACEHOLDER_COMMENT` were

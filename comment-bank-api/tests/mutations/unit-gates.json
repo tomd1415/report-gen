@@ -132,6 +132,24 @@
         "the cleanText divergence, resolved coerces true to true instead of throwing",
         "the cleanText divergence, resolved coerces { a - 1 } to [object Object] instead of throwing"
       ]
+    },
+    {
+      "id": "pupilnames-warning-removed",
+      "file": "src/routes/index.js",
+      "find": "\n    warnIfPupilNamesSent(req, 'POST /api/import-reports');\n",
+      "replace": "\n",
+      "expect": [
+        "a stale client sending pupilNames logs a deprecation warning naming the field and the endpoint"
+      ]
+    },
+    {
+      "id": "pupilnames-warning-leaks-the-names",
+      "file": "src/routes/index.js",
+      "find": "    `[deprecated] ${endpoint} received a pupilNames field (${shape}) from user id `",
+      "replace": "    `[deprecated] ${endpoint} received a pupilNames field (${value}) from user id `",
+      "expect": [
+        "a stale client sending pupilNames NEVER writes the names themselves into the log"
+      ]
     }
   ]
 }

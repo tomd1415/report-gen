@@ -69,6 +69,35 @@ const parseWordLimit = (value) => {
   return parsed;
 };
 const hashIdentifier = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
+/**
+ * A stale client can still POST a `pupilNames` field: it was removed from both
+ * import pages on 2026-08-06, but a cached page does not know that. The server
+ * ignores it either way — the owner chose to accept and warn rather than reject,
+ * unlike /generate-report, which refuses a transmitted name outright.
+ *
+ * **The value is deliberately never logged.** The decision that removed this
+ * field was that no pupil-name list should be held server-side, and a log line is
+ * server-side storage of the most widely copied kind — logs get shipped, tailed
+ * and pasted into tickets. Recording the names here would recreate precisely the
+ * artefact the decision removed. Only the shape is reported, which is enough to
+ * tell an operator a client is stale and which account to go and reload.
+ */
+const warnIfPupilNamesSent = (req, endpoint) => {
+  const value = req.body?.pupilNames;
+  if (value === undefined || value === null) {
+    return;
+  }
+  const shape = Array.isArray(value)
+    ? `array of ${value.length}`
+    : `${typeof value}${typeof value === 'string' ? ` of ${value.length} chars` : ''}`;
+  console.warn(
+    `[deprecated] ${endpoint} received a pupilNames field (${shape}) from user id `
+    + `${req.session?.user?.id ?? 'unknown'}. The server stopped collecting pupil names on `
+    + '2026-08-06 and is ignoring it; the client is stale and should be reloaded (Ctrl+F5). '
+    + 'The value itself is deliberately not logged — see docs/PROJECT_STATE.md §6.3.2.'
+  );
+};
+
 const getSafetyIdentifier = (req) => {
   const userId = req.session?.user?.id;
   return userId ? hashIdentifier(userId) : 'anonymous';
@@ -1258,6 +1287,8 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { subjectId, yearGroupId, reports } = req.body;
     const userId = req.session.user.id;
 
+    warnIfPupilNamesSent(req, 'POST /api/import-reports');
+
     try {
       const subjectContext = await SubjectContext.findOne({
         where: { subjectId, yearGroupId, userId }
@@ -1376,6 +1407,8 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
 
   app.post('/api/admin/staff/:userId/import-reports', openAiLimiter, async (req, res) => {
     const { userId } = req.params;
+
+    warnIfPupilNamesSent(req, 'POST /api/admin/staff/:userId/import-reports');
     const {
       subjectId,
       yearGroupId,

@@ -92,6 +92,13 @@ describe('import-reports', () => {
   it('ignores a pupilNames field if a stale client still sends one', async () => {
     // The field is gone from both import pages, but a cached page could still
     // post it. It must be dropped, not stored, and not echoed into the prompt.
+    //
+    // Ignored is not the whole contract as of 2026-08-13: the server also logs a
+    // deprecation warning, so a stale client is visible rather than invisible.
+    // That half lives in tests/pupil-names-deprecation.test.js, including the
+    // assertion that the warning must NOT contain the names. Cross-referenced
+    // deliberately — two tests describing one endpoint differently is how a
+    // contract quietly ends up with two versions.
     openai.responses.parse.mockResolvedValue({
       output_parsed: { categories: [{ name: 'Effort / motivation / attendance', comments: ['Works hard'] }] }
     });
