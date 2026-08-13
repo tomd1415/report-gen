@@ -901,7 +901,7 @@ thing: rename a migration to `.js`; add a model with no migration
 (`expected [ 'Orphans' ] to deeply equal []`); stop creating `Sessions`; change
 the number in the drill (`expected 12 to be 11`).
 
-**Not fixed, and worth a decision:** `migrations/20250106-002` wraps
+**Not fixed, and worth a decision:** `migrations/20250106-002-add-session-timestamps.mjs` wraps
 `describeTable('Sessions')` in `try { … } catch { return; }`. The intent is "skip
 if the table is not there yet", but it swallows *every* reason — and umzug then
 records the migration as executed, so it never runs again. A transient failure at
@@ -1173,6 +1173,30 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.27 A documentation sweep, and a gate deliberately not built (2026-08-13)
+Swept every `§x.y` cross-reference and every backticked repo path across the
+documentation — the text written this fortnight is the least-verified in the
+repo, and LESSONS §3 applies to hand-made cross-references like anything else.
+
+**Result: 24 of 24 section refs resolve**, and one real defect in ~40 cited
+paths — `migrations/20250106-002` was missing its suffix, so a reader could not
+tab-complete it. Fixed.
+
+**The more useful result is that I did not build the gate**, for two reasons now
+in `docs/TESTING.md` as rule 4b. The path check would cry wolf: three of its four
+hits were *proposals* — a rename not yet done, two files the route-split plan will
+create — and planning documents are supposed to name files that do not exist yet.
+And the section-ref check catches the wrong failure: a dangling `§6.99` is
+harmless because the reader knows something is wrong, while the dangerous case is
+a ref that **still resolves but now points at different content** after a
+renumbering, which existence-checking cannot see at all.
+
+Recorded because the instinct after a week of building gates is to build another
+one, and the general form is worth more than the sweep: **before building a check,
+ask which failure mode it actually catches.** If it catches the loud one and
+misses the quiet one, it is worse than nothing — the quiet one is now behind a
+green tick.
 
 ### 6.26 A fresh-eyes read of my own diff (2026-08-13)
 The mutation run checked the tests; this checked the **source** changes from the

@@ -298,6 +298,32 @@ Two things follow:
   §3 of LESSONS applies to it: breaks verified individually at the moment they
   were written can decay as the code moves under them.
 
+### Rule 4b — a check that catches the harmless failure is worse than none
+
+Swept the documentation on 2026-08-13 for two things that could be gated: every
+`§x.y` cross-reference resolving to a real heading, and every backticked repo path
+existing. Result: **24 of 24 section refs resolved**, and one truncated filename
+in ~40 cited paths (`migrations/20250106-002`, missing its suffix). Fixed by hand.
+
+**Deliberately not turned into a gate**, for two separate reasons worth keeping:
+
+- **The path check would cry wolf.** Three of the four things it flagged were
+  *proposals* — a rename not yet done, and two files the route-split plan will
+  create. Planning documents are supposed to name files that do not exist yet. A
+  gate with a 3-in-4 false-positive rate gets switched off within a fortnight,
+  taking real coverage with it (rule 2).
+- **The section-ref check catches the wrong failure.** A dangling `§6.99` is
+  harmless: the reader finds nothing and knows something is wrong. The dangerous
+  failure is a ref that **still resolves but now points at different content**,
+  which is what happens when sections are renumbered or inserted between — and
+  existence-checking cannot see that at all. Building it would produce confidence
+  about the one case it cannot detect.
+
+The second is the general form and the reason this is a rule rather than a note:
+**before building a check, ask which of the failure modes it actually catches.**
+If it catches the loud one and misses the quiet one, it is worse than nothing,
+because now the quiet one is behind a green tick.
+
 ### Rule 5 — test the branch that fires when a check cannot run
 
 A check that silently finds nothing is indistinguishable from one that never
