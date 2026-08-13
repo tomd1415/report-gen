@@ -299,6 +299,35 @@ stable. The inline-script count is *meant to fall* as scripts move into
 `public/*.js` (see `PROJECT_STATE.md` §6.4), so pinning it would make legitimate
 progress fail the build.
 
+### Rule 4c — a red a teacher cannot act on gets taped over
+
+The person maintaining this project is a teacher. A gate that fails with
+
+```
+AssertionError: expected [ 'dbbackup_web/x.sql' ] to deeply equal []
+```
+
+names the offending item and nothing else — **the what-to-do lives in a comment
+beside the assertion, which nobody sees at failure time.** A check whose red
+cannot be acted on gets silenced within a term, and a silenced check is worse than
+an absent one because it still looks like coverage.
+
+Surveyed 2026-08-13: of the gates asserting an empty result, only
+`openai-privacy-params` used Vitest's message argument. The highest-stakes three
+now do — an unauthenticated request reaching the database, a credential-shaped
+file committed, a migration that will never run — and each message says what
+happened, why it matters and what to do, including *"ask before rewriting
+history"* where the safe action is not obvious.
+
+**"Act on" may legitimately mean "ring the person who built this".** It must say
+so. The rest were left alone: where the array contents already read as a sentence
+(`feedback-target-ids` builds *"page → ReportGenUI.showStatus('#id') — no element
+with that id"*), a message argument would be ceremony.
+
+**For any new gate, write two lines beside it**: what the worst outcome is if it
+went vacuous for a year, and who acts on red and how. If neither has a good
+answer, that is an argument against the gate.
+
 ### Rule 4a — fixing a bug can silently disable the guard that watched it
 
 Found 2026-08-13, and it is the sharpest instance of rule 4 so far.

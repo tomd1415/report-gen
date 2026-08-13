@@ -126,7 +126,12 @@ describe('repository hygiene', () => {
     expect(tracked.length).toBeGreaterThan(50);
 
     const offenders = tracked.filter((file) => dangerous.test(file));
-    expect(offenders).toEqual([]);
+    expect(
+      offenders,
+      'A credential-shaped file is committed to this repository. Remove it, and treat anything '
+      + 'inside it as disclosed — rotate the key or password. Deleting it in a new commit does '
+      + 'NOT remove it from history; ask before rewriting history.'
+    ).toEqual([]);
   });
 
   it('tracks no SQL file containing a Users table dump', () => {

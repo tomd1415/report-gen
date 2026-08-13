@@ -118,7 +118,12 @@ describe('route auth matrix', () => {
 
     // No unauthenticated request may reach the database or OpenAI, whether or
     // not it was rejected with the right status code.
-    expect(reached).toEqual([]);
+    expect(
+      reached,
+      'An unauthenticated request reached the database or OpenAI. That is more serious than a '
+      + 'wrong status code: a logged-out caller touched real data. Add the missing '
+      + 'app.use(prefix, isAuthenticated) guard in src/routes/index.js before merging.'
+    ).toEqual([]);
 
     expect(unprotected.sort()).toEqual(
       KNOWN_UNGUARDED.map((entry) => `${entry} -> 500`).sort()

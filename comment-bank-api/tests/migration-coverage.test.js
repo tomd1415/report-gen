@@ -95,7 +95,11 @@ describe('the migration glob actually matches the migration files', () => {
 
     // If this fails, a file is sitting in migrations/ that runMigrations() will
     // never run — almost certainly the extension: the glob is *.mjs.
-    expect(onDisk.filter((name) => !resolved.includes(name))).toEqual([]);
+    expect(
+      onDisk.filter((name) => !resolved.includes(name)),
+      'A file in migrations/ will never be run: runMigrations() globs *.mjs, so a differently '
+      + 'named file is silently skipped and the app starts against a stale schema. Rename it.'
+    ).toEqual([]);
   });
 });
 
@@ -109,7 +113,11 @@ describe('every model has a table some migration creates', () => {
 
     // If this fails, the named model has no table in a fresh deployment. The
     // models are never synced, so nothing else would tell you.
-    expect(modelTables.filter((table) => !created.includes(table))).toEqual([]);
+    expect(
+      modelTables.filter((table) => !created.includes(table)),
+      'A model has no table in a fresh deployment. The models are never synced, so nothing else '
+      + 'would tell you — write the migration that creates it.'
+    ).toEqual([]);
   });
 
   it('creates Sessions, which has no model to fall back on', async () => {
