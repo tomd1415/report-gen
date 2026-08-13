@@ -170,6 +170,12 @@ mutate --root . --list tests/mutations/unit-gates.json   # what a spec claims
 mutate --root . tests/mutations/*.json                   # run them
 ```
 
+**Two tests must not share a name.** `mutation-report.mjs` refuses (exit 2) if any
+two sanitise to the same string, because `mutate` collects failed names into a
+set: if one of a colliding pair reddens and the other does not, the break is
+reported as *caught* while half the gate never moved. There are none today; the
+guard is there because the failure would be silent and would flatter the result.
+
 **Run it alone.** It edits source in place, so anything else reading the tree at
 the same time — another suite, a browser run, the live service on port 44344 — is
 reading deliberately broken code. Restoration is from bytes it read first, never

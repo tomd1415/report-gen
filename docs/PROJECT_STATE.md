@@ -1174,6 +1174,38 @@ and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
 
+### 6.30 The tool that verifies the gates was itself unverified (2026-08-13)
+Every mutation result this fortnight passed through `scripts/mutation-report.mjs`,
+which I wrote and nothing tested. Catalogue item 11 — *look for silent-failure
+shapes in your own code* — points straight at it: a fault there would not produce
+a wrong test result, it would produce a wrong **verdict about every test result**.
+
+The shape found, by asking what the sanitiser could do rather than by anything
+going wrong: **two tests can sanitise to the same name.** Colons become ` -` (so
+`mutate`'s FAIL regex cannot truncate a name), which means
+`a name: with a colon` and `a name - with a colon` collapse into one.
+
+**The failure is silent and in the dangerous direction.** `mutate` collects failed
+assertion names into a *set*. If one of a colliding pair goes red and the other
+stays green, the shared name lands in that set and the break is reported as
+**caught** — a gate looking proven when only half of it moved. Nothing downstream
+can notice, because a duplicate name in the stream is indistinguishable from a
+single test.
+
+**Measured first: there are no collisions today**, in either suite. So this is a
+latent hole, not a live one, and the results already recorded stand.
+
+Now it refuses — exit 2 naming the pair, the same fail-closed treatment as an
+unparseable run, on the principle that no output is better than output that reads
+as a verdict. Proved by planting two tests differing only by a colon: the reporter
+exits 2 and names them, and `mutate` then refuses to run rather than reporting
+anything.
+
+The general form is one this document keeps arriving at from new directions:
+**a verification tool needs the same scepticism as the thing it verifies**, and
+"it has always worked" is not evidence when its failure mode is a confident wrong
+answer.
+
 ### 6.29 The deployed schema now has an outside check (2026-08-13)
 §6.13 records that umzug's `up()` resolves happily when its glob matches nothing
 — measured, `pending: 0, ran: 0`, no error — and `server.mjs` awaits it at the

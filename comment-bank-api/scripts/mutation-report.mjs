@@ -136,6 +136,28 @@ if (tests.length === 0) {
   process.exit(2);
 }
 
+// Two tests that sanitise to the same name make a spec's `expect` ambiguous, and
+// the failure is silent AND in the dangerous direction: `mutate` collects failed
+// names into a set, so if one of the pair goes red and the other stays green the
+// name lands in that set and the break is reported as CAUGHT. A gate would look
+// proven when only half of it moved.
+//
+// Nothing else can notice — a duplicate name in this stream is indistinguishable
+// from a single test. So refuse here, the same way an unparseable run is refused:
+// no output at all is better than output that reads as a verdict.
+const seen = new Map();
+for (const test of tests) {
+  const name = sanitise(test.name);
+  seen.set(name, (seen.get(name) ?? 0) + 1);
+}
+const collisions = [...seen.entries()].filter(([, count]) => count > 1);
+if (collisions.length > 0) {
+  console.error(`${mode}: ${collisions.length} test name(s) collide after sanitising, so a spec cannot name them unambiguously:`);
+  for (const [name, count] of collisions) console.error(`  ${count}x  ${name}`);
+  console.error('Rename one of each pair. Colons become " -", so two names differing only by a colon collide.');
+  process.exit(2);
+}
+
 for (const test of tests) {
   console.log(`${test.passed ? 'PASS' : 'FAIL'} ${sanitise(test.name)}`);
 }
