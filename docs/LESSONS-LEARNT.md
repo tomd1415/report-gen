@@ -400,38 +400,50 @@ nothing, because the quiet one is now behind a green tick.*
 
 ---
 
-## 12. A test that shells out to its own suite is a fork bomb
+## 12. A heavy tool leaked for four hours and nothing noticed
 
-**What happened.** To stop the mutation specs going stale unnoticed, I wrote a test that
-compares each spec's `expect` names against the suite's real test names — and put it in the
-suite. Getting those names meant running the suite. Running the suite ran the test. Peak load
-**269** on a shared four-core box, 52 processes, several minutes of other containers being
-starved.
+**Corrected 2026-08-13 with host evidence.** My first write-up of this was wrong in a way worth
+preserving: I dated the incident to ~18:20 and credited myself with stopping it. Both false.
 
-**What it looked like.** A slow test. The first run "timed out" at 120 seconds and was
-backgrounded, and I read that as *this is heavier than I expected* rather than *this is not
-terminating*. I then started a second investigation, which spawned more of them, and the thing
-had four minutes to breed while I read output.
+**What actually happened.** Repeated `mutate` invocations — a dozen-odd across the day, several
+backgrounded — did not clean up their children. From host measurements: the oldest
+`vitest`/`esbuild` processes had run **15,043s (~4.2h)**, so it began near **14:00**; by
+**15:42** the 15-minute load average was already **238**; stuck `docker exec` probes against
+this container go back to **~14:25**. The supervisor killed the last **69** processes at
+**18:25** — 22 `mutation-report.mjs`, 138 vitest, 46 esbuild. I killed some at 18:23; I did not
+end it.
 
-**What would have told me sooner.** Asking where the code lives relative to what it measures.
-The rule is simple once stated: **if a check needs the suite's own output, it cannot live in
-the suite.** It belongs in builder-time tooling. The tell was there — a check that should take
-milliseconds was taking minutes — and I misread it as cost rather than recursion.
+**It bred for over four hours and nothing noticed.** Not the suite, not the dashboard — which
+showed this container as *down* because the load had wedged `docker exec`, so the one system
+watching was blinded by the fault it should have reported. And not me: I ran `uptime` once at
+03:33 and never again until something looked wrong.
 
-**Two compounding errors in the cleanup, both already in `/claude-guidance/LESSONS.md` §5 and
-both walked into anyway:**
+**What would have told me sooner.** Checking `uptime` after each heavy run, and checking that
+the tool's children were gone rather than trusting its exit. `mutate` says it restores the tree;
+it does not promise its grandchildren are dead. **An exit code is a statement about the parent.**
 
-- `pkill -f vitest` matches the pattern in *its own* command line, so it partly killed itself
-  and returned exit 144.
-- `pgrep -cf 'vitest'` then reported **2 remaining** when the true answer was **0** — again
-  matching itself. I nearly recorded "2 stragglers survived" as a fact. Counting with a pattern
-  that cannot match the counter (`ps -eo pid,args | grep -E "[v]itest"`) gave the right answer.
+**The secondary lesson, still true but not the cause.** At ~18:20 — four hours in — I wrote a
+test that shells out to its own suite and put it in that suite, so running the suite ran the
+test which ran the suite. That added the final burst to an already-wedged box. The rule stands:
+**if a check needs the suite's own output, it cannot live in the suite.** The tell was a check
+that should take milliseconds taking minutes, and I read it as cost rather than recursion.
 
-**Carry forward:** *knowing a trap is not the same as not walking into it.* This is the third
-time this fortnight I have hit something written in the very document I had read that morning —
-the pipe-status trap twice, and the self-match trap here. The defence is not more reading; it
-is measuring a second way when the first answer is one you would like to be true.
+**Two compounding errors in the cleanup**, both in `/claude-guidance/LESSONS.md` §5 and both
+walked into anyway: `pkill -f vitest` matches its own command line and partly killed itself
+(exit 144), and `pgrep -cf` then reported **2 remaining** when the answer was **0**, matching
+itself again — I nearly recorded that as fact. Count with a pattern that cannot match the
+counter: `ps -eo pid,args | grep -E "[v]itest"`.
 
-**And the irony worth keeping:** this was written while implementing a critique whose whole
-point was that my verification estate is not self-maintaining. The first attempt at making it
-self-guarding made it self-*replicating*.
+**Carry forward:**
+- *An exit code is a statement about the parent.* Verify the children are gone.
+- *Check the load after heavy work*, not only when something looks wrong. Four hours of
+  evidence sat in `uptime` the whole time.
+- *Knowing a trap is not the same as not walking into it* — three times this fortnight I hit
+  something in a document I had read that morning. The defence is measuring a second way when
+  the first answer is one you would like to be true.
+- *A monitor blinded by the fault it should report is the worst failure shape here*: the
+  dashboard said "down" when the truth was "up and on fire".
+
+**And the irony, kept because it is instructive:** this happened while implementing a critique
+whose whole point was that my verification estate is not self-maintaining. Making it
+self-guarding is what made it self-replicating.
