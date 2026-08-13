@@ -91,6 +91,15 @@
         "every model has a table some migration creates creates Sessions, which has no model to fall back on",
         "the table count in the restore drill matches the migrations agrees with what a real backup would contain"
       ]
+    },
+    {
+      "id": "partial-save-reported-as-flat-failure",
+      "file": "public/subject-config.js",
+      "find": "  if (promptSaved && !contextSaved) {",
+      "replace": "  if (false) {",
+      "expect": [
+        "saving a subject configuration says the prompt WAS saved when only the context write fails"
+      ]
     }
   ]
 }

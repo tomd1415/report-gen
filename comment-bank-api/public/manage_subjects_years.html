@@ -12,6 +12,7 @@
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
     <script type="module" src="app-ui.js"></script>
+    <script type="module" src="subject-config.js"></script>
 </head>
 <body>
     <!-- Include header -->
@@ -122,16 +123,6 @@
             ]);
         }
 
-        async function parseResponseMessage(response) {
-            const text = await response.text();
-            try {
-                const payload = JSON.parse(text);
-                return payload.message || text;
-            } catch {
-                return text;
-            }
-        }
-
         async function loadSubjects(userSubjects) {
             const response = await fetch('/api/subjects');
             const subjects = await response.json();
@@ -225,57 +216,28 @@ Use the selected comments as evidence, do not use headings or bullet points, and
                 return;
             }
 
+            const helper = window.ReportGenSubjectConfig;
+            if (!helper || typeof helper.saveSubjectConfig !== 'function') {
+                // Fail closed. Saving here is two writes with no transaction, and
+                // the whole point of the helper is reporting which of them landed.
+                // Without it a partial save would be reported as a flat error
+                // again, which is the bug this replaced.
+                window.ReportGenUI?.showStatus('#prompt-status', 'Could not load the save helper. Please reload the page (Ctrl+F5) before saving.', { tone: 'error' });
+                return;
+            }
+
             window.ReportGenUI?.setButtonLoading(button, true, 'Saving...');
 
             try {
-                // Check if the prompt exists
-                const checkResponse = await fetch(`/api/prompts/${subjectId}/${yearGroupId}`);
-                const existingPrompt = await checkResponse.json();
-
-                let method;
-                let url;
-
-                if (existingPrompt && existingPrompt !== '') {
-                    method = 'PUT';
-                    url = `/api/prompts/${subjectId}/${yearGroupId}`;
-                } else {
-                    method = 'POST';
-                    url = '/api/prompts';
-                }
-
-                const responseSave = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        subjectId,
-                        yearGroupId,
-                        promptPart
-                    })
+                const result = await helper.saveSubjectConfig({
+                    subjectId,
+                    yearGroupId,
+                    promptPart,
+                    subjectDescription,
+                    wordLimit
                 });
 
-                const contextSave = await fetch('/api/subject-context', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        subjectId,
-                        yearGroupId,
-                        subjectDescription,
-                        wordLimit
-                    })
-                });
-
-                if (responseSave.ok && contextSave.ok) {
-                    window.ReportGenUI?.showStatus('#prompt-status', 'Prompt and subject context saved.', { tone: 'success' });
-                } else {
-                    const message = !responseSave.ok
-                        ? await parseResponseMessage(responseSave)
-                        : await parseResponseMessage(contextSave);
-                    window.ReportGenUI?.showStatus('#prompt-status', message || 'Error saving prompt.', { tone: 'error' });
-                }
+                window.ReportGenUI?.showStatus('#prompt-status', result.message, { tone: result.tone });
             } catch (error) {
                 console.error('Error saving prompt:', error);
                 window.ReportGenUI?.showStatus('#prompt-status', 'Error saving prompt.', { tone: 'error' });

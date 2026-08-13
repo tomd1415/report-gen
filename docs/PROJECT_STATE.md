@@ -62,8 +62,8 @@ comment-bank-api/
     middleware/auth.js     # isAuthenticated / isAdmin
   migrations/             # 3 Umzug migrations
   public/                 # static frontend: 10 pages + header.html/footer.html
-                          #   partials, 5 shared JS helpers, no build step
-  tests/                  # 24 Vitest files + Playwright e2e (tests/e2e/)
+                          #   partials, 6 shared JS helpers, no build step
+  tests/                  # 25 Vitest files + Playwright e2e (tests/e2e/)
 ```
 
 ---
@@ -99,7 +99,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-24 Vitest files (152 tests) + 13 Playwright browser journeys, as of 2026-08-12.
+25 Vitest files (158 tests) + 13 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -108,8 +108,8 @@ security headers, password-change consistency, browser-side redaction helpers,
 and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
-> 2026-08-12:** `npm install` + `npm test` run green here — **24 files, 152 tests
-> passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> 2026-08-12 and 2026-08-13:** `npm install` + `npm test` run green here —
+> **25 files, 158 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
 > `git diff --check` clean.
 > The Vitest suite mocks the models and OpenAI client (injected into
@@ -1067,6 +1067,40 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.20 The non-atomic save on `manage_subjects_years.html` — fixed (2026-08-13)
+Saving a subject's configuration is two independent writes with no transaction
+across them — `/api/prompts`, then `/api/subject-context` — and the old code
+reported success only if both succeeded. When the **first** succeeded and the
+second failed, the teacher was shown the *context* error alone. The prompt had
+already changed, and nothing said so.
+
+That is not cosmetic: the prompt is the instruction driving every report
+generated for that subject and year group. A teacher told "error" either retries
+(harmless) or gives up believing nothing was saved (not harmless — what is stored
+now differs from what they think is stored).
+
+**It was untestable, and that was the real blocker.** The handler was an inline
+`<script>`, so no test could import it — a concrete, named cost of the
+inline-script debt in §6.4, and evidence that the CSP unlock and the testability
+unlock are the same piece of work. It is now `public/subject-config.js`, a pure
+function over an injected `fetch`.
+
+`saveSubjectConfig` returns `promptSaved` and `contextSaved` separately, and the
+page reports which half landed. The four outcomes are named individually, because
+"nothing was saved" is honest in exactly one of them.
+
+**Seen to fail first**, which is what the work-list item required: with the
+original decision logic restored, the new tests failed with
+`expected 'Word limit must be a number.' to match /prompt was saved/i` — the
+teacher shown the context error while the prompt had changed. Asserting merely
+that "an error appeared" would have passed against the old code, which is why the
+tests assert the message against **what was actually stored**. A mutation break
+(`partial-save-reported-as-flat-failure`) now pins it.
+
+The page fails closed if the module does not load, matching the import pages: a
+partial save reported as a flat error is the bug this replaced, so falling back to
+it silently would be worse than refusing.
 
 ### 6.19 Mutation-testing the gates properly, and the two defects it found (2026-08-13)
 Every gate here had been meta-tested **by hand**. `/claude-guidance/LESSONS.md` §5

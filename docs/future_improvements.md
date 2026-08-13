@@ -89,7 +89,7 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   now throws `ReportImportEmptyResultError`, the route returns 502 saying the
   comment bank is unchanged, and the existing bank is left untouched. See
   `docs/PROJECT_STATE.md` §6.3.3.
-- `2026-08-06`: **Saving on `manage_subjects_years.html` is two independent
+- `2026-08-06`: ~~Saving on `manage_subjects_years.html` is two independent
   writes with no atomicity, and one all-or-nothing error message.** The handler
   POSTs/PUTs `/api/prompts` and then POSTs `/api/subject-context`, and reports
   success only if `responseSave.ok && contextSave.ok`. If the first succeeds and
@@ -102,7 +102,10 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   **This is currently untestable**, which is the point worth noting: the handler
   is an inline `<script>` in the HTML, so it cannot be imported by a test. That
   is a concrete, named cost of the inline-script debt in §6.4 — the CSP unlock
-  and the testability unlock are the same piece of work.
+  and the testability unlock are the same piece of work.~~
+  **Fixed 2026-08-13.** Extracted to `public/subject-config.js` and the outcomes
+  are now reported per field; the tests were seen to fail against the old logic
+  first. `docs/PROJECT_STATE.md` §6.20.
 - `2026-08-08`: ~~A failed backup overwrites a good one, and the backup service
   has no tests.~~ **Fixed 2026-08-12** (owner approved) — the service dumps to a
   temporary file beside its target, verifies the artefact ends with

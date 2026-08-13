@@ -10,7 +10,7 @@ until now lived only in commit messages, where nobody reads them._
 
 | Command | What it is | Needs |
 |---|---|---|
-| `npm test` | Vitest — 24 files, 152 tests | nothing |
+| `npm test` | Vitest — 25 files, 158 tests | nothing |
 | `npm run test:e2e` | Playwright — 13 browser journeys | Chromium |
 | `npm run check:inline-scripts` | syntax-checks the inline `<script>` blocks | nothing |
 | `npm run check:deploy` | all three, then `git diff --check` | Chromium |
