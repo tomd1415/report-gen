@@ -39,7 +39,12 @@ const publicDir = path.join(here, '..', 'public');
 const KNOWN_UNCHECKABLE_CALL_SITES = 32;
 
 /**
- * What those 32 are, counted 2026-08-12 across `public/*.html`:
+ * What those are, recounted 2026-08-13 across each page AND the modules it
+ * loads. The 2026-08-12 count of 32 was across `public/*.html` alone; moving
+ * index.html's script into `report-page.js` moved call sites out of the HTML,
+ * which turned this gate blind rather than turning it red about the right thing.
+ * The scope now follows the `<script src=…>` tags, so the CSP work cannot
+ * quietly shrink what is checked. Original breakdown:
  *   setButtonLoading      26  — passed an element reference, not a selector
  *   setFieldInvalid        5  — `#${id}` built from a loop variable
  *   getSelectedOptionText  1  — same
@@ -64,6 +69,27 @@ const readPage = (name) => fs.readFileSync(path.join(publicDir, name), 'utf8');
 
 const matchAll = (source, pattern) => [...source.matchAll(pattern)];
 
+/** Same-directory `<script src="x.js">` tags — the modules this page loads. */
+const SCRIPT_SRC = /<script[^>]*\bsrc=["']([A-Za-z0-9_.-]+\.js)["']/g;
+
+/**
+ * Everything whose selectors must resolve against THIS page's ids: the page
+ * itself, plus each module it pulls in. Following the script tags is what keeps
+ * the gate honest as logic migrates out of the HTML — a shared helper is checked
+ * against every page that loads it, which is the correct requirement.
+ */
+const sourcesFor = (name) => {
+  const html = readPage(name);
+  const sources = [{ from: name, text: html }];
+  for (const [, src] of matchAll(html, SCRIPT_SRC)) {
+    const modulePath = path.join(publicDir, src);
+    if (fs.existsSync(modulePath)) {
+      sources.push({ from: `${name} → ${src}`, text: fs.readFileSync(modulePath, 'utf8') });
+    }
+  }
+  return sources;
+};
+
 describe('every feedback target the pages ask for actually exists', () => {
   const pages = htmlPages();
 
@@ -73,7 +99,8 @@ describe('every feedback target the pages ask for actually exists', () => {
     expect(pages.length).toBeGreaterThanOrEqual(12);
 
     const totalLiteral = pages
-      .reduce((sum, name) => sum + matchAll(readPage(name), LITERAL_CALL).length, 0);
+      .flatMap(sourcesFor)
+      .reduce((sum, source) => sum + matchAll(source.text, LITERAL_CALL).length, 0);
     expect(totalLiteral).toBeGreaterThan(100);
   });
 
@@ -81,12 +108,13 @@ describe('every feedback target the pages ask for actually exists', () => {
     const missing = [];
 
     for (const name of pages) {
-      const source = readPage(name);
-      const ids = new Set(matchAll(source, ELEMENT_ID).map((match) => match[1]));
+      const ids = new Set(matchAll(readPage(name), ELEMENT_ID).map((match) => match[1]));
 
-      for (const [, helper, id] of matchAll(source, LITERAL_CALL)) {
-        if (!ids.has(id)) {
-          missing.push(`${name}: ReportGenUI.${helper}('#${id}') — no element with that id`);
+      for (const source of sourcesFor(name)) {
+        for (const [, helper, id] of matchAll(source.text, LITERAL_CALL)) {
+          if (!ids.has(id)) {
+            missing.push(`${source.from}: ReportGenUI.${helper}('#${id}') — no element with that id`);
+          }
         }
       }
     }
@@ -100,10 +128,10 @@ describe('every feedback target the pages ask for actually exists', () => {
   });
 
   it('has no more dynamic call sites than are already known', () => {
-    const [literal, all] = pages.reduce(([lit, total], name) => {
-      const source = readPage(name);
-      return [lit + matchAll(source, LITERAL_CALL).length, total + matchAll(source, ANY_CALL).length];
-    }, [0, 0]);
+    const [literal, all] = pages.flatMap(sourcesFor).reduce(([lit, total], source) => [
+      lit + matchAll(source.text, LITERAL_CALL).length,
+      total + matchAll(source.text, ANY_CALL).length
+    ], [0, 0]);
 
     expect(all).toBeGreaterThan(literal);
     expect(all - literal).toBe(KNOWN_UNCHECKABLE_CALL_SITES);

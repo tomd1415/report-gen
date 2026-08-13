@@ -62,7 +62,7 @@ comment-bank-api/
     middleware/auth.js     # isAuthenticated / isAdmin
   migrations/             # 3 Umzug migrations
   public/                 # static frontend: 10 pages + header.html/footer.html
-                          #   partials, 6 shared JS helpers, no build step
+                          #   partials, 7 shared JS helpers, no build step
   tests/                  # 25 Vitest files + Playwright e2e (tests/e2e/)
 ```
 
@@ -99,7 +99,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-25 Vitest files (158 tests) + 13 Playwright browser journeys, as of 2026-08-13.
+25 Vitest files (159 tests) + 13 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -109,9 +109,10 @@ and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
 > 2026-08-12 and 2026-08-13:** `npm install` + `npm test` run green here —
-> **25 files, 158 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> **25 files, 159 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
-> `git diff --check` clean.
+> `git diff --check` clean. (`check:inline-scripts` reports 9 from 2026-08-13 —
+> see §6.21.)
 > The Vitest suite mocks the models and OpenAI client (injected into
 > `registerRoutes`), so it needs **no database**. A live MariaDB 10.11 was also
 > installed, migrated, and the server booted: `/api/health`, `/api/version`,
@@ -1067,6 +1068,50 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.21 `index.html`'s inline script moved to a module (2026-08-13)
+`public/index.html` carried a single **1,225-line** inline `<script>` — the whole
+Generate Report page. It is now `public/report-page.js`, and
+`npm run check:inline-scripts` reports **9 blocks across 12 files**, down from 10.
+
+That gate counts *blocks*, not lines, so this page was all-or-nothing: any
+partial extraction would have left the count at 10.
+
+**It exposed a latent bug that had been live.** Five Generate Report journeys
+failed after the move, stuck on *"Loading comment bank and prompt settings."* The
+cause was one line:
+
+```js
+promptPart = await promptPartResponse.text();   // no declaration anywhere
+```
+
+In a sloppy-mode inline `<script>` that silently created a global. A module is
+**strict mode**, so the same line throws `ReferenceError` and aborts
+`loadCategoriesAndComments` halfway. Nothing else in the codebase read that
+global, so scoping it with `const` is the whole fix — but the page had been
+running on an accidental global, and only the move surfaced it. Expect more of
+these as the other nine blocks move: **sloppy → strict is the real risk in this
+refactor, not the copying.**
+
+**It also blinded one of my own gates**, and updating the number would have been
+the wrong fix. `feedback-target-ids` scanned `public/*.html` only, so call sites
+moving into a module made it check *less* while staying green. Its scope now
+follows each page's `<script src=…>` tags, so a shared helper is checked against
+every page that loads it. Verified after rescoping: 139 calls, 107 literal, 32
+dynamic — the dynamic count unchanged, which is why its known-blind-spot constant
+still holds.
+
+**Proven to be exercised, not merely present.** The work-list required seeing a
+journey fail when a moved function is broken. Two mutation breaks now pin it:
+`moved-function-broken` (an early `return` in `updateReadyChecklist`) reddens the
+ready-check journey, and `window-binding-dropped` reddens four.
+
+**This is a first step, not the CSP unlock — do not read the count as progress
+toward CSP on its own.** The page still has ten inline `onclick=`/`onchange=`
+attributes, which are equally an `unsafe-inline` violation. They are bridged by
+publishing the nine functions they name on `window`, documented in the module as
+a bridge that disappears as each attribute becomes an `addEventListener`. Nine
+inline blocks remain on the other pages.
 
 ### 6.20 The non-atomic save on `manage_subjects_years.html` — fixed (2026-08-13)
 Saving a subject's configuration is two independent writes with no transaction

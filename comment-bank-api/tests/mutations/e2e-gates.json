@@ -1,7 +1,11 @@
 {
-  "name": "browser gates — the off-origin guard and the import name warning",
+  "name": "browser gates \u2014 the off-origin guard and the import name warning",
   "why": "Two of the four gates named in the work-list live in Playwright, and both were meta-tested by hand. Each break below names the journey that must go red. The two 'guard blinded' breaks matter more than the two 'behaviour broken' ones: they check the floors, which are what stop a journey passing because it looked at nothing.",
-  "command": ["node", "scripts/mutation-report.mjs", "e2e"],
+  "command": [
+    "node",
+    "scripts/mutation-report.mjs",
+    "e2e"
+  ],
   "breaks": [
     {
       "id": "off-origin-asset-planted",
@@ -37,6 +41,24 @@
       "replace": "                return [];",
       "expect": [
         "ui-smoke.spec.js import refuses to send if the possible-name check could not load"
+      ]
+    },
+    {
+      "id": "moved-function-broken",
+      "file": "public/report-page.js",
+      "find": "function updateReadyChecklist() {\n    const checklist = document.getElementById('ready-checklist');",
+      "replace": "function updateReadyChecklist() {\n    return;\n    const checklist = document.getElementById('ready-checklist');",
+      "expect": [
+        "ui-smoke.spec.js Generate Report ready check validates required fields and reaches a generated report"
+      ]
+    },
+    {
+      "id": "window-binding-dropped",
+      "file": "public/report-page.js",
+      "find": "    generateReport,\n    loadCategoriesAndComments,\n    saveNewComment,\n    toggleAllCategories,\n    updateGenerateContext\n  });",
+      "replace": "    loadCategoriesAndComments,\n    saveNewComment,\n    toggleAllCategories,\n    updateGenerateContext\n  });",
+      "expect": [
+        "ui-smoke.spec.js Generate Report ready check validates required fields and reaches a generated report"
       ]
     }
   ]
