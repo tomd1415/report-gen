@@ -100,7 +100,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-29 Vitest files (190 tests) + 17 Playwright browser journeys, as of 2026-08-13.
+29 Vitest files (191 tests) + 17 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -110,7 +110,7 @@ and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
 > 2026-08-12 and 2026-08-13:** `npm install` + `npm test` run green here —
-> **29 files, 190 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> **29 files, 191 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
 > `git diff --check` clean. (`check:inline-scripts` reports 9 from 2026-08-13 —
 > see §6.21.)
@@ -1173,6 +1173,39 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.26 A fresh-eyes read of my own diff (2026-08-13)
+The mutation run checked the tests; this checked the **source** changes from the
+thirteen work-list items. Three findings, and the honest summary is that **none
+was a live bug** — which is worth stating as plainly as a defect would be.
+
+**1. Null fallbacks that contradict the schema.** The admin import's failure path
+wrote `actorUserId: req.session.user?.id ?? null` and
+`ownerUserId: Number(userId) || null` into columns declared `allowNull: false`.
+
+Measured before claiming anything: **neither fallback is reachable.** A
+non-numeric target returns 404 before the catch runs, and `isAdmin` guarantees the
+session user. So this was the code asserting a possibility the column rejects —
+and had it ever fired, the insert would have thrown into `recordImportJob`'s
+deliberate swallow, so the audit row would have vanished **silently**. The
+fallbacks are gone.
+
+**2. A 404 writes no audit row, and that is now deliberate.** An admin posting to
+a non-existent staff user leaves no trace. That is defensible — nothing happened
+to anybody's comment bank — but the opposite reading is also defensible: repeated
+probing of staff ids is the kind of thing a trail might want. It was incidental;
+it is now pinned by a test, so anyone taking the other view has to change their
+mind on purpose rather than by editing around it.
+
+**3. The short-secret warning printed the secret's exact length.** Not a leak
+worth alarm — anyone reading the log can probably read `.env` — but it is
+inconsistent with the rule applied two items earlier to the `pupilNames` warning,
+which reports shape rather than value precisely because logs travel further than
+files. It now says "shorter than the recommended 32 characters" and no more.
+
+The reason to record a pass that found no live bug: **"reviewed and found nothing
+serious" is a result**, and without it written down the next person cannot tell
+this diff was read from one that never was.
 
 ### 6.25 Fixing a bug disabled the guard that watched it (2026-08-13)
 `route-auth-matrix`'s staleness test loops over `KNOWN_UNGUARDED`. When the

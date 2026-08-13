@@ -115,6 +115,22 @@ describe('import jobs are recorded', () => {
     expect(jobs[0].confirmed).toBeNull();
   });
 
+  it('writes NO row when the target staff user does not exist', async () => {
+    // Deliberate, not incidental: a 404 means nothing happened to anybody's
+    // comment bank, so there is nothing for the trail to record. Pinned because
+    // the alternative reading — "an admin probing staff ids should leave a
+    // trace" — is a defensible different decision, and this test is where
+    // someone taking it would have to change their mind on purpose.
+    models.User.findByPk.mockResolvedValue(null);
+
+    const response = await request(adminApp())
+      .post('/api/admin/staff/999/import-reports')
+      .send({ subjectId: 1, yearGroupId: 2, reports: 'A steady term.' });
+
+    expect(response.status).toBe(404);
+    expect(jobs).toHaveLength(0);
+  });
+
   it('never lets a failed record block the import itself', async () => {
     // The audit trail is not worth losing a teacher's import over. If the write
     // fails the import must still succeed, loudly in the log rather than to the

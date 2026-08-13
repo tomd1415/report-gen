@@ -39,7 +39,14 @@ if (sessionSecret === 'dev-insecure-secret') {
   console.warn('SESSION_SECRET/SECRET_KEY not set; using insecure dev secret.');
 } else if (sessionSecret.length < 32) {
   // A warning, not a refusal — see the note above on why this is not fatal.
-  console.warn(`SESSION_SECRET is only ${sessionSecret.length} characters; 32 or more is recommended.`);
+  //
+  // The exact length is deliberately NOT printed. It is a property of a secret,
+  // and this line goes to a log, which is shipped and tailed and pasted into
+  // tickets more readily than `.env` ever is. Marginal — anyone reading the log
+  // can probably read the file — but it costs nothing to be consistent with the
+  // rule applied to the pupilNames warning in routes/index.js: report that there
+  // is a problem, not the value that has it.
+  console.warn('SESSION_SECRET is shorter than the recommended 32 characters.');
 }
 
 // Fail closed in production, and say precisely what to do about it. This runs at

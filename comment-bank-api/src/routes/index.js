@@ -1556,8 +1556,14 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
       });
     } catch (error) {
       await recordImportJob(ImportJob, {
-        actorUserId: req.session.user?.id ?? null,
-        ownerUserId: Number(userId) || null,
+        // Neither of these can be null and the schema forbids it, so no `?? null`
+        // fallback: `isAdmin` guarantees the session user, and a target id that
+        // does not resolve has already returned 404 above — measured 2026-08-13,
+        // that path writes no row at all. A defensive fallback here would claim a
+        // possibility the column rejects, and because a failed audit write is
+        // swallowed, the row would vanish silently rather than complain.
+        actorUserId: req.session.user.id,
+        ownerUserId: Number(userId),
         subjectId: subjectId ?? null,
         yearGroupId: yearGroupId ?? null,
         source: 'reports',
