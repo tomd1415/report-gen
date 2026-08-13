@@ -1,15 +1,15 @@
+import { cleanText, isTargetPlaceholderComment, TARGET_PLACEHOLDER_COMMENT } from '../lib/text.js';
+
+export { TARGET_PLACEHOLDER_COMMENT };
+
 const LIMITS = {
   reports: 60000
 };
 
-export const TARGET_PLACEHOLDER_COMMENT = '***Generate a target for this pupil and add to the report***';
-const TARGET_PLACEHOLDER_PATTERN = /generate a target for this pupil/i;
 
-const cleanText = (text) => (text ? String(text).replace(/\s+/g, ' ').trim() : '');
 // escapeRegex was removed on 2026-08-06 with replacePupilNames — it had no other
 // caller. docs/NEXT-MILESTONE.md step 2 lists it as one to move into
 // src/lib/text.js; it no longer exists anywhere and that line is now moot.
-const isTargetPlaceholderComment = (value) => TARGET_PLACEHOLDER_PATTERN.test(String(value || ''));
 
 const normalizeKey = (category, comment) =>
   `${cleanText(category).toLowerCase()}||${cleanText(comment).toLowerCase()}`;

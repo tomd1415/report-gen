@@ -54,6 +54,7 @@ comment-bank-api/
       sequelize.js        # Sequelize connection (MariaDB/MySQL)
       migrate.js          # Umzug migration runner (called by server.mjs)
     routes/index.js       # ALL routes — 2069 lines, 68 endpoints (see §6)
+    lib/text.js           # shared text helpers (one definition — see §6.23)
     services/
       openai.js           # thin OpenAI client wrapper (6 lines)
       reportImport.js      # import → comment-bank extraction (478 lines)
@@ -99,7 +100,7 @@ Implemented and covered by tests / docs:
   generation.
 
 ### Test surface
-25 Vitest files (159 tests) + 17 Playwright browser journeys, as of 2026-08-13.
+27 Vitest files (179 tests) + 17 Playwright browser journeys, as of 2026-08-13.
 Nine of those files are *gates* rather than ordinary tests — see `docs/TESTING.md`
 for what each guards and the rules they follow. Coverage is genuinely broad for a
 project this size: prompt assembly, placeholder replacement, relevance filtering,
@@ -109,7 +110,7 @@ and UI helpers.
 
 > **Verified 2026-07-21, re-checked 2026-07-27, 2026-07-31, 2026-08-06 and
 > 2026-08-12 and 2026-08-13:** `npm install` + `npm test` run green here —
-> **25 files, 159 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
+> **27 files, 179 tests passing** at the latest check (18 files / 111 tests on 2026-08-06; the growth is
 > the gates added since) — plus `npm run check:inline-scripts` (10 scripts) and
 > `git diff --check` clean. (`check:inline-scripts` reports 9 from 2026-08-13 —
 > see §6.21.)
@@ -1116,6 +1117,56 @@ Two of my own write-ups also quoted the retracted sentence verbatim (§6.14 abov
 and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
+
+### 6.23 The two copies of `cleanText` had drifted (2026-08-13)
+`cleanText`, `isTargetPlaceholderComment` and `TARGET_PLACEHOLDER_COMMENT` were
+defined twice, in `src/routes/index.js` and `src/services/reportImport.js`. They
+are now one definition in **`src/lib/text.js`** — the deliberately small first
+step of the route-file split (§6.1, `NEXT-MILESTONE.md` step 2).
+
+**They had drifted, by exactly one `String()`**, and it was reachable:
+
+| | `routes/index.js` | `services/reportImport.js` |
+|---|---|---|
+| `cleanText(42)` | **throws** `text.replace is not a function` | `'42'` |
+
+Measured, not reasoned about: `POST /api/categories` with `{"name": 123}`
+answered **500**.
+
+**How the check was met, and a method note worth keeping.** My first
+characterisation tests asserted the *desired* behaviour, so they were red before
+the move and green after. That is a weaker test than it looks — red-then-green
+cannot distinguish *the move fixed the drift* from *the move broke something
+else*. They were rewritten to pin the divergence **as it was**, all green before
+the move, so that the move turned that block red. That failure is the record.
+
+**The resolution makes one path worse, and that is recorded rather than buried.**
+Unified on coercion, because a text-normalisation helper should not throw on
+non-text and the alternative would inject crashes into the import path, which
+processes model output where a value may legitimately not be a string. Measured
+after the merge:
+
+```
+{"name":"Fine"}  -> 200   stored: "Fine"
+{"name":123}     -> 200   stored: "123"
+{"name":{"a":1}} -> 200   stored: "[object Object]"
+```
+
+A loud 500 became a quiet 200 storing garbage — the silent-failure shape this
+document keeps returning to. The correct fix is a **400 at the request
+boundary**, which is validation rather than de-duplication; it is backlogged with
+this reproduction and `src/lib/text.js` says so at the definition. It was not
+smuggled in under a refactor.
+
+**The tool caught a typo in my own mutation spec**, which is worth recording
+because of how it would have read otherwise. `mutate` refused to apply the break:
+*names an assertion the suite does not have — a typo here reads as a missing
+guard.* Had it been less careful it would have planted the break, seen the named
+assertion "stay green" because no such assertion existed, and reported the merged
+helper as unprotected. The cause was my own sanitiser: `mutation-report.mjs`
+rewrites colons to ` -` (so `mutate`'s FAIL regex cannot truncate a name), and its
+docstring says to take names from the script's output. I wrote that line and then
+guessed the name anyway.
 
 ### 6.22 The three Playwright coverage gaps — closed (2026-08-13)
 Login, settings persistence and admin user management had no browser coverage.

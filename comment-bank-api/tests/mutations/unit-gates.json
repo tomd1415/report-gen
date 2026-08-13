@@ -120,6 +120,18 @@
       "expect": [
         "an empty CORS allow-list must not fail silently in production refuses to load when CORS_ORIGINS is empty"
       ]
+    },
+    {
+      "id": "cleantext-coercion-removed",
+      "file": "src/lib/text.js",
+      "find": "export const cleanText = (text) => (text ? String(text).replace(/\\s+/g, ' ').trim() : '');",
+      "replace": "export const cleanText = (text) => (text ? text.replace(/\\s+/g, ' ').trim() : '');",
+      "expect": [
+        "the cleanText divergence, resolved coerces 42 to 42 instead of throwing",
+        "the cleanText divergence, resolved coerces [ 'x', 'y' ] to x,y instead of throwing",
+        "the cleanText divergence, resolved coerces true to true instead of throwing",
+        "the cleanText divergence, resolved coerces { a - 1 } to [object Object] instead of throwing"
+      ]
     }
   ]
 }

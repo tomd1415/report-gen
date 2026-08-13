@@ -134,7 +134,13 @@ on next restart. Left as-is pending an answer.
 
 ---
 
-## Step 2 — Extract `src/lib/text.js` (first step of the route-file split)
+## Step 2 — Extract `src/lib/text.js` (first step of the route-file split) ✅ DONE 2026-08-13
+
+> **Completed.** One definition in `src/lib/text.js`; grep for the local
+> definitions returns nothing. The two copies had drifted by one `String()` and
+> the resolution is recorded, including the way it makes one path worse —
+> `PROJECT_STATE.md` §6.23. Note `escapeRegex`, listed below as one to move, had
+> already been deleted on 2026-08-06 and no longer exists anywhere.
 
 `docs/PROJECT_STATE.md` §6.1. Scope is deliberately tiny: move shared helpers,
 change no behaviour.

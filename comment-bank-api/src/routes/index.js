@@ -6,6 +6,7 @@ import multer from 'multer';
 import { Parser } from 'json2csv';
 import rateLimit from 'express-rate-limit';
 import { isAuthenticated, isAdmin } from '../middleware/auth.js';
+import { cleanText, isTargetPlaceholderComment, TARGET_PLACEHOLDER_COMMENT } from '../lib/text.js';
 import { exportDatabase, backupDatabase } from '../services/dbBackup.js';
 import { importReportsToCommentBank, ReportImportValidationError } from '../services/reportImport.js';
 import { config } from '../config/env.js';
@@ -29,9 +30,6 @@ const LIMITS = {
   strengthFocusLevel: 30
 };
 
-const TARGET_PLACEHOLDER_COMMENT = '***Generate a target for this pupil and add to the report***';
-const TARGET_PLACEHOLDER_PATTERN = /generate a target for this pupil/i;
-const isTargetPlaceholderComment = (value) => TARGET_PLACEHOLDER_PATTERN.test(String(value || ''));
 const normalizeKey = (category, comment) =>
   `${cleanText(category).toLowerCase()}||${cleanText(comment).toLowerCase()}`;
 
@@ -49,7 +47,6 @@ const packageVersion = (() => {
   }
 })();
 
-const cleanText = (text) => (text ? text.replace(/\s+/g, ' ').trim() : '');
 const cleanAndLimit = (value, maxLength) => {
   const cleaned = cleanText(value);
   if (!cleaned) {

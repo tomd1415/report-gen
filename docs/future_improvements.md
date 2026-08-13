@@ -86,6 +86,16 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Reliability and Data Safety
 
+- `2026-08-13`: **Non-string request fields are coerced instead of rejected.**
+  `POST /api/categories` with `{"name": {"a":1}}` returns **200** and stores a
+  category called `"[object Object]"`. Before the `src/lib/text.js` merge that
+  same input returned 500 (`text.replace is not a function`), so a loud failure
+  became a quiet one — recorded at the time rather than discovered later
+  (`docs/PROJECT_STATE.md` §6.23). The fix is a type check at the request
+  boundary returning **400**: neither a crash nor silent garbage. Deliberately
+  not done under the de-duplication item, because it is a validation change.
+  Reproduction is the one-liner above.
+
 - `2026-08-06`: ~~An empty import silently wipes a teacher's comment bank.~~
   **Fixed** — the owner chose abort-before-deleting. An empty final category map
   now throws `ReportImportEmptyResultError`, the route returns 502 saying the
