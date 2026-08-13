@@ -187,6 +187,18 @@ member**, which the admin staff-import workflow relies on.
 Ordered roughly by leverage. None are blocking; the app is in production. These
 are the things most likely to bite or to slow future work.
 
+> **How to read this section, measured 2026-08-13.** It is now **32 subsections,
+> and roughly half of it is history**: 12 are closed — fixed, gated or decided —
+> and carry 725 lines; 20 are still open and carry 740. A heading that says
+> *"— fixed"*, *"— decided"* or *"— added"* is a record of reasoning, kept
+> because the premise behind a decision is what you need when the decision is
+> questioned later. **If you are looking for what is currently wrong, read only
+> the headings without one of those markers.**
+>
+> Splitting the closed half into an archive would halve this document, and is
+> offered rather than done: it restructures the file you read most, and it would
+> move 24 working cross-references. Say the word.
+
 ### 6.1 The 2060-line route file is the central piece of tech debt
 `src/routes/index.js` holds **all ~68 endpoints** plus schemas, limits, and helper
 functions. It's the single biggest drag on testability and the reason CSP is
