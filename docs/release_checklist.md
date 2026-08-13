@@ -54,6 +54,29 @@ Use this checklist before pulling or deploying changes on the live server.
 - For production, confirm `SESSION_SECRET` is a long random value,
   `ALLOW_REGISTRATION_IN_PROD=false`, `CORS_ORIGINS` is set to the live origin,
   and HTTPS deployments use `SESSION_SECURE=true`.
+
+  > **⚠ Changed 2026-08-13 — read this before your next restart.** Two of those are
+  > now **fatal** under `NODE_ENV=production`: the app **refuses to start** if
+  > `SESSION_SECRET` is unset or still a published placeholder (`change-me`,
+  > `dev-insecure-secret`), or if `CORS_ORIGINS` is empty. It exits non-zero at
+  > import, before it can serve a request.
+  >
+  > **A deployment that is running happily today without them will not come back
+  > up.** That is deliberate — a known session secret lets anyone forge a login
+  > cookie, and an empty allow-list makes a misconfigured deploy look like a broken
+  > frontend rather than a config error — but it means you should check *now*
+  > rather than discover it during a restart:
+  >
+  > ```bash
+  > cd /path/to/report-gen/comment-bank-api
+  > grep -E '^(SESSION_SECRET|CORS_ORIGINS)=' .env
+  > # then confirm the app will actually boot, without restarting the live service:
+  > NODE_ENV=production node -e "import('./src/config/env.js')" && echo "config OK"
+  > ```
+  >
+  > That last line is the real check: it loads the same module the server loads and
+  > exits non-zero with the reason if anything is wrong. If you need a secret:
+  > `openssl rand -base64 32`.
 - Confirm auth throttling is present in `.env` or using defaults:
   `AUTH_RATE_LIMIT_WINDOW_MS=900000` and `AUTH_RATE_LIMIT_MAX=20`.
 

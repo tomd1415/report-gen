@@ -100,6 +100,26 @@
       "expect": [
         "saving a subject configuration says the prompt WAS saved when only the context write fails"
       ]
+    },
+    {
+      "id": "session-secret-check-removed",
+      "file": "src/config/env.js",
+      "find": "  if (PUBLISHED_SESSION_SECRETS.has(sessionSecret)) {",
+      "replace": "  if (false) {",
+      "expect": [
+        "the session secret must not be guessable in production refuses to load with no secret set",
+        "the session secret must not be guessable in production refuses to load with .env.example's placeholder",
+        "the session secret must not be guessable in production refuses to load with the dev fallback set explicitly"
+      ]
+    },
+    {
+      "id": "cors-check-removed",
+      "file": "src/config/env.js",
+      "find": "  if (allowedOrigins.length === 0) {",
+      "replace": "  if (false) {",
+      "expect": [
+        "an empty CORS allow-list must not fail silently in production refuses to load when CORS_ORIGINS is empty"
+      ]
     }
   ]
 }

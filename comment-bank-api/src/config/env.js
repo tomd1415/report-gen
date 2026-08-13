@@ -17,18 +17,73 @@ const toInt = (value, fallback) => {
 const env = process.env.NODE_ENV || 'development';
 const sessionSecret = process.env.SESSION_SECRET || process.env.SECRET_KEY || 'dev-insecure-secret';
 
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+/**
+ * Secrets that are published somewhere: this file's own fallback, and the
+ * placeholder in `.env.example`. Anyone can read both, so either one means the
+ * session cookie can be forged.
+ *
+ * Deliberately a list of KNOWN-BAD values rather than a strength test. A minimum
+ * length would also reject a short-but-random secret and take down a working
+ * deployment on its next restart for something that is not actually a hole — and
+ * the owner named exactly that risk when asking for this. Weak-but-unpublished
+ * secrets get a warning below instead.
+ */
+const PUBLISHED_SESSION_SECRETS = new Set(['dev-insecure-secret', 'change-me']);
+
 if (sessionSecret === 'dev-insecure-secret') {
   console.warn('SESSION_SECRET/SECRET_KEY not set; using insecure dev secret.');
+} else if (sessionSecret.length < 32) {
+  // A warning, not a refusal — see the note above on why this is not fatal.
+  console.warn(`SESSION_SECRET is only ${sessionSecret.length} characters; 32 or more is recommended.`);
+}
+
+// Fail closed in production, and say precisely what to do about it. This runs at
+// import, so the process exits before it can serve a request — which is the
+// point: a warning on a boot log nobody reads is not a mitigation.
+//
+// It also means an existing deployment missing either value will REFUSE TO START
+// on its next restart. That is the intended behaviour and was the owner's call;
+// docs/release_checklist.md carries the warning where an operator will meet it.
+if (env === 'production') {
+  const problems = [];
+
+  if (PUBLISHED_SESSION_SECRETS.has(sessionSecret)) {
+    problems.push(
+      'SESSION_SECRET is unset or still set to a published placeholder. Anyone who can read '
+      + 'this project can forge a login cookie. Set it to a long random value, for example:\n'
+      + '    SESSION_SECRET=$(openssl rand -base64 32)'
+    );
+  }
+
+  if (allowedOrigins.length === 0) {
+    problems.push(
+      'CORS_ORIGINS is empty. An empty allow-list blocks every cross-origin request, which is '
+      + 'safe but silent — the frontend simply stops working and looks broken rather than '
+      + 'misconfigured. Set it to the live origin, for example:\n'
+      + '    CORS_ORIGINS=https://reportgen.org.uk'
+    );
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `Refusing to start in production with an unsafe configuration:\n\n`
+      + problems.map((problem) => `  * ${problem}`).join('\n\n')
+      + `\n\nFix these in comment-bank-api/.env and restart. `
+      + `To run without them, start with NODE_ENV=development.`
+    );
+  }
 }
 
 export const config = {
   env,
   port: toInt(process.env.PORT, 44344),
   cors: {
-    allowedOrigins: (process.env.CORS_ORIGINS || '')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean)
+    allowedOrigins
   },
   db: {
     host: process.env.DB_HOST || '127.0.0.1',

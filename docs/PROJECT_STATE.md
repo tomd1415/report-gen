@@ -468,7 +468,36 @@ mode, then enforce. Until then, treat any HTML that renders report text as a
 potential XSS surface (input sanitisation is whitespace-only, no HTML escaping in
 `cleanText`).
 
-### 6.5 Session-secret fallback doesn't fail closed
+### 6.5 Session-secret fallback didn't fail closed — fixed (2026-08-13)
+**Fixed 2026-08-13.** `src/config/env.js` now **throws at import** under
+`NODE_ENV=production` if `SESSION_SECRET` is unset or still a published
+placeholder (`change-me`, `dev-insecure-secret`), or if `CORS_ORIGINS` is empty —
+the latter at the owner's direction, overruling my narrower lean.
+
+The guard is a list of **known-published** secrets rather than a strength test.
+A minimum-length rule would also reject a short-but-random secret and take down a
+working deployment for something that is not a hole; the owner named that exact
+risk. Short secrets get a warning instead. **That is narrower than "enforce strong
+secrets" and should not be read as more.**
+
+Seen to fail first: the tests went in before the implementation and reported
+`promise resolved "{ config: { env: 'production', …" instead of rejecting` — the
+module loading happily in production with no secret. Four red, four green
+controls. Mutation breaks `session-secret-check-removed` and `cors-check-removed`
+pin both halves.
+
+A unit test proves the *module* throws, not that the *server* refuses to boot, so
+that was measured separately: production with no secret exits **1**, production
+with empty `CORS_ORIGINS` exits **1**, both set exits 0, development exits 0.
+
+**Operational consequence, flagged rather than buried:** a deployment running
+today without these will not come back up after its next restart. That is
+deliberate, and `docs/release_checklist.md` carries the warning plus a pre-flight
+that tests the real thing without touching the live service:
+`NODE_ENV=production node -e "import('./src/config/env.js')"`.
+
+The original note follows.
+
 If `SESSION_SECRET` is unset, config falls back to `'dev-insecure-secret'` and
 only logs a warning. In production this should **refuse to start** (or the
 planned pre-deploy `.env` check should gate it). Same check could cover
