@@ -126,6 +126,25 @@ Use this checklist before pulling or deploying changes on the live server.
 
   Until then, the deployed commit is the one you noted before pulling **and only
   after the restart below** — see the next item for why.
+- **Confirm the schema actually matches the code** — the check that catches a
+  migration which silently did not run:
+
+  ```bash
+  cd /path/to/report-gen/comment-bank-api
+  node scripts/check-schema.mjs
+  ```
+
+  Read-only (`SHOW TABLES` and `DESCRIBE`), exits non-zero naming the model and
+  the missing table or column. This exists because umzug's `up()` resolves
+  happily when its glob matches nothing — `pending: 0, ran: 0`, no error
+  (`PROJECT_STATE.md` §6.13) — and `server.mjs` awaits it at the top level, so a
+  migration can fail to run without anything saying so. On an existing database
+  the symptom is not a crash; it is one feature breaking later with nothing
+  connecting it to the deploy.
+
+  The unit suite cannot do this: it mocks the models and needs no database, which
+  is its most valuable property. This is the other half, and it needs a real
+  connection.
 - Check database connectivity from an authenticated admin browser session:
   `/api/health/db`
 - Watch logs while doing the smoke test:

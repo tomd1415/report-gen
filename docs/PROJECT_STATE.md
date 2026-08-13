@@ -1174,6 +1174,34 @@ and the note in `server_mjs.txt`). Both now paraphrase, for the reason
 `docs/TESTING.md` rule 5 gives: a verbatim quotation stays matchable by the next
 person's search and gets read as current.
 
+### 6.29 The deployed schema now has an outside check (2026-08-13)
+§6.13 records that umzug's `up()` resolves happily when its glob matches nothing
+— measured, `pending: 0, ran: 0`, no error — and `server.mjs` awaits it at the
+top level, so **migrations can silently not run**. Nothing verified the result
+from outside, because the unit suite mocks the models and needs no database.
+
+`scripts/check-schema.mjs` is that outside check: it compares every model's
+declared attributes against the real columns, read-only (`SHOW TABLES`,
+`DESCRIBE`), and exits non-zero naming the model and what is missing. Added to the
+release checklist beside the restart, which is where it is useful.
+
+**Two results from running it, and the first is a clean sweep worth recording.**
+All **nine** pre-existing models match the live schema exactly — the first time
+the deployed database and the code's expectations have ever been compared, and
+they agree. Ownership tests assert the `where` clause passed to a mock; nothing
+had ever checked the columns were real.
+
+The second is that `ImportJobs` is **absent from the live database**, which is
+correct — the migration has not run, and will not until the process restarts
+(§6.17). The check reporting it is the tool working, not a defect.
+
+Meta-tested in both directions, because a check nobody has watched succeed is as
+unproven as one nobody has watched fail: dropping the un-migrated model from the
+registry gives *"Schema matches: 9 models"* and exit 0, and adding a bogus
+attribute to `Subject` gives exit 1 naming `bogusColumn` — so it catches a missing
+**column**, not merely a missing table. It carries a floor too: an empty model
+registry refuses to report success.
+
 ### 6.28 The migration has never run against a real database (2026-08-13)
 The riskiest assumption under this fortnight's work is the one `docs/TESTING.md`
 states in its opening paragraphs: **the Vitest suite mocks the database
