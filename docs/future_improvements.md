@@ -49,12 +49,17 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   that file is untracked-but-visible, so a `git add -A` commits the
   `OPENAI_API_KEY`. The drill now warns and cleans up; the `.gitignore` fix is
   in the working tree, uncommitted (it was found in a docs-only session).
-- `2026-08-06`: **40 Dependabot advisories** on the default branch (1 critical,
-  16 high, 21 moderate, 2 low), reported by GitHub on push. This supersedes the
-  2026-04-17 note below about a single moderate `umzug`/`@rushstack`/`ajv`
-  advisory. Needs triage of what is actually reachable from this app's code
-  paths before any upgrade — the advice below about avoiding broad
-  `npm audit fix` on the live branch still stands.
+- `2026-08-06`: **40+ Dependabot advisories** on the default branch. **Triaged
+  2026-08-13 — `docs/dependency-triage-2026-08-13.md`.** Headline: only **one** is
+  reachable from a live request path (`multer`, DoS via deeply nested field names,
+  on the two authenticated CSV-import routes; fix is in-range at `>=2.2.0`). The
+  *critical* is `vitest` — a devDependency whose vulnerability needs the UI server,
+  which no script starts. Two caveats recorded there rather than buried: GitHub's
+  count (41) and `npm audit`'s (16) could not be reconciled without the `gh` CLI,
+  so the triage is complete only for what the lockfile shows; and npm's proposed
+  "fix" for `sequelize` is a **major downgrade to 3.30.0** that would break the
+  data layer — which is precisely why a broad `npm audit fix` must never be run
+  on the live branch.
 - `2026-08-09`: ~~Nothing enforces `store: false` on OpenAI calls.~~ **Gated.**
   All five `openai.responses.parse` call sites spread `buildOpenAIParams`, so
   `store: false` and the hashed `safety_identifier` are sent — but nothing made
