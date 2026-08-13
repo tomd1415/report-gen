@@ -179,6 +179,16 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## UX and Admin Workflows
 
+- `2026-08-13`: **The possible-name check's empty state is an endorsement.** When
+  nothing is flagged, the import page hides the panel entirely, so a teacher sees
+  silence and may reasonably infer the text was checked and is clean. It was
+  checked; clean does not follow — the highlighter misses lowercase names,
+  ALL-CAPS names and names starting a sentence. Proposal: replace the hidden
+  empty state with a quiet line saying nothing was flagged **and that this is not
+  a guarantee**. It is not a dialog, so it does not reintroduce the habituation
+  problem that decided `docs/REDACTION-DECISIONS.md` decision 4. Raised there and
+  deliberately left undone, being a UI change nobody asked for.
+
 - `2026-08-09`: **The user-feedback layer fails silently.** 138 `ReportGenUI?.`
   call sites across six pages, no page verifies the module loaded, and every
   call discards the `false` the helpers return when they cannot find their

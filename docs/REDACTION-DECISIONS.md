@@ -294,3 +294,46 @@ appears in pasted text.** The highlighter is a heuristic — *Newton* the physic
 and *Newton* the pupil are indistinguishable — so **no warning appearing does not
 mean no name is present**. The accepted basis is unchanged from the top of this
 document: teachers are expected not to enter another pupil's name.
+
+
+---
+
+## Decision 4 — Should the import confirmation appear on every import? (2026-08-13)
+
+**Decided: only when something is flagged.** The current behaviour stands; no code
+changed.
+
+**The case for always-on**, which was put and rejected: it gives a stronger and
+more uniform accountability trail, and — the sharper half — **the dialog not
+appearing tells the teacher nothing.** The highlighter is a heuristic. It misses
+lowercase names, ALL-CAPS names, and names at the start of a sentence, because it
+looks for capitalised words mid-sentence. So "no dialog" means "nothing matched a
+pattern", not "no names present".
+
+**The case for suspect-triggered**, which won: this page always contains free
+text, so an always-on dialog is shown on every single import. Within about a week
+it becomes muscle memory and stops being read — at which point the accountability
+trail records a click that carried no attention, which is worse than not claiming
+one. A confirm that fires only when there is something to look at still means
+something when it fires.
+
+**The residual risk being accepted, stated plainly:** a teacher who sees no
+warning may reasonably infer the text was checked and is clean. It was checked;
+"clean" does not follow. This is knowingly accepted — the trade-off above was in
+front of the owner when they chose.
+
+**And it sits in tension with a standing rule**, which is recorded rather than
+smoothed over. `/root/.claude/CLAUDE.md`: *"in an interface where clean means
+safe, an unrendered branch is an endorsement."* When nothing is flagged the panel
+is hidden entirely (`import_reports.html`, the `suspects.length === 0` branch) —
+so the interface says nothing, and silence reads as approval. The decision is
+still the right one on the muscle-memory argument; the tension is real and is not
+resolved by it.
+
+**Deliberately not done:** making the empty state non-endorsing — a quiet line
+saying the check found nothing *and that this is not a guarantee*, which is not a
+dialog and would not reintroduce the habituation problem. That is a UI change
+nobody asked for, so it is proposed in `docs/future_improvements.md` rather than
+smuggled in under a decision item. See also §6.18: decision 1(A) on the
+*generation* path is the same shape — show the confirm only when there is
+something to confirm — and its premise has separately changed.
