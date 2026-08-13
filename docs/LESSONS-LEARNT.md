@@ -1,8 +1,8 @@
 # Lessons learnt
 
-_Started 2026-08-06, covering the work from 2026-07-28 to 2026-08-06: the
-free-text redaction thread, the off-origin asset fixes, and the doc-verification
-pass._
+_Started 2026-08-06, covering the work from 2026-07-28 to 2026-08-13: the
+free-text redaction thread, the off-origin asset fixes, the doc-verification
+pass, and the thirteen-item work-list of 2026-08-13._
 
 The useful entry here is not "X was broken". It is **"X looked like Y, and here
 is what would have told us sooner"** — including the wrong theories held on the
@@ -281,3 +281,118 @@ is loaded; leave the defaults alone.
   made the change safe to land incrementally; it did not reduce the total work,
   and the estimate that it would was wrong. That is recorded in the decision doc's
   *Outcome* section rather than quietly forgotten.
+
+
+---
+
+## 7. Fixing a bug can disable the guard that was watching it
+
+**What happened.** `/api/categories` got its missing auth guard, and
+`KNOWN_UNGUARDED` — the list of routes known to be unprotected — was emptied, as
+the process requires. A separate test iterates that list to check no entry has
+gone stale. With the list empty **the loop body never runs**, so that test began
+asserting nothing at all. It passed whatever the router did, including with the
+route enumeration returning no routes.
+
+**What it looked like.** A closed bug and a green suite. Both true, and the guard
+underneath had quietly stopped existing. Nobody broke it: *fixing* the bug is what
+made it vacuous.
+
+**What would have told us sooner.** Running the mutation specs **as a set** rather
+than one at a time. Each break had been verified in isolation when written; run
+together, this one reported
+
+> 1 of 3 expected assertions stayed green while 2 others went red
+
+A bare pass/fail would have called it covered — something *did* go red. The
+shortfall is the signal, which is the whole reason the tool reports per-assertion.
+
+**Carry forward:** *any assertion that loops over a list needs a floor outside the
+loop*, and a mutation spec is hand-maintained, so §3 of this document applies to
+it like anything else — verify it as a set, periodically, not once at birth.
+
+---
+
+## 8. A verification tool needs the same scepticism as the thing it verifies
+
+**What happened.** Every mutation result for a fortnight passed through a reporter
+I wrote and nothing tested. Asking what it *could* do wrong — rather than waiting
+for a symptom — found that two tests can sanitise to the same name, because
+colons are rewritten to avoid a truncation bug in the tool downstream.
+
+**Why it mattered more than an ordinary bug.** `mutate` collects failed assertion
+names into a **set**. If one of a colliding pair reddened and the other did not,
+the shared name would land in that set and the break would be reported as
+*caught* — a gate looking proven when half of it never moved. A fault in a
+verifier does not produce a wrong result; it produces a wrong **verdict about
+every result**.
+
+**What would have told us sooner.** Nothing would have. That is the point: the
+failure mode is a confident right-looking answer, so no symptom was ever going to
+appear. It was found by treating the tool as suspect on principle. There were no
+collisions in practice, so nothing recorded was wrong — but the guard is there
+now, and it fails closed.
+
+**Carry forward:** *"it has always worked" is not evidence when the failure mode
+is a confident wrong answer.*
+
+---
+
+## 9. Three claims that sound like one
+
+Each pair below reads as the same statement and is not. All three cost something
+this fortnight.
+
+- **"The tests pass" ≠ "the migration runs."** This suite mocks the database
+  entirely — its most valuable property, and the reason a green run says nothing
+  about the SQL Sequelize generates. A migration's whole job is to execute against
+  a real server, and ours never had. Narrowing it statically (model table name
+  versus `createTable`, model attributes versus migration columns) closed the
+  failure modes that bite hardest; the rest needs a real connection and is written
+  down as an owed check rather than assumed.
+- **"Called by no page in this repo" ≠ "called by nothing."** A bookmark, a
+  script or a cached admin page still reaches a route. Before deleting eight
+  apparently-dead endpoints, put a warning on them and wait — the evidence you
+  want is *the warning fired for nobody*, not *the grep was empty*.
+- **"De-duplicated" ≠ "behaviour-preserving."** Two copies of one helper had
+  drifted by a single `String()`, so merging them had to choose, and the honest
+  choice made one path worse before it could be made better. A refactor that
+  cannot change behaviour is not a refactor of two things that disagree.
+
+---
+
+## 10. Ask which failure mode a check actually catches
+
+**What happened.** After a fortnight of building gates, the reflex was to build
+another: every `§x.y` cross-reference should resolve, every cited path should
+exist. It was not built, and declining was the more useful outcome.
+
+**Why.** Two reasons, and the second generalises:
+
+- Three of the four paths it flagged were *proposals* — a rename not yet done,
+  files a plan will create. Planning documents are supposed to name things that do
+  not exist yet, and a gate with that false-positive rate is switched off within a
+  fortnight, taking real coverage with it.
+- The section-ref check catches the **harmless** failure and misses the dangerous
+  one. A dangling `§6.99` tells the reader something is wrong. A reference that
+  *still resolves but now points at different content* — after a renumbering —
+  says nothing, and existence-checking cannot see it.
+
+**Carry forward:** before building a check, name the failure modes and ask which
+it catches. *If it catches the loud one and misses the quiet one it is worse than
+nothing, because the quiet one is now behind a green tick.*
+
+---
+
+## 11. Two false theories held on the way, recorded because they were reasonable
+
+- **"Characterisation tests should assert the behaviour I want."** Written that
+  way, they were red before the `cleanText` merge and green after — which cannot
+  distinguish *the move fixed the drift* from *the move broke something else*.
+  Pinning the divergence **as it actually was**, green before and red after, is
+  what makes the change deliberate and legible. Rewritten before the move landed.
+- **"A defensive `?? null` is free."** Two of them wrote `null` into columns
+  declared `NOT NULL`. Measured: both unreachable, so not a live bug — but had
+  either fired, the insert would have thrown into a deliberate swallow and the
+  audit row would have vanished **silently**. A fallback that makes a failure
+  quieter is worse than no fallback.
