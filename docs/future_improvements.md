@@ -67,10 +67,12 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   call site cannot slip past unexercised. Four planted faults verified red; the
   table is in `docs/PROJECT_STATE.md` §6.14. Gate is in the working tree,
   uncommitted.
-- `2026-04-17`: Consider consolidating duplicate admin routes under one
-  namespace. The code currently has both `/api/admin/*` and non-admin-looking
-  admin-protected routes such as `/api/users`, `/api/subjects`, and
-  `/api/year-groups`.
+- `2026-04-17`: ~~Consider consolidating duplicate admin routes under one
+  namespace.~~ **Decided 2026-08-13: the flat family is canonical** —
+  `docs/admin-namespace-decision.md` has the evidence (eight of the nine
+  `/api/admin/*` CRUD routes are called by no page) and the migration order. The
+  work itself is not started; it needs one frontend change and should be done in
+  the stated order.
 - `2026-04-17`: Enable a strict Content Security Policy after large inline page
   scripts have been moved into dedicated JS files. Helmet is in place, but CSP
   is intentionally disabled until that refactor is complete.

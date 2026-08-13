@@ -204,18 +204,28 @@ Re-checked 2026-08-06, the duplicated set is now exactly three:
 cut-over (§6.3.1) and now lives only in `reportImport.js`. See
 `docs/NEXT-MILESTONE.md` for this broken into verifiable steps.
 
-### 6.2 Duplicate / overlapping route surface
-There are two parallel families of admin endpoints:
-- `/api/admin/subject`, `/api/admin/year-group`, `/api/admin/user`,
-  `/api/admin/export`, `/api/admin/backup` (name-keyed), **and**
-- `/api/subjects`, `/api/year-groups`, `/api/users`, `/api/export-database`,
-  `/api/backup-database` (id-keyed).
+### 6.2 Duplicate / overlapping route surface — decided (2026-08-13)
+**Decided: the flat family is canonical; `/api/admin/*` CRUD is to be retired.**
+Full evidence and the migration order in `docs/admin-namespace-decision.md`; the
+owner delegated the call.
 
-Both work and both are admin-protected, but it's confusing and doubles the
-maintenance/test cost. The prompts routes similarly expose both `/:id` and
-`/:subjectId/:yearGroupId` forms. Pick a canonical set, keep the others as thin
-aliases during a transition, and delete once the frontend is migrated. (Already
-noted in the backlog.)
+The evidence made it one-sided rather than a matter of taste. **Eight of the nine
+`/api/admin/*` routes are called by no page at all** — the only exception is
+`PUT /api/admin/user/:username/password` at `adminpage.html:407`. The flat family
+is used by seven pages plus `report-page.js`, and carries the test coverage. The
+duplicated handlers differ only in `findOne({ where: { name } })` versus
+`findByPk(id)`, so nothing is lost.
+
+**A correction the investigation produced:** the framing of *name-keyed vs
+id-keyed* is wrong. `DELETE /api/users/:username` sits in the flat family and is
+keyed by username, so adopting that family does not by itself remove name-keyed
+lookup. Someone "finishing the job" later would otherwise be surprised.
+
+Not started — consolidation needs a frontend change, and the decision was wanted
+before the work rather than after. The order matters: add the flat password route,
+repoint the one page, guard the retired paths, then delete. And "called by no page
+in this repo" is not "called by nothing", so a log line on the retired routes
+before deletion would turn that assumption into a measurement.
 
 ### 6.3 Privacy: free-text fields in generation — now redacted (fixed 2026-07-28)
 > **Superseded by §6.3.1 — read that first.** This section describes the
