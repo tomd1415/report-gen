@@ -170,6 +170,15 @@ mutate --root . --list tests/mutations/unit-gates.json   # what a spec claims
 mutate --root . tests/mutations/*.json                   # run them
 ```
 
+**Do not build a separate check that spec names still exist — `mutate` already
+does it.** It compares every `expect` against the names discovered in the baseline
+run, *before* it edits anything, and refuses the break with
+*"names an assertion the suite does not have — a typo here reads as a missing
+guard"*. Verified in its source and observed firing on 2026-08-13. A second guard
+for this would be duplication; the one attempt at building it recursed and took a
+shared box to load 269 (`LESSONS-LEARNT.md` §12). The residual gap is only that
+you must *run* mutate to find out — which is when a spec matters anyway.
+
 **Two tests must not share a name.** `mutation-report.mjs` refuses (exit 2) if any
 two sanitise to the same string, because `mutate` collects failed names into a
 set: if one of a colliding pair reddens and the other does not, the break is
