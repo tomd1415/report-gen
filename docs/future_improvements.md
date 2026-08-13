@@ -230,13 +230,19 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Code Organization
 
-- `2026-08-06`: **`axios` is a declared dependency and is imported nowhere** —
-  zero references across `src/`, `public/`, `tests/`, `scripts/` and
-  `server.mjs`. It is dead weight that still counts toward the Dependabot
-  advisory surface. Removing it is a one-line `package.json` change plus a
-  lockfile update, left undone in a docs-only session. (`mariadb` and `mysql2`
-  *look* unused by the same test but are not — Sequelize loads the dialect driver
-  by name from `DB_DIALECT`, so both must stay.)
+- `2026-08-06`: ~~`axios` is a declared dependency and is imported nowhere.~~
+  **Removed 2026-08-13.** Evidence beyond the grep, because a dynamic require
+  would not show up in one: `npm ci` from the regenerated lockfile succeeded with
+  `node_modules/axios` absent, the whole app module graph (`app.js`, routes,
+  `reportImport`, `dbBackup`, `openai`) loaded without it, and
+  `npm run check:deploy` passed — exit 0 confirmed unpiped. Separately, there are
+  no non-literal `require(`/`import(` calls anywhere in `src/`, `public/`,
+  `scripts/` or `server.mjs`, so there is no branch a dynamic import could hide
+  in. **`mariadb` and `mysql2` fail the same "unused" test and must stay** —
+  Sequelize resolves the dialect driver by name from `DB_DIALECT`, so neither
+  ever appears in an import. That is why a grep-only argument is unsafe in both
+  directions: it would have condemned two dependencies the app cannot start
+  without.
 - `2026-08-06`: A stale-code sweep found **nothing else**: no `TODO`/`FIXME`/
   `HACK`/`XXX`/`@deprecated` markers anywhere in the source, no orphaned modules
   under `src/`, and every file in `public/*.js` referenced by at least one page.
