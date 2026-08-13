@@ -396,3 +396,42 @@ nothing, because the quiet one is now behind a green tick.*
   either fired, the insert would have thrown into a deliberate swallow and the
   audit row would have vanished **silently**. A fallback that makes a failure
   quieter is worse than no fallback.
+
+
+---
+
+## 12. A test that shells out to its own suite is a fork bomb
+
+**What happened.** To stop the mutation specs going stale unnoticed, I wrote a test that
+compares each spec's `expect` names against the suite's real test names — and put it in the
+suite. Getting those names meant running the suite. Running the suite ran the test. Peak load
+**269** on a shared four-core box, 52 processes, several minutes of other containers being
+starved.
+
+**What it looked like.** A slow test. The first run "timed out" at 120 seconds and was
+backgrounded, and I read that as *this is heavier than I expected* rather than *this is not
+terminating*. I then started a second investigation, which spawned more of them, and the thing
+had four minutes to breed while I read output.
+
+**What would have told me sooner.** Asking where the code lives relative to what it measures.
+The rule is simple once stated: **if a check needs the suite's own output, it cannot live in
+the suite.** It belongs in builder-time tooling. The tell was there — a check that should take
+milliseconds was taking minutes — and I misread it as cost rather than recursion.
+
+**Two compounding errors in the cleanup, both already in `/claude-guidance/LESSONS.md` §5 and
+both walked into anyway:**
+
+- `pkill -f vitest` matches the pattern in *its own* command line, so it partly killed itself
+  and returned exit 144.
+- `pgrep -cf 'vitest'` then reported **2 remaining** when the true answer was **0** — again
+  matching itself. I nearly recorded "2 stragglers survived" as a fact. Counting with a pattern
+  that cannot match the counter (`ps -eo pid,args | grep -E "[v]itest"`) gave the right answer.
+
+**Carry forward:** *knowing a trap is not the same as not walking into it.* This is the third
+time this fortnight I have hit something written in the very document I had read that morning —
+the pipe-status trap twice, and the self-match trap here. The defence is not more reading; it
+is measuring a second way when the first answer is one you would like to be true.
+
+**And the irony worth keeping:** this was written while implementing a critique whose whole
+point was that my verification estate is not self-maintaining. The first attempt at making it
+self-guarding made it self-*replicating*.
