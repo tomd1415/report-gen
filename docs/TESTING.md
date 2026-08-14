@@ -190,6 +190,14 @@ the same time — another suite, a browser run, the live service on port 44344 �
 reading deliberately broken code. Restoration is from bytes it read first, never
 `git checkout`, which would silently revert any uncommitted work along with it.
 
+**Run it in the background, never in the foreground of something that can time
+out.** Learned 2026-08-14: a foreground run hit a 2-minute tool timeout and was
+killed **mid-mutation**, leaving the planted break — `if (true) { return false; }`
+— sitting in `src/routes/index.js` on the request-validation path. A killed
+`mutate` does not restore. Recover from the sidecar it writes before every edit
+(`<file>.mutate-backup`), **not** `git checkout`, which would take any
+uncommitted work with it.
+
 **And check its children are gone afterwards.** This cost a four-hour outage on
 2026-08-13: repeated runs across the day leaked `vitest` and `esbuild` processes,
 which bred to load **269** on a four-core box shared by ten containers, and

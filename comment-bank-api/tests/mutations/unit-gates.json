@@ -171,6 +171,20 @@
       "expect": [
         "import jobs are recorded stores NO report text, comments, free text or names"
       ]
+    },
+    {
+      "id": "non-text-field-accepted",
+      "file": "src/routes/index.js",
+      "find": "  if (value === undefined || value === null || typeof value === 'string') {\n    return false;\n  }",
+      "replace": "  if (true) {\n    return false;\n  }",
+      "expect": [
+        "a text field that is not text is refused, not coerced refuses an object as a category name, and stores nothing",
+        "a text field that is not text is refused, not coerced refuses an array as a category name, and stores nothing",
+        "a text field that is not text is refused, not coerced refuses a number as a category name, and stores nothing",
+        "a text field that is not text is refused, not coerced refuses a boolean as a category name, and stores nothing",
+        "a text field that is not text is refused, not coerced says the field must be text, rather than that it is missing",
+        "a text field that is not text is refused, not coerced refuses a non-string comment, and stores nothing"
+      ]
     }
   ]
 }

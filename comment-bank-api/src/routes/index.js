@@ -47,6 +47,29 @@ const packageVersion = (() => {
   }
 })();
 
+/**
+ * A request field that is present but is not a string is a client error, not
+ * text to be coerced.
+ *
+ * `cleanText` deliberately coerces (§6.23) because a text-normalisation helper
+ * should not throw on non-text — but applied straight to a request body that
+ * turns a bad request into **stored garbage**: `{"name": {"a":1}}` became a
+ * category called `"[object Object]"`, where before the helpers were merged it
+ * had been a loud 500.
+ *
+ * Sends the 400 and returns true when the value is present and not a string.
+ * **Absent stays absent** — the caller's existing "is required" check handles
+ * that, and the two messages must differ, or the distinction is useless to
+ * whoever reads them.
+ */
+const rejectNonText = (res, value, label) => {
+  if (value === undefined || value === null || typeof value === 'string') {
+    return false;
+  }
+  sendError(res, 400, `${label} must be text.`);
+  return true;
+};
+
 const cleanAndLimit = (value, maxLength) => {
   const cleaned = cleanText(value);
   if (!cleaned) {
@@ -651,6 +674,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
   app.post('/api/admin/year-group', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Year group name is required.' });
@@ -685,6 +709,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
   app.post('/api/admin/subject', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Subject name is required.' });
@@ -765,6 +790,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
   app.post('/api/subjects', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Subject name is required.' });
@@ -784,6 +810,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { id } = req.params;
     const { name } = req.body;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Subject name is required.' });
@@ -834,6 +861,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
   app.post('/api/year-groups', isAdmin, async (req, res) => {
     const { name } = req.body;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Year group name is required.' });
@@ -853,6 +881,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { id } = req.params;
     const { name } = req.body;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Year group name is required.' });
@@ -904,6 +933,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { name, subjectId, yearGroupId } = req.body;
     const userId = req.session.user.id;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Category name is required.' });
@@ -924,6 +954,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { name } = req.body;
     const userId = req.session.user.id;
     try {
+      if (rejectNonText(res, name, 'Name')) return;
       const cleanedName = cleanText(name);
       if (!cleanedName) {
         return res.status(400).json({ message: 'Category name is required.' });
@@ -997,6 +1028,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { text, categoryId } = req.body;
     const userId = req.session.user.id;
     try {
+      if (rejectNonText(res, text, 'Comment text')) return;
       const cleanedText = cleanText(text);
       if (!cleanedText) {
         return res.status(400).json({ message: 'Comment text is required.' });
@@ -1021,6 +1053,7 @@ export function registerRoutes(app, { models, openai, sequelizeClient = sequeliz
     const { text } = req.body;
     const userId = req.session.user.id;
     try {
+      if (rejectNonText(res, text, 'Comment text')) return;
       const cleanedText = cleanText(text);
       if (!cleanedText) {
         return res.status(400).json({ message: 'Comment text is required.' });
