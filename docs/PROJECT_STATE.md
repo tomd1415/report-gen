@@ -1139,6 +1139,22 @@ and the newest file there is from June 2024. If nothing else takes backups, then
 the §6.10 defect is not one safety net among several, it is the safety net.
 
 ### 6.17 The app is served out of the working tree
+
+> **Correction, 2026-08-14 — I overstated this, repeatedly.** This instance runs
+> with **`NODE_ENV=development`** against a **`comment_bank` database that is
+> completely empty** — 0 users, 0 categories, 0 comments, 0 sessions, measured.
+> Production is `reportgen.org.uk`, elsewhere. I described it throughout as "the
+> live service" and "the live database", which is wrong: it is a development
+> instance holding no data.
+>
+> **The mechanism below is still true and still matters** — Node caches `src/` at
+> start, so an edit goes live at the next restart — and it applies with full force
+> to the real deployment. What was wrong was the stakes I attached to it *here*.
+> The over-claim had a cost: it is why I refused to verify the `ImportJobs`
+> migration for a day (§6.28), on the grounds that running it would change a live
+> database. It would have changed an empty development one, which is what
+> `server.mjs` does on every boot anyway.
+
 Measured 2026-08-12: PID 61, `node server.mjs`, cwd `/workspace/comment-bank-api`,
 listening on 44344, started 2026-08-09.
 
@@ -1281,6 +1297,24 @@ registry gives *"Schema matches: 9 models"* and exit 0, and adding a bogus
 attribute to `Subject` gives exit 1 naming `bogusColumn` — so it catches a missing
 **column**, not merely a missing table. It carries a floor too: an empty model
 registry refuses to report success.
+
+### 6.28 The migration has never run against a real database — now verified (2026-08-13, closed 2026-08-14)
+> **Closed.** Run against this container's development database on 2026-08-14 —
+> `event: 'migrated', name: '20260813-001-add-import-jobs.mjs', durationSeconds: 0.089`.
+> The SQL executes: **12 tables**, `errorMessage` really is `varchar(500)`,
+> `confirmed` is `tinyint(1)`, and both named indexes exist
+> (`import_jobs_actor_created`, `import_jobs_owner_created`) alongside the foreign
+> key indexes. `scripts/check-schema.mjs` now reports *"Schema matches: 10 models"*
+> and exits 0 — it had been red since the day it was written.
+>
+> **Why it stayed open a day longer than it needed to:** I refused to run it
+> against what I had been calling "the live database". It is a development
+> database with `NODE_ENV=development` and zero rows, and running migrations is
+> what the app does on every boot. The caution was right in shape and wrong in
+> degree, because I had mislabelled the environment — see the correction at §6.17.
+>
+> This does **not** verify the migration against production, which is a different
+> server. The commands for a throwaway database are still below.
 
 ### 6.28 The migration has never run against a real database (2026-08-13)
 The riskiest assumption under this fortnight's work is the one `docs/TESTING.md`
