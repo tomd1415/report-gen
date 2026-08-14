@@ -115,7 +115,26 @@ and UI helpers.
 > `git diff --check` clean. (`check:inline-scripts` reports 9 from 2026-08-13 —
 > see §6.21.)
 > The Vitest suite mocks the models and OpenAI client (injected into
-> `registerRoutes`), so it needs **no database**. A live MariaDB 10.11 was also
+> `registerRoutes`), so it needs **no database**.
+>
+> **Re-verified against the real database on 2026-08-14, with current code** —
+> because the sentence about register/login working end-to-end dates from
+> 2026-07-21 and I had been refreshing this block's *counts* on later dates
+> without re-testing that claim. Restamping a dated verification while checking
+> only part of it is how a claim outlives its evidence.
+>
+> Result: `POST /api/register` **200**, `POST /api/login` **200**,
+> `GET /api/authenticated` **200 `{authenticated:true}`** with the session
+> surviving the round trip, and a wrong password **401** — the negative control,
+> without which the other three prove only that the endpoint answers. The probe
+> user was deleted afterwards and both `Users` and `Sessions` are back to 0.
+>
+> **This was the first thing in the fortnight to exercise the route handlers
+> against a real database**; all 191 unit tests inject mocks. The method is worth
+> knowing because it is cheap and carries no risk of the process leak that cost
+> four hours on 2026-08-13: drive the app **in-process with supertest against the
+> real `models` export** — no listening server, so there is nothing to leak, and a
+> `finally` that deletes what it created. A live MariaDB 10.11 was also
 > installed, migrated, and the server booted: `/api/health`, `/api/version`,
 > register/login, and admin subject/year-group creation all work end-to-end
 > against the real DB.
