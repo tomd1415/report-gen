@@ -45,11 +45,27 @@ EXIT;
 >
 > ```bash
 > ls -l /path/to/comment_bank_backup.sql
-> grep -c 'CREATE TABLE' /path/to/comment_bank_backup.sql   # expect 12, not 0
+> grep -c 'CREATE TABLE' /path/to/comment_bank_backup.sql   # expect 12 for a current backup
 > ```
 >
-> If that count is 0, stop — the file is a failed dump, not a backup, and
-> restoring it will give you an empty database with no error at all.
+> **Read the number like this** (measured 2026-08-14 against real dumps, not
+> derived):
+>
+> | count | meaning |
+> |---|---|
+> | **0** | **A failed dump. Stop.** The header is there and the data is not; restoring it gives you an empty database with no error at all. |
+> | **12** | A backup of the current schema. |
+> | anything else non-zero | A genuine backup from **before the schema grew** — the three 2024 dumps in `dbbackup_web/` return 6, 6 and 8. Usable, but check it is the one you meant. |
+>
+> The test that matters is **zero versus non-zero**. An earlier version of this
+> page said "expect 12, not 0", which reads as though 8 were also a problem; it is
+> not.
+>
+> The `# expect 12` comment is load-bearing: `tests/migration-coverage.test.js`
+> parses it and fails if it disagrees with the migrations, so the number cannot go
+> stale as the schema grows. Rewording that line without keeping it is how this
+> page silently stops being checked — which happened while writing this very
+> correction, and the gate caught it.
 
 For a plain SQL dump:
 

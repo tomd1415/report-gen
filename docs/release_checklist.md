@@ -13,12 +13,16 @@ Use this checklist before pulling or deploying changes on the live server.
 
   ```bash
   ls -l <latest backup>.sql
-  grep -c 'CREATE TABLE' <latest backup>.sql   # expect 12, not 0
+  grep -c 'CREATE TABLE' <latest backup>.sql
   ```
 
-  If that count is 0, the backup does not exist in any useful sense — stop, and
-  take a fresh one before pulling. (The 12 is checked against the migrations by
-  `tests/migration-coverage.test.js`, so it stays right as the schema grows.)
+  **Zero versus non-zero is the test.** 0 means a failed dump — stop, and take a
+  fresh one before pulling. 12 is the current schema. Anything else non-zero is a
+  genuine older backup from before the schema grew (the 2024 dumps return 6, 6 and
+  8), so it is usable but may not be the one you meant. Measured 2026-08-14
+  against real files; an earlier version of this line said "expect 12, not 0",
+  which wrongly implied 8 was a problem. (The 12 is checked against the migrations
+  by `tests/migration-coverage.test.js`, so it stays right as the schema grows.)
 - If the update is risky, confirm the backup has recently passed the restore
   drill in `docs/restore_drill.md`.
 - Confirm a recent file/server backup exists if uploads, `.env`, or service
