@@ -483,6 +483,23 @@ the work that unlocks CSP is the same work that makes this page testable, which
 strengthens the case for doing it.
 
 ### 6.4 Content Security Policy is deliberately disabled
+
+> **Verified 2026-08-14, and useful to whoever does the next extraction.** Moving
+> `index.html`'s block out orphaned **nothing** — checked by listing every function
+> `report-page.js` defines that is not bridged to `window`, then searching every
+> other page for a call to it. Three apparent hits were all explained:
+> `fetchWithTimeout` and `toggleCategory` are defined per-page, and
+> `setFieldInvalid` is a `ReportGenUI` method, not a page global.
+>
+> That surfaced one thing worth knowing before the remaining nine blocks move:
+> **`fetchWithTimeout` exists in four copies** — `adminpage.html`,
+> `import_reports.html`, `manage_export_import.html` and `report-page.js` — and
+> they are currently **byte-identical** (same 30000 ms default). That is the same
+> shape as the two `cleanText` copies, which *had* drifted by one `String()` and
+> made merging them a decision rather than a refactor (§6.23). These have not
+> drifted yet, so consolidating them into `src`-style shared module is risk-free
+> **today** and becomes a judgement call the moment one copy is edited.
+
 Helmet is active but CSP is off because the static pages still contain large
 inline `<script>` blocks. This is a conscious, documented trade-off. The unlock
 sequence is: move inline scripts into `public/*.js` modules (partly done —
