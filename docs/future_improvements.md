@@ -88,6 +88,15 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
 
 ## Reliability and Data Safety
 
+- `2026-08-14`: **Backups are now never deleted, and that is my doing.**
+  Timestamping `exportDatabase` to fix the overwrite defect (§6.10) removed the
+  only thing that ever deleted a backup — the old date-only name meant same-day
+  exports overwrote each other. Nothing prunes `dbbackup_web/` now: no cron, and
+  the only `unlink` in the service is the partial-file cleanup. Low urgency (~11 KB
+  a dump, 37 GB free, backups off by default) but **higher sensitivity than the
+  item below**, because a dump holds the `Users` table and every comment bank.
+  Decide it together with `ImportJobs` retention — one answer about what this
+  system keeps, not two.
 - `2026-08-13`: **`ImportJobs` has no retention policy.** The table added for the
   audit trail (§6.6) accumulates one row per import for ever, with nothing to
   prune it. The rows are staff metadata rather than pupil data — actor, owner,

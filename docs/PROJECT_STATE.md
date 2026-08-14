@@ -762,6 +762,25 @@ It also pins a security invariant nothing was checking: the password reaches
 `mysqldump` through `MYSQL_PWD`, never through argv, where every user on this
 shared box could read it from `ps`.
 
+**A consequence of this fix that I did not record at the time (noted 2026-08-14).**
+Timestamping both entry points removed the only thing that was ever deleting a
+backup. The old date-only naming meant a second export on one day *overwrote* the
+first — the very bug that lost data, but also, accidentally, the only pruning
+this project had. Now nothing removes a backup ever: the sole `unlink` in
+`dbBackup.js` is the partial-file cleanup, there is no cron, and nothing else
+touches `dbbackup_web/`.
+
+**Not urgent, and the numbers say so:** a dump is ~11 KB at this data size, the
+directory holds 3 files / 80 KB, the disk has 37 GB free, and `ENABLE_DB_BACKUP`
+is `false` by default. Daily backups would be a few megabytes a year.
+
+**But the retention question is sharper here than anywhere else in the project.**
+A database backup contains the `Users` table and every comment bank — far more
+than the `ImportJobs` metadata whose retention is already flagged for a decision.
+I raised that one and missed this, which is the more sensitive of the two. Both
+want the same answer at the same time: a period, or an explicit decision to keep
+for ever, written down. See `docs/future_improvements.md`.
+
 **Still true, and still worth the operator's time:** the `grep -c 'CREATE TABLE'`
 check in `docs/restore_drill.md` and the release checklist. New stubs can no
 longer be created, but **any stub already sitting in a backup directory is still
