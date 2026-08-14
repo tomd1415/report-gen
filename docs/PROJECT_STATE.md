@@ -732,6 +732,18 @@ it is a list of outstanding bugs, not approved exceptions.
 >
 > Every probe row was removed; `Users`, `Categories`, `Subjects`, `YearGroups` and
 > `Sessions` are all back to 0.
+>
+> **Re-run through `createApp()` the same day**, because the first probe built its
+> own Express app and I had *argued* — rather than checked — that helmet, CORS,
+> the real session store and the middleware order could not affect whether SQL
+> filters by `userId`. The argument was right; re-running it was still worth it,
+> because it produced a result arguing could not:
+>
+> **A logged-out request for a category that genuinely exists returns 401
+> `Unauthorized`.** Every previous check of the guard added in §6.9 used tripwire
+> mocks, where a 404 or 401 could equally mean *nothing to find*. This is the first
+> time it has been shown against a real row that really is there — which is the
+> difference between "the guard fires" and "there was nothing behind it anyway".
 
 **Fixed 2026-08-13** by adding `app.use('/api/categories', isAuthenticated)` to the
 guard block. All four now answer **401** with the guard's own body, measured; and
