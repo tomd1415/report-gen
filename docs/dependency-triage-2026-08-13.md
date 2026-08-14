@@ -98,7 +98,18 @@ hang the server with a crafted multipart body.** The `fileSize` limit does not h
 advisory is about field *names*, not file size.
 
 The second multer advisory (moderate, incomplete cleanup of aborted uploads) is on the same
-path and leaves files in `uploads/`.
+path.
+
+**Checked 2026-08-14, and the app's own cleanup is sound:** both CSV routes unlink the
+uploaded file in a `finally` with an existence check, so it is removed on success *and* on
+failure, and `uploads/` is empty — which is the evidence rather than the intention.
+
+That leaves one residual, and it is the advisory's actual subject: an upload **aborted
+mid-transfer**. Multer writes to `uploads/` before the route handler is invoked, so if the
+client disconnects the handler never runs and its `finally` never fires — the file stays.
+*(Reasoned from the control flow, not measured; testing it needs a deliberately truncated
+multipart request against a live server.)* Nothing in the app can fix that from the handler,
+which is precisely why the version bump is the fix rather than a cleanup patch.
 
 **Fix is in-range** (`>=2.2.0`), so a patch bump with no API change. This is the one item
 worth doing promptly.
