@@ -124,9 +124,24 @@ and UI helpers.
 > only part of it is how a claim outlives its evidence.
 >
 > Result: `POST /api/register` **200**, `POST /api/login` **200**,
-> `GET /api/authenticated` **200 `{authenticated:true}`** with the session
-> surviving the round trip, and a wrong password **401** — the negative control,
-> without which the other three prove only that the endpoint answers. The probe
+> `GET /api/authenticated` **200 `{authenticated:true}`**, and a wrong password
+> **401** — the negative control, without which the other three prove only that
+> the endpoint answers.
+>
+> **Correction to my own probe, same day.** That run supplied its *own in-memory*
+> `session()` middleware, so it proved `express-session` works and said nothing
+> about the real store. The app uses `connect-session-sequelize` persisting to the
+> `Sessions` table, which `createApp()` wires up — so it was re-run through
+> `createApp()` instead:
+>
+> - login → **200**, and `Sessions` rows **0 → 1**: the session really is persisted
+>   to the database, not held in memory.
+> - `GET /api/authenticated` → **200 `{authenticated:true}`**.
+> - logout → **200**, and `Sessions` rows back to **0** — logout *destroys the
+>   server-side row*, it does not merely clear the client's cookie. Nothing had
+>   verified that, and the difference matters: a cleared cookie leaves a valid
+>   session behind for anyone holding the old value.
+> - `GET /api/authenticated` after logout → **401 `{authenticated:false}`**. The probe
 > user was deleted afterwards and both `Users` and `Sessions` are back to 0.
 >
 > **This was the first thing in the fortnight to exercise the route handlers
