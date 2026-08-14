@@ -11,12 +11,14 @@
     <link rel="manifest" href="/site.webmanifest">
     <script type="module" src="site-menu.js"></script>
     <script type="module" src="page-layout.js"></script>
+    <script type="module" src="app-ui.js"></script>
 </head>
 <body>
     <div id="header-placeholder"></div>
     <div class="container bg-light-blue rounded-lg shadow-lg">
         <h1 class="main-title">Settings</h1>
         <div id="user-info">Logged in as: <span id="username"></span></div>
+        <div id="settings-status" class="status-panel" hidden></div>
 
         <section class="section">
             <h2>Select Year Groups</h2>
@@ -99,7 +101,7 @@
                     item.classList.add('checkbox-item');
                     item.innerHTML = `
                         <label>
-                            <input type="checkbox" value="${yearGroup.id}" ${isChecked ? 'checked' : ''} onchange="toggleYearGroup(${yearGroup.id}, this.checked)">
+                            <input type="checkbox" value="${yearGroup.id}" ${isChecked ? 'checked' : ''} onchange="toggleYearGroup(${yearGroup.id}, this.checked, this)">
                             ${yearGroup.name}
                         </label>
                     `;
@@ -114,7 +116,7 @@
                     item.classList.add('checkbox-item');
                     item.innerHTML = `
                         <label>
-                            <input type="checkbox" value="${subject.id}" ${isChecked ? 'checked' : ''} onchange="toggleSubject(${subject.id}, this.checked)">
+                            <input type="checkbox" value="${subject.id}" ${isChecked ? 'checked' : ''} onchange="toggleSubject(${subject.id}, this.checked, this)">
                             ${subject.name}
                         </label>
                     `;
@@ -125,7 +127,20 @@
             }
         }
 
-        async function toggleYearGroup(yearGroupId, selected) {
+        // A failed save used to be swallowed: console.error, box left ticked, and
+        // the next page load quietly showed it unticked. Report it AND put the
+        // control back, so what the teacher sees matches what is stored — one
+        // without the other is still a lie or still looks like a missed click.
+        function reportSettingsFailure(checkbox, wasSelected, what) {
+            if (checkbox) {
+                checkbox.checked = !wasSelected;
+            }
+            window.ReportGenUI?.showStatus('#settings-status',
+                `Could not save your ${what}. Nothing has changed — check your connection and try again.`,
+                { tone: 'error' });
+        }
+
+        async function toggleYearGroup(yearGroupId, selected, checkbox) {
             try {
                 const response = await fetch('/api/user-year-groups', {
                     method: 'POST',
@@ -135,12 +150,14 @@
                 if (!response.ok) {
                     throw new Error('Failed to update year group');
                 }
+                window.ReportGenUI?.clearStatus('#settings-status');
             } catch (error) {
                 console.error('Error updating year group:', error);
+                reportSettingsFailure(checkbox, selected, 'year group choice');
             }
         }
 
-        async function toggleSubject(subjectId, selected) {
+        async function toggleSubject(subjectId, selected, checkbox) {
             try {
                 const response = await fetch('/api/user-subjects', {
                     method: 'POST',
@@ -150,8 +167,10 @@
                 if (!response.ok) {
                     throw new Error('Failed to update subject');
                 }
+                window.ReportGenUI?.clearStatus('#settings-status');
             } catch (error) {
                 console.error('Error updating subject:', error);
+                reportSettingsFailure(checkbox, selected, 'subject choice');
             }
         }
 

@@ -764,3 +764,32 @@ test('admin creates and deletes a staff user, sending each to the API', async ({
   expect(sent.some((call) => call.path === '/api/users/oldteacher' && call.method === 'DELETE'))
     .toBe(true);
 });
+
+test('settings tells the teacher when a save fails, and does not lie about the state', async ({ page }) => {
+  // toggleSubject and toggleYearGroup threw on a non-ok response inside a `try`
+  // whose `catch` only called console.error. The teacher saw the box stay
+  // ticked, was told nothing, and the next page load quietly showed it unticked
+  // — visible state and stored state disagreeing in silence, which is the shape
+  // §6.20 was about on a different page.
+  //
+  // Two assertions, because either alone is insufficient: an error message that
+  // leaves the box ticked still shows the teacher a lie, and a reverted box with
+  // no message looks like the click missed.
+  await mockApis(page, {
+    writeOk: false,
+    userSettings: { userSubjects: [], userYearGroups: [] }
+  });
+
+  await page.goto('/settings.html');
+  const subject = page.locator('#subject-checkboxes input[type="checkbox"]').first();
+  await expect(subject).not.toBeChecked();
+
+  // `.click()`, not `.check()`. Playwright's check() asserts the box ends up
+  // checked and errors with "Clicking the checkbox did not change its state" —
+  // which is exactly the behaviour being tested, so using it here would make the
+  // correct outcome look like a broken test.
+  await subject.click();
+
+  await expect(page.locator('#settings-status')).toContainText(/could not|not saved|failed/i);
+  await expect(subject).not.toBeChecked();
+});

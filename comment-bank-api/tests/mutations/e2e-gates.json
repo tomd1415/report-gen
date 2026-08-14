@@ -97,6 +97,24 @@
       "expect": [
         "ui-smoke.spec.js admin creates and deletes a staff user, sending each to the API"
       ]
+    },
+    {
+      "id": "settings-failure-silent-again",
+      "file": "public/settings.html",
+      "find": "                reportSettingsFailure(checkbox, selected, 'subject choice');",
+      "replace": "",
+      "expect": [
+        "ui-smoke.spec.js settings tells the teacher when a save fails, and does not lie about the state"
+      ]
+    },
+    {
+      "id": "settings-failure-message-without-revert",
+      "file": "public/settings.html",
+      "find": "            if (checkbox) {\n                checkbox.checked = !wasSelected;\n            }",
+      "replace": "",
+      "expect": [
+        "ui-smoke.spec.js settings tells the teacher when a save fails, and does not lie about the state"
+      ]
     }
   ]
 }
