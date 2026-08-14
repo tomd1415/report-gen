@@ -440,6 +440,18 @@ pupil's name is unaffected — that name is never transmitted at all. It is the
 guarantee is weaker than the README implied.
 
 ### 6.3.3 An empty import silently wiped the comment bank — fixed (found and fixed 2026-08-06)
+
+> **Verified against real SQL, 2026-08-14.** The unit tests assert that
+> `Category.destroy` was not called *on a mock*, and the real path runs inside a
+> `sequelize.transaction` that the same mock replaces outright — so the fix that
+> stops a comment bank being wiped had never been exercised against a database.
+>
+> With a real bank of 1 category and 1 comment, and the model returning nothing
+> usable: **502** with the honest message, and the bank **intact** — 1 category, 1
+> comment still there. The `ImportJobs` row was written with `status: 'failed'`,
+> which also verifies the audit trail's failure path against real SQL for the
+> first time. Every probe row was removed afterwards.
+
 *(Heading corrected 2026-08-12. It read as a present-tense defect, with the fix
 eight paragraphs below — the §6.18 pattern, in this document. Headings are what
 get skimmed, grepped and quoted, so they have to carry the status.)*
