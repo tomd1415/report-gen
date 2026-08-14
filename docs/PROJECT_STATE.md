@@ -656,6 +656,32 @@ origin"* visits all eleven pages and fails on any off-origin request. Its
 it is a list of outstanding bugs, not approved exceptions.
 
 ### 6.9 Four `/api/categories` routes had no auth guard — fixed (found 2026-08-06, fixed 2026-08-13)
+
+> **Ownership scoping verified against real SQL, 2026-08-14.** This section and
+> `docs/TESTING.md` both warn that the ownership tests assert the `where` clause
+> *passed to a mock* — and a mock returns whatever it was told to. If the
+> association or the query were wrong, one teacher could read another's comment
+> bank and all 191 tests would still pass. That was the largest unverified
+> security claim in the project.
+>
+> Driven in-process against the real database with two logged-in users:
+>
+> | step | result |
+> |---|---|
+> | Alice creates a category | 200 |
+> | Alice reads her own | 200, with the row |
+> | **Bob reads Alice's** | **404**, no data |
+> | **Bob deletes Alice's** | **404** |
+> | the row afterwards | **still there** |
+>
+> The last line is the one that matters. A 404 with the row deleted anyway would
+> be a silent disaster, and asserting only the status would miss it — the same
+> pairing the empty-import tests use (§6.3.3): assert the refusal **and** that
+> nothing was destroyed.
+>
+> Every probe row was removed; `Users`, `Categories`, `Subjects`, `YearGroups` and
+> `Sessions` are all back to 0.
+
 **Fixed 2026-08-13** by adding `app.use('/api/categories', isAuthenticated)` to the
 guard block. All four now answer **401** with the guard's own body, measured; and
 `/api/categories-comments` was re-checked alongside them, because an
