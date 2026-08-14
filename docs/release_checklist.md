@@ -2,6 +2,12 @@
 
 Use this checklist before pulling or deploying changes on the live server.
 
+> **Every command on this page was executed on 2026-08-14**, rather than written
+> from memory — one of them was wrong (the backup check, corrected below). The two
+> exceptions, which cannot be tested from a container: `sudo systemctl restart
+> reportgen` and anything that assumes production's own database. Those remain
+> written-not-run, and are marked where they appear.
+
 ## Before Pulling
 
 - Confirm a recent database backup exists **and contains tables**. Its existence
