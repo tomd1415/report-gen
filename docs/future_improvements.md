@@ -104,6 +104,14 @@ For the prioritised roadmap, see `docs/future_improvements_plan.md`.
   audit log" with no retention answer is how a small table becomes a
   data-protection question two years later. Decide a period and add a prune, or
   decide explicitly to keep for ever and write that down.
+- `2026-08-14`: **`ImportJobs` blocks deleting a subject that has import history —
+  a regression I introduced.** The table foreign-keys `subjectId`, `yearGroupId`
+  and both user columns, so `DELETE /api/subjects/:id` now answers **500** once any
+  import references that subject, and the subject survives. Measured against the
+  real admin route; the mocked suite cannot see it because no foreign key is ever
+  enforced. Fix: `ON DELETE SET NULL` on `subjectId`/`yearGroupId` — both are
+  already nullable, and it keeps the audit row, which `CASCADE` would destroy.
+  `docs/PROJECT_STATE.md` §6.6.
 - `2026-08-13`: **The audit trail does not cover deletions or CSV imports.**
   §6.6's original concern was admin/destructive actions generally; what was built
   covers the AI-report import paths. Deleting a shared subject or year group still

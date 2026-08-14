@@ -606,6 +606,30 @@ to prove the assertion bites.
    visibility call while the comment said "BEFORE". Fixed rather than left, which
    is §6.18's whole lesson.
 
+**A REGRESSION THIS TABLE INTRODUCED, found 2026-08-14 and not yet fixed.**
+`ImportJobs` foreign-keys `subjectId` → `Subjects`, `yearGroupId` → `YearGroups`
+and both user columns → `Users`. So **once any import references a subject, an
+admin can no longer delete it**: the route answers **500 "Error deleting subject"**
+and the subject stays. Measured against the real admin route, not inferred —
+deleting a subject with no import history still works, and the same subject after
+one import does not.
+
+Nothing in the suite could catch this: all 191 unit tests mock the models, so no
+foreign key is ever enforced. I found it because a probe's own cleanup failed with
+`ImportJobs_ibfk_3`.
+
+It is worse than the pre-existing concern this section already recorded. Deletion
+used to rely on cascade behaviour without a clear warning; it now fails outright,
+with a generic 500 that says nothing about why.
+
+**The fix is small and the column types already point at it:** `subjectId` and
+`yearGroupId` are `allowNull: true`, so `ON DELETE SET NULL` keeps the audit row
+and lets the delete proceed — the row still records who imported what for whom,
+which is the point of the table. `CASCADE` would be wrong, because it would
+delete the audit trail as a side effect of an admin tidying up a subject list.
+A caught FK error returning a clear 409 is the alternative if the reference is
+judged worth preserving.
+
 **Still not covered by this table:** deletion of shared subjects/year-groups,
 which was the other half of this section's original concern, and CSV imports
 (`source` exists to distinguish them, but only the AI-report paths write rows so
